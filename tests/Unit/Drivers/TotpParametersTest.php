@@ -11,10 +11,6 @@ use SineMacula\Laravel\Mfa\Drivers\TotpParameters;
 use Tests\Fixtures\Factors\TotpStubFactor;
 
 /**
- * Unit tests for `TotpParameters`: the RFC 6238 Appendix B test vectors for
- * each algorithm, the time step a moment falls in, the length of a new secret,
- * the bounds, and the parameters read from a factor.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -31,8 +27,7 @@ final class TotpParametersTest extends TestCase
     ];
 
     /**
-     * Rows of `[algorithm, time, code]`: RFC 6238 Appendix B, 8 digits and a
-     * 30-second period.
+     * RFC 6238 Appendix B, 8 digits and a 30-second period.
      *
      * @return iterable<string, array{string, int, string}>
      */
@@ -55,8 +50,6 @@ final class TotpParametersTest extends TestCase
     }
 
     /**
-     * The code for the time step a moment falls in is the published one.
-     *
      * @param  string  $algorithm
      * @param  int  $time
      * @param  string  $code
@@ -71,9 +64,6 @@ final class TotpParametersTest extends TestCase
     }
 
     /**
-     * A shorter code is the low digits of the same value, zero-padded to its
-     * length.
-     *
      * @return void
      */
     public function testAShorterCodeKeepsItsLeadingZeros(): void
@@ -86,8 +76,6 @@ final class TotpParametersTest extends TestCase
     }
 
     /**
-     * A moment falls in the step of whole periods since the epoch.
-     *
      * @return void
      */
     public function testAMomentFallsInItsStep(): void
@@ -101,7 +89,7 @@ final class TotpParametersTest extends TestCase
     }
 
     /**
-     * A new secret is as long as the algorithm's output, never under 160 bits.
+     * Never under 160 bits.
      *
      * @return void
      */
@@ -113,7 +101,7 @@ final class TotpParametersTest extends TestCase
     }
 
     /**
-     * Rows of `[algorithm, digits, period]` just outside the bounds.
+     * Just outside the bounds.
      *
      * @return iterable<string, array{string, int, int}>
      */
@@ -128,9 +116,6 @@ final class TotpParametersTest extends TestCase
     }
 
     /**
-     * Parameters outside the bounds are refused, and none are read from a
-     * factor that holds them.
-     *
      * @param  string  $algorithm
      * @param  int  $digits
      * @param  int  $period
@@ -148,8 +133,6 @@ final class TotpParametersTest extends TestCase
     }
 
     /**
-     * The bounds themselves are allowed.
-     *
      * @return void
      */
     public function testAllowsTheBounds(): void
@@ -162,9 +145,6 @@ final class TotpParametersTest extends TestCase
     }
 
     /**
-     * A factor's parameters are read as it holds them, and none are read from a
-     * factor missing any of them.
-     *
      * @return void
      */
     public function testReadsTheParametersAFactorHolds(): void

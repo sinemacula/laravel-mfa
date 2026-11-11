@@ -15,11 +15,6 @@ use Tests\Fixtures\Drivers\HeaderApplicationResolver;
 use Tests\TestCase;
 
 /**
- * Tests for `RequestApplication`: the application a request is for through a
- * guard is the guard's name, or what a bound resolver names, through the guard
- * when it is a guard application resolver; and a caller and a sign-in on the
- * same guard name the same one.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -29,8 +24,6 @@ use Tests\TestCase;
 final class RequestApplicationTest extends TestCase
 {
     /**
-     * Without a resolver, the application is the guard's name.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -41,9 +34,6 @@ final class RequestApplicationTest extends TestCase
     }
 
     /**
-     * A resolver that knows no guard names the request's application whatever
-     * the guard.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -56,9 +46,6 @@ final class RequestApplicationTest extends TestCase
     }
 
     /**
-     * A guard application resolver is asked through the guard, and its answer
-     * without one is not used.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -72,10 +59,8 @@ final class RequestApplicationTest extends TestCase
     }
 
     /**
-     * The caller of a request through a guard and a sign-in on that guard name
-     * the same application, with each kind of resolver and with none, so a
-     * proof begun at sign-in is bound to the application its caller is served
-     * on.
+     * So a proof begun at sign-in is bound to the application its caller is
+     * served on.
      *
      * @return void
      *

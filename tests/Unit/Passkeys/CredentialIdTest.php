@@ -10,10 +10,6 @@ use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Passkeys\CredentialId;
 
 /**
- * Unit tests for `CredentialId`: a credential id is its canonical unpadded
- * base64url form, compared exactly, and every other encoding of the same bytes
- * is refused.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -23,8 +19,6 @@ use SineMacula\Laravel\Mfa\Passkeys\CredentialId;
 final class CredentialIdTest extends TestCase
 {
     /**
-     * A canonical id is kept as it is, and is canonical.
-     *
      * @return void
      */
     public function testACanonicalIdIsKept(): void
@@ -35,9 +29,6 @@ final class CredentialIdTest extends TestCase
     }
 
     /**
-     * The encoding is unpadded base64url, and the digest is the SHA-256 hex of
-     * the canonical string.
-     *
      * @return void
      */
     public function testEncodesAndHashesTheCanonicalForm(): void
@@ -48,8 +39,6 @@ final class CredentialIdTest extends TestCase
     }
 
     /**
-     * Rows of an id that is not canonical.
-     *
      * @return iterable<string, array{string}>
      */
     public static function nonCanonical(): iterable
@@ -64,8 +53,6 @@ final class CredentialIdTest extends TestCase
     }
 
     /**
-     * An id in any other encoding is refused, and is not canonical.
-     *
      * @param  string  $credentialId
      * @return void
      */
@@ -81,8 +68,6 @@ final class CredentialIdTest extends TestCase
     }
 
     /**
-     * An id of exactly 1023 bytes is canonical.
-     *
      * @return void
      */
     public function testTheLongestIdIsCanonical(): void
@@ -91,8 +76,7 @@ final class CredentialIdTest extends TestCase
     }
 
     /**
-     * An id of a single byte, two characters that decode only with no padding
-     * or with all of it, is canonical.
+     * Its two characters decode only with no padding or with all of it.
      *
      * @return void
      */

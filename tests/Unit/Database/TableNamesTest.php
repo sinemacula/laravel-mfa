@@ -11,9 +11,6 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
 use Tests\TestCase;
 
 /**
- * Unit tests for `TableNames`: every table the package creates, its setting and
- * its `mfa_` default.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -23,7 +20,7 @@ use Tests\TestCase;
 final class TableNamesTest extends TestCase
 {
     /**
-     * Every table, by block, with its default name, so a renamed table fails.
+     * A renamed table fails here.
      *
      * @return void
      */
@@ -41,8 +38,6 @@ final class TableNamesTest extends TestCase
     }
 
     /**
-     * A table's setting is in its block.
-     *
      * @return void
      */
     public function testATablesSettingIsInItsBlock(): void
@@ -51,9 +46,6 @@ final class TableNamesTest extends TestCase
     }
 
     /**
-     * The configured name wins; a blank, missing or malformed one takes the
-     * default.
-     *
      * @return void
      */
     public function testTheConfiguredNameWinsOverTheDefault(): void
@@ -72,8 +64,6 @@ final class TableNamesTest extends TestCase
     }
 
     /**
-     * Before the configuration is bootstrapped, the default is read.
-     *
      * @return void
      */
     public function testBeforeTheConfigurationTheDefaultIsRead(): void
@@ -94,8 +84,6 @@ final class TableNamesTest extends TestCase
     }
 
     /**
-     * A block the package creates no table for is refused.
-     *
      * @return void
      */
     public function testABlockWithoutATableIsRefused(): void

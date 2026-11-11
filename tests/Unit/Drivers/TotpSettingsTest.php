@@ -11,9 +11,6 @@ use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Drivers\TotpSettings;
 
 /**
- * Unit tests for `TotpSettings`: each setting's default, the bounds it accepts,
- * and the message a value past them fails with.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -35,11 +32,7 @@ final class TotpSettingsTest extends TestCase
     }
 
     /**
-     * Each setting takes its default (within its bounds) when unset, reads
-     * either bound as an integer or the digit string `env()` returns, and
-     * refuses a value past either bound, or one that is not an integer, naming
-     * the key and its bounds, both as it is read and when every setting is
-     * validated.
+     * A bound reads as an integer or as the digit string `env()` returns.
      *
      * @param  string  $key
      * @param  \Closure(\SineMacula\Laravel\Mfa\Drivers\TotpSettings): int  $read
@@ -76,8 +69,6 @@ final class TotpSettingsTest extends TestCase
     }
 
     /**
-     * The defaults validate.
-     *
      * @return void
      */
     public function testTheDefaultsValidate(): void
@@ -88,10 +79,6 @@ final class TotpSettingsTest extends TestCase
     }
 
     /**
-     * The algorithm defaults to `sha1`, reads each RFC 6238 algorithm, and
-     * refuses any other value naming the key, as it is read and when every
-     * setting is validated.
-     *
      * @return void
      */
     public function testTheAlgorithmIsOneOfTheRfcAlgorithms(): void
@@ -119,9 +106,6 @@ final class TotpSettingsTest extends TestCase
     }
 
     /**
-     * The parameters of a new enrolment are the configured algorithm, digits
-     * and period, and fail closed on a value out of bounds.
-     *
      * @return void
      */
     public function testTheParametersOfANewEnrollmentAreTheConfiguredOnes(): void
@@ -141,10 +125,7 @@ final class TotpSettingsTest extends TestCase
     }
 
     /**
-     * The issuer is the configured one, or the application's name without one;
-     * one that is not a non-empty string is refused, as it is read and when
-     * every setting is validated, and nothing to show at all is refused only
-     * when it is read.
+     * Nothing to show at all is refused only when read, not when validated.
      *
      * @return void
      */
@@ -174,10 +155,6 @@ final class TotpSettingsTest extends TestCase
     }
 
     /**
-     * An application's window is its own `totp_window`, and the package-wide
-     * one when it sets none or is not configured; one out of bounds is refused,
-     * naming the application's key.
-     *
      * @return void
      */
     public function testTheWindowOfAnApplicationIsItsOwn(): void
@@ -202,8 +179,6 @@ final class TotpSettingsTest extends TestCase
     }
 
     /**
-     * Build the settings over an `mfa.totp` block.
-     *
      * @param  array<string, mixed>  $block
      * @return \SineMacula\Laravel\Mfa\Drivers\TotpSettings
      */

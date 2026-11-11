@@ -16,10 +16,6 @@ use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 use Tests\TestCase;
 
 /**
- * Tests for `ContextBindings`: no pending sessions and the identity contract's
- * subject type are the defaults, built afresh, and an application may rebind
- * either.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -29,8 +25,6 @@ use Tests\TestCase;
 final class ContextBindingsTest extends TestCase
 {
     /**
-     * Rows of a seam and its default.
-     *
      * @return iterable<string, array{class-string, class-string}>
      */
     public static function seams(): iterable
@@ -41,9 +35,6 @@ final class ContextBindingsTest extends TestCase
     }
 
     /**
-     * Each seam is bound to its default, built afresh, and a binding of the
-     * application's own replaces it.
-     *
      * @param  class-string  $seam
      * @param  class-string  $default
      * @return void

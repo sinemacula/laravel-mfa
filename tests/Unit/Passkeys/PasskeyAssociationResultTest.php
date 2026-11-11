@@ -12,9 +12,6 @@ use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociationResult;
 use Tests\Fixtures\Verification\Dumps;
 
 /**
- * Unit tests for `PasskeyAssociationResult`: an association on an active
- * session carries what the transition returned, hidden from every dump.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -24,8 +21,6 @@ use Tests\Fixtures\Verification\Dumps;
 final class PasskeyAssociationResultTest extends TestCase
 {
     /**
-     * The result returns its completion as given, and none by default.
-     *
      * @return void
      */
     public function testCarriesTheCompletion(): void
@@ -37,8 +32,6 @@ final class PasskeyAssociationResultTest extends TestCase
     }
 
     /**
-     * No way of dumping it shows the completion.
-     *
      * @return void
      */
     public function testNoDumpShowsTheCompletion(): void
@@ -59,8 +52,6 @@ final class PasskeyAssociationResultTest extends TestCase
     }
 
     /**
-     * A confirmed TOTP factor.
-     *
      * @return \SineMacula\Laravel\Mfa\Factors\FactorSummary
      */
     private static function factor(): FactorSummary

@@ -25,9 +25,6 @@ use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\TestCase;
 
 /**
- * Tests for `CallerContext`: who an action is served to, built from plain
- * values or, at the one edge that reads a request, from the request.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -38,9 +35,6 @@ use Tests\TestCase;
 final class CallerContextTest extends TestCase
 {
     /**
-     * An identity on an active session carries no pending session, and an
-     * unknown client when none is given.
-     *
      * @return void
      */
     public function testAnIdentityOnAnActiveSession(): void
@@ -55,8 +49,6 @@ final class CallerContextTest extends TestCase
     }
 
     /**
-     * A pending session is its own identity's, on its own application.
-     *
      * @return void
      */
     public function testAPendingSessionIsItsOwnIdentitysOnItsOwnApplication(): void
@@ -72,8 +64,6 @@ final class CallerContextTest extends TestCase
     }
 
     /**
-     * Nobody carries no identity, on the application.
-     *
      * @return void
      */
     public function testNobody(): void
@@ -86,8 +76,6 @@ final class CallerContextTest extends TestCase
     }
 
     /**
-     * A blank application is refused.
-     *
      * @return void
      */
     public function testABlankApplicationIsRefused(): void
@@ -98,8 +86,6 @@ final class CallerContextTest extends TestCase
     }
 
     /**
-     * A request's pending session is its caller, ahead of the guard's user.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -119,9 +105,6 @@ final class CallerContextTest extends TestCase
     }
 
     /**
-     * An invalid pending credential is refused, never served as the guard's
-     * user.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -137,9 +120,6 @@ final class CallerContextTest extends TestCase
     }
 
     /**
-     * Without a pending session, the caller is the named guard's user, on the
-     * guard's own application.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -166,8 +146,6 @@ final class CallerContextTest extends TestCase
     }
 
     /**
-     * A bound application resolver names the application for the request.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -185,9 +163,6 @@ final class CallerContextTest extends TestCase
     }
 
     /**
-     * A bound guard application resolver names the application through the
-     * guard the caller is built through, or the default one.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -203,8 +178,6 @@ final class CallerContextTest extends TestCase
     }
 
     /**
-     * A guest, or a user this package does not serve, is nobody.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -219,8 +192,6 @@ final class CallerContextTest extends TestCase
     }
 
     /**
-     * A caller served gives back the context it was served from.
-     *
      * @return void
      */
     public function testACallerGivesBackItsContext(): void

@@ -9,26 +9,9 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Holds the package's namespaces to the dependency rules its design states:
- * which classes may not name which others. Each rule is data in `RULES`, so a
- * change that moves a class or narrows a dependency adds or tightens a rule
- * there. A rule applies to the classes in its `from` namespaces or classes (`*`
- * for every class of the package) except those in `except`, and forbids them to
- * name anything in its `forbids` namespaces or classes (`*` for the whole
- * package) except what `allows` lists; every name is relative to the package.
- *
- * A class names another through an import (`use`, grouped or aliased), a
- * qualified or fully qualified name in its code, or a fully qualified type in a
- * docblock. Names resolve as PHP resolves them, without regard to case, and a
- * qualified name only through a class or namespace import. The source is
- * tokenised, not parsed, so a name built at run time (a class name in a string,
- * say) and an unqualified name of a class in the same namespace are not seen:
- * the test is a backstop for the rules, not a proof of them.
- *
- * Two rules are about suffixes and calls rather than namespaces: only the
- * service provider names a capability's bindings class, so the provider is the
- * one composition root; and only the event dispatcher reaches Laravel's, so
- * every event the package dispatches goes through it, after the storage commit.
+ * Holds the package to the dependency rules in `RULES`. The source is
+ * tokenised, not parsed, so a name built at run time or an unqualified
+ * same-namespace name is unseen.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -61,7 +44,7 @@ final class NamespaceDependenciesTest extends TestCase
         'Proofs\ProofBindings'   => 'registers listeners for Laravel\'s Login, Logout and CurrentDeviceLogout events and dispatches nothing',
     ];
 
-    /** @var array<string, array{from: non-empty-list<string>, except: list<string>, forbids: non-empty-list<string>, allows: list<string>}> The rules, by what each holds. */
+    /** @var array<string, array{from: non-empty-list<string>, except: list<string>, forbids: non-empty-list<string>, allows: list<string>}> `from` less `except` may not name `forbids` less `allows`; `*` is the whole package. */
     private const array RULES = [
         'enums name nothing else of the package' => [
             'from'    => ['Enums'],
@@ -170,8 +153,6 @@ final class NamespaceDependenciesTest extends TestCase
     private static ?array $sources = null;
 
     /**
-     * Rows of `[from, except, forbids, allows]`: each rule.
-     *
      * @return iterable<string, array{0: list<string>, 1: list<string>, 2: list<string>, 3: list<string>}>
      */
     public static function provideRules(): iterable
@@ -182,8 +163,6 @@ final class NamespaceDependenciesTest extends TestCase
     }
 
     /**
-     * No class a rule applies to names anything it forbids.
-     *
      * @param  list<string>  $from
      * @param  list<string>  $except
      * @param  list<string>  $forbids
@@ -197,8 +176,7 @@ final class NamespaceDependenciesTest extends TestCase
     }
 
     /**
-     * Every namespace or class a rule names has a class in it, so a rule left
-     * behind by a move fails rather than holding over nothing.
+     * A rule left behind by a move fails rather than holding over nothing.
      *
      * @param  list<string>  $from
      * @param  list<string>  $except
@@ -217,10 +195,8 @@ final class NamespaceDependenciesTest extends TestCase
     }
 
     /**
-     * Only the service provider names a capability's bindings class, a package
-     * class whose name ends in `Bindings`, so the provider is the one place the
-     * package is composed; the suffix, not a list, decides, so a new
-     * capability's bindings class is held without a change here.
+     * The `Bindings` suffix decides, so a new capability's bindings class is
+     * held without a change here.
      *
      * @return void
      */
@@ -248,11 +224,7 @@ final class NamespaceDependenciesTest extends TestCase
     }
 
     /**
-     * Only the event dispatcher reaches Laravel's: outside the exempted
-     * classes, none names Laravel's dispatcher, by its contract, its class, its
-     * facade or the `Dispatchable` trait, resolves it by its container key, or
-     * calls the `event()` helper, so every event the package dispatches goes
-     * through `Events\EventDispatcher`.
+     * Every event the package dispatches goes through `Events\EventDispatcher`.
      *
      * @return void
      */
@@ -275,9 +247,7 @@ final class NamespaceDependenciesTest extends TestCase
     }
 
     /**
-     * Each class exempted from the dispatcher rule exists and reaches Laravel's
-     * dispatcher, so an exemption left behind by a change fails rather than
-     * excusing nothing.
+     * An exemption left behind by a change fails rather than excusing nothing.
      *
      * @return void
      */
@@ -289,9 +259,6 @@ final class NamespaceDependenciesTest extends TestCase
     }
 
     /**
-     * Rows of `[code, reaches]`: a way of reaching Laravel's dispatcher, or of
-     * not reaching it, and what the scanner finds in it.
-     *
      * @return iterable<string, array{0: string, 1: list<string>}>
      */
     public static function provideDispatcherReaches(): iterable
@@ -320,13 +287,6 @@ final class NamespaceDependenciesTest extends TestCase
     }
 
     /**
-     * The scanner finds Laravel's dispatcher however a class reaches it:
-     * imported alone, aliased or grouped, through its facade or the
-     * `Dispatchable` trait, fully qualified in code or in a docblock, by its
-     * container key in either quotes, or by a call of the `event()` helper,
-     * unqualified or fully qualified; and nothing for a method named `event`,
-     * called or declared, another string, or another name of Laravel's events.
-     *
      * @param  string  $code
      * @param  list<string>  $reaches
      * @return void
@@ -340,12 +300,6 @@ final class NamespaceDependenciesTest extends TestCase
     }
 
     /**
-     * The scanner finds a package name however a class names it: imported
-     * alone, aliased, grouped, as a function or a constant (alone or within a
-     * group), through an alias or relative to its namespace, fully qualified in
-     * code or in a docblock; and nothing for an unqualified name, a closure's
-     * `use`, or a name outside the package.
-     *
      * @return void
      */
     public function testTheScannerFindsEveryWayOfNamingAClass(): void
@@ -411,11 +365,6 @@ final class NamespaceDependenciesTest extends TestCase
     }
 
     /**
-     * The scanner reads the imports of a bracketed namespace as imports, gives
-     * each namespace its own aliases, reads a closure's `use` at the top of a
-     * namespace as code, and resolves names in the global namespace from its
-     * root.
-     *
      * @return void
      */
     public function testTheScannerReadsEachBracketedNamespaceOnItsOwn(): void
@@ -461,12 +410,6 @@ final class NamespaceDependenciesTest extends TestCase
     }
 
     /**
-     * A qualified name resolves through the class or namespace import its first
-     * segment names, whatever its case, and not through a function's or a
-     * constant's import of the same name, alone or within a group; a rule
-     * catches a forbidden name whatever its case, fully qualified in code or in
-     * a docblock.
-     *
      * @return void
      */
     public function testTheScannerResolvesAQualifiedNameAsPhpDoes(): void
@@ -560,8 +503,7 @@ final class NamespaceDependenciesTest extends TestCase
     }
 
     /**
-     * Every class of the package and the package names it names, relative to
-     * the package.
+     * Every class and the package names it names, relative to the package.
      *
      * @return array<string, list<string>>
      */
@@ -571,8 +513,7 @@ final class NamespaceDependenciesTest extends TestCase
     }
 
     /**
-     * Every class of the package and every name it names, fully qualified, read
-     * once.
+     * Every class and every name it names, fully qualified, read once.
      *
      * @return array<string, list<string>>
      */
@@ -595,8 +536,7 @@ final class NamespaceDependenciesTest extends TestCase
     }
 
     /**
-     * Every class of the package and its source, by its name relative to the
-     * package, read once.
+     * Every class's source by its name relative to the package, read once.
      *
      * @return array<string, string>
      */
@@ -629,10 +569,8 @@ final class NamespaceDependenciesTest extends TestCase
     }
 
     /**
-     * How the source reaches Laravel's dispatcher: each of its names it names,
-     * in the order of `DISPATCHERS`, then, in the order they appear, `event()`
-     * for each call of the helper and `'events'` for each use of its container
-     * key.
+     * Each dispatcher name in `DISPATCHERS` order, then `event()` and
+     * `'events'` in the order they appear.
      *
      * @param  string  $source
      * @return list<string>
@@ -658,7 +596,6 @@ final class NamespaceDependenciesTest extends TestCase
     }
 
     /**
-     * How the token at the index reaches Laravel's dispatcher, if it does:
      * `event()` for a call of the helper, or the quoted container key.
      *
      * @param  list<array{0: int, 1: string, 2: int}|string>  $tokens
@@ -679,8 +616,7 @@ final class NamespaceDependenciesTest extends TestCase
     }
 
     /**
-     * Whether the token is the dispatcher's container key as a string literal,
-     * in single or double quotes.
+     * The container key as a string literal in either quotes.
      *
      * @param  array{0: int, 1: string, 2: int}|string  $token
      * @return bool
@@ -693,9 +629,8 @@ final class NamespaceDependenciesTest extends TestCase
     }
 
     /**
-     * Whether the token at the index calls the global `event()` helper: the
-     * name `event`, unqualified or fully qualified, followed by `(`, and not a
-     * method called through `->`, `?->` or `::` or a function being declared.
+     * The name `event`, unqualified or fully qualified, then `(`, and not a
+     * method call or a declaration.
      *
      * @param  list<array{0: int, 1: string, 2: int}|string>  $tokens
      * @param  int  $index
@@ -721,12 +656,8 @@ final class NamespaceDependenciesTest extends TestCase
     }
 
     /**
-     * The distinct names the source names, fully qualified.
-     *
-     * An import is read as one statement, so its names are not read again as
-     * names in code; each namespace's body, whether it ends at the next
-     * `namespace` or at its closing brace, has its own aliases. The names of a
-     * trait's or a closure's `use` are read as names in code.
+     * Fully qualified. An import is read as one statement, each namespace body
+     * has its own aliases, and a trait's or closure's `use` is read as code.
      *
      * @param  string  $source
      * @return list<string>
@@ -763,8 +694,8 @@ final class NamespaceDependenciesTest extends TestCase
     }
 
     /**
-     * The namespace declared at the index, the depth of the braces its imports
-     * sit in, and the index of its last token before its body.
+     * The namespace, the brace depth of its imports and its last token before
+     * its body.
      *
      * @param  list<array{0: int, 1: string, 2: int}|string>  $tokens
      * @param  list<int>  $depths
@@ -780,9 +711,7 @@ final class NamespaceDependenciesTest extends TestCase
     }
 
     /**
-     * Whether the `use` at the index is an import: one directly in the
-     * namespace's body, not a trait's in a class or a closure's after its
-     * parameters.
+     * A `use` directly in the namespace's body, not a trait's or a closure's.
      *
      * @param  list<array{0: int, 1: string, 2: int}|string>  $tokens
      * @param  list<int>  $depths
@@ -796,7 +725,7 @@ final class NamespaceDependenciesTest extends TestCase
     }
 
     /**
-     * The source's tokens, without whitespace and plain comments.
+     * Without whitespace and plain comments.
      *
      * @param  string  $source
      * @return list<array{0: int, 1: string, 2: int}|string>
@@ -834,8 +763,7 @@ final class NamespaceDependenciesTest extends TestCase
     }
 
     /**
-     * The import statement that starts at the index, as text without its
-     * whitespace, and the index of its `;`.
+     * As text without whitespace, with the index of its `;`.
      *
      * @param  list<array{0: int, 1: string, 2: int}|string>  $tokens
      * @param  int  $index
@@ -853,8 +781,7 @@ final class NamespaceDependenciesTest extends TestCase
     }
 
     /**
-     * The text of the token, with a space around `as` and after `function` or
-     * `const`, the words an import statement may hold.
+     * With a space around `as` and after `function` or `const`.
      *
      * @param  array{0: int, 1: string, 2: int}|string  $token
      * @return string
@@ -873,10 +800,8 @@ final class NamespaceDependenciesTest extends TestCase
     }
 
     /**
-     * The names an import statement imports, recording the alias each class or
-     * namespace import gives by its lower case. A qualified name resolves only
-     * through those, without regard to case: a function's or a constant's
-     * import of the same name is kept apart from them.
+     * Records each class or namespace import's alias by its lower case;
+     * function and constant imports stay apart.
      *
      * @param  string  $statement
      * @param  array<string, string>  $aliases
@@ -915,10 +840,9 @@ final class NamespaceDependenciesTest extends TestCase
     }
 
     /**
-     * What the import imports, `function`, `const` or `''` for a class or a
-     * namespace, and the import without the word that gives it: a whole
-     * statement's, or one member's of a group, which imports what its statement
-     * does unless it gives its own.
+     * `function`, `const` or `''` for a class or namespace, and the import
+     * without that word; a group member takes its statement's kind unless it
+     * gives its own.
      *
      * @param  string  $import
      * @param  string  $kind
@@ -934,9 +858,8 @@ final class NamespaceDependenciesTest extends TestCase
     }
 
     /**
-     * The fully qualified name a name token stands for: a qualified name
-     * through the alias its first segment names, whatever its case, or else
-     * relative to the namespace; `null` for any other token.
+     * Through the alias its first segment names, whatever its case, or relative
+     * to the namespace; `null` for any other token.
      *
      * @param  int  $id
      * @param  string  $text
@@ -966,8 +889,6 @@ final class NamespaceDependenciesTest extends TestCase
     }
 
     /**
-     * The fully qualified names a docblock gives.
-     *
      * @param  string  $docblock
      * @return list<string>
      */
@@ -979,8 +900,7 @@ final class NamespaceDependenciesTest extends TestCase
     }
 
     /**
-     * Whether the name is one of the namespaces or classes, or inside one of
-     * them, without regard to case; `*` stands for the whole package.
+     * Case-insensitive; `*` stands for the whole package.
      *
      * @param  string  $name
      * @param  list<string>  $scopes

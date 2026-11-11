@@ -10,9 +10,6 @@ use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Context\ClientContext;
 
 /**
- * Unit tests for `ClientContext`: the client's address and user agent, and the
- * facts a same-site check reads, as a request gives them, or nothing known.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -22,8 +19,6 @@ use SineMacula\Laravel\Mfa\Context\ClientContext;
 final class ClientContextTest extends TestCase
 {
     /**
-     * A request gives the client's address and user agent.
-     *
      * @return void
      */
     public function testARequestGivesItsAddressAndUserAgent(): void
@@ -35,8 +30,6 @@ final class ClientContextTest extends TestCase
     }
 
     /**
-     * An unknown client knows neither.
-     *
      * @return void
      */
     public function testAnUnknownClientKnowsNothing(): void
@@ -52,9 +45,7 @@ final class ClientContextTest extends TestCase
     }
 
     /**
-     * A request gives its `Origin` as sent, its scheme and host, and the names
-     * of the headers whose first value is not empty, a `0` counting; never
-     * their values.
+     * Header names only, never their values; a `0` counts as not empty.
      *
      * @return void
      */
@@ -81,9 +72,6 @@ final class ClientContextTest extends TestCase
     }
 
     /**
-     * A request without an `Origin` gives none, and one whose host the request
-     * refuses gives no scheme and host.
-     *
      * @return void
      */
     public function testARequestWithoutAnOriginOrWithABadHostGivesNeither(): void
@@ -97,9 +85,8 @@ final class ClientContextTest extends TestCase
     }
 
     /**
-     * Header names given to the constructor are kept as a request's are:
-     * lower-cased, underscores read as hyphens, once each, and only those that
-     * are HTTP tokens.
+     * Lower-cased, underscores read as hyphens, once each, and only HTTP
+     * tokens.
      *
      * @return void
      */
@@ -113,9 +100,8 @@ final class ClientContextTest extends TestCase
     }
 
     /**
-     * An origin, or a scheme and host, is kept only when it is 1 to 512
-     * printable ASCII characters with no spaces, as an authentication layer's
-     * own client context keeps it.
+     * 1 to 512 printable ASCII characters with no spaces, as an authentication
+     * layer's client context keeps it.
      *
      * @return void
      */

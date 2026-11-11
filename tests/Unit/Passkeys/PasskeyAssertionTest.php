@@ -10,8 +10,6 @@ use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion;
 
 /**
- * Unit tests for `PasskeyAssertion`.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -21,8 +19,6 @@ use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion;
 final class PasskeyAssertionTest extends TestCase
 {
     /**
-     * The assertion holds the credential and what it observed.
-     *
      * @return void
      */
     public function testHoldsTheCredentialAndWhatItObserved(): void
@@ -36,8 +32,6 @@ final class PasskeyAssertionTest extends TestCase
     }
 
     /**
-     * A blank credential id is refused.
-     *
      * @return void
      */
     public function testRefusesABlankCredentialId(): void

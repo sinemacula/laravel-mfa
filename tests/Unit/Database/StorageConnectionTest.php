@@ -17,9 +17,6 @@ use Tests\Fixtures\Factors\SecondaryConnectionFactor;
 use Tests\TestCase;
 
 /**
- * Unit tests for `StorageConnection`: the connection setting, how a model's
- * connection is named, and the refusal of a model on another connection.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -29,9 +26,6 @@ use Tests\TestCase;
 final class StorageConnectionTest extends TestCase
 {
     /**
-     * Without a setting, or with an empty one, the tables live on the default
-     * connection.
-     *
      * @return void
      */
     public function testNamesNoConnectionWhenTheSettingIsUnsetOrEmpty(): void
@@ -48,8 +42,6 @@ final class StorageConnectionTest extends TestCase
     }
 
     /**
-     * A configured name is the storage connection.
-     *
      * @return void
      */
     public function testNamesTheConfiguredConnection(): void
@@ -73,9 +65,6 @@ final class StorageConnectionTest extends TestCase
     }
 
     /**
-     * A malformed setting fails closed rather than falling back to another
-     * connection.
-     *
      * @param  mixed  $setting
      * @return void
      */
@@ -95,9 +84,8 @@ final class StorageConnectionTest extends TestCase
     }
 
     /**
-     * A shipped model is built on the storage connection by name, the default
-     * one included, and on the default connection before the configuration is
-     * bootstrapped.
+     * Before the configuration is bootstrapped, it is built on the default
+     * connection.
      *
      * @return void
      */
@@ -127,8 +115,6 @@ final class StorageConnectionTest extends TestCase
     }
 
     /**
-     * A model's connection is its own, or the default one when it names none.
-     *
      * @return void
      */
     public function testNamesAModelsConnection(): void
@@ -138,9 +124,6 @@ final class StorageConnectionTest extends TestCase
     }
 
     /**
-     * A model on the storage connection passes, whether the connection is named
-     * or the default one.
-     *
      * @return void
      */
     public function testAcceptsAModelOnTheStorageConnection(): void
@@ -156,9 +139,6 @@ final class StorageConnectionTest extends TestCase
     }
 
     /**
-     * A model on another connection is refused, naming the setting, the model
-     * and both connections.
-     *
      * @return void
      */
     public function testRefusesAModelOnAnotherConnection(): void
@@ -173,8 +153,7 @@ final class StorageConnectionTest extends TestCase
     }
 
     /**
-     * Register the `secondary` connection the tests name, so the migrations
-     * rolled back when the application is destroyed find it.
+     * The migrations rolled back on teardown need the `secondary` connection.
      *
      * @param  mixed  $app
      * @return void

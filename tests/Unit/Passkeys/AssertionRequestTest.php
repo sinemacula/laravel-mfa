@@ -10,9 +10,6 @@ use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Passkeys\AssertionRequest;
 
 /**
- * Tests for `AssertionRequest`: started with its options, or refused with its
- * reason, told apart by the reason and never by an empty payload.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -22,8 +19,6 @@ use SineMacula\Laravel\Mfa\Passkeys\AssertionRequest;
 final class AssertionRequestTest extends TestCase
 {
     /**
-     * A started request holds its options, and no reason.
-     *
      * @return void
      */
     public function testStartedHoldsTheOptions(): void
@@ -36,8 +31,6 @@ final class AssertionRequestTest extends TestCase
     }
 
     /**
-     * A refused request holds its reason, and no options.
-     *
      * @return void
      */
     public function testRefusedHoldsTheReason(): void
@@ -50,8 +43,6 @@ final class AssertionRequestTest extends TestCase
     }
 
     /**
-     * A gateway that answers with no options has still started the ceremony.
-     *
      * @return void
      */
     public function testAnEmptyAnswerIsStillStarted(): void

@@ -26,11 +26,6 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * Unit tests for `OperationGuard`, the guard every operation on an identity's
- * factors starts with: the matrix of what it refuses (a machine, an inactive
- * identity, another identity's factor, a pending factor, a type the application
- * does not enable), in its order, and what it lets through.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -59,8 +54,6 @@ final class OperationGuardTest extends TestCase
     }
 
     /**
-     * Rows of an identity and the reason the guard refuses it.
-     *
      * @return iterable<string, array{\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable, \SineMacula\Laravel\Mfa\Enums\FailureReason}>
      */
     public static function refusedIdentities(): iterable
@@ -71,9 +64,6 @@ final class OperationGuardTest extends TestCase
     }
 
     /**
-     * A machine or an inactive identity is refused, on its own and before its
-     * factor is looked up.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
      * @return void
@@ -88,8 +78,6 @@ final class OperationGuardTest extends TestCase
     }
 
     /**
-     * A person who is active passes the identity checks.
-     *
      * @return void
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
@@ -102,9 +90,6 @@ final class OperationGuardTest extends TestCase
     }
 
     /**
-     * The bound subject type resolver is the authority on who is a person: one
-     * that finds a person a machine is honoured.
-     *
      * @return void
      */
     public function testTheBoundSubjectTypeResolverDecidesWhoIsAPerson(): void
@@ -118,10 +103,6 @@ final class OperationGuardTest extends TestCase
     }
 
     /**
-     * The bound active state resolver is the authority on who is active: one
-     * that finds an active identity inactive, and an inactive one active, is
-     * honoured.
-     *
      * @return void
      */
     public function testTheBoundActiveStateResolverDecidesWhoIsActive(): void
@@ -133,9 +114,6 @@ final class OperationGuardTest extends TestCase
     }
 
     /**
-     * The identity's own confirmed factor of an enabled type is returned, as
-     * stored.
-     *
      * @return void
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
@@ -152,8 +130,6 @@ final class OperationGuardTest extends TestCase
     }
 
     /**
-     * A non-Eloquent identity's factor is found by its class name and key.
-     *
      * @return void
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
@@ -166,8 +142,7 @@ final class OperationGuardTest extends TestCase
     }
 
     /**
-     * Another identity's factor is not found, exactly as an id that does not
-     * exist is not, whether the owner differs by key or by type.
+     * Exactly as an id that does not exist is not.
      *
      * @return void
      */
@@ -185,8 +160,6 @@ final class OperationGuardTest extends TestCase
     }
 
     /**
-     * Rows of a factor id the guard cannot look a factor up by.
-     *
      * @return iterable<string, array{mixed}>
      */
     public static function unusableIds(): iterable
@@ -198,8 +171,6 @@ final class OperationGuardTest extends TestCase
     }
 
     /**
-     * An id that is neither a string nor an integer finds nothing.
-     *
      * @param  mixed  $id
      * @return void
      */
@@ -214,8 +185,6 @@ final class OperationGuardTest extends TestCase
     }
 
     /**
-     * An identity whose key is neither a string nor an integer owns nothing.
-     *
      * @return void
      */
     public function testAnIdentityWithAKeyOfAnotherShapeOwnsNothing(): void
@@ -226,8 +195,6 @@ final class OperationGuardTest extends TestCase
     }
 
     /**
-     * An integer factor id is looked up as the key it names.
-     *
      * @return void
      */
     public function testAnIntegerIdIsLookedUp(): void
@@ -240,8 +207,7 @@ final class OperationGuardTest extends TestCase
     }
 
     /**
-     * The columns of an owner or id that may differ only in case from what is
-     * asked for.
+     * Owner or id columns that may differ only in case from what is asked for.
      *
      * @return iterable<string, array{string}>
      */
@@ -253,8 +219,7 @@ final class OperationGuardTest extends TestCase
     }
 
     /**
-     * What a case-insensitive collation matches differing only in case is not
-     * what was asked for: the row found must hold exactly the owner and the id.
+     * The row found must hold exactly the owner and the id asked for.
      *
      * @param  string  $column
      * @return void
@@ -287,8 +252,6 @@ final class OperationGuardTest extends TestCase
     }
 
     /**
-     * An integer key is the same id as its string form.
-     *
      * @return void
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
@@ -313,9 +276,6 @@ final class OperationGuardTest extends TestCase
     }
 
     /**
-     * A pending factor is refused where the operation needs a confirmed one,
-     * and returned where it takes a pending one.
-     *
      * @return void
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
@@ -330,10 +290,6 @@ final class OperationGuardTest extends TestCase
     }
 
     /**
-     * A factor whose type the application does not enable is refused, as is
-     * every factor through an application that is not configured; a pending
-     * factor is refused as pending first.
-     *
      * @return void
      */
     public function testAFactorOfATypeTheApplicationDoesNotEnableIsRefused(): void
@@ -349,8 +305,6 @@ final class OperationGuardTest extends TestCase
     }
 
     /**
-     * A refusal names its reason and a detail, never the factor's owner.
-     *
      * @return void
      */
     public function testARefusalCarriesItsReasonAndDetail(): void
@@ -362,8 +316,6 @@ final class OperationGuardTest extends TestCase
     }
 
     /**
-     * Resolve the guard.
-     *
      * @return \SineMacula\Laravel\Mfa\Factors\OperationGuard
      */
     private function guard(): OperationGuard
@@ -372,8 +324,6 @@ final class OperationGuardTest extends TestCase
     }
 
     /**
-     * The reason the call is refused with.
-     *
      * @param  \Closure(): mixed  $call
      * @return ?\SineMacula\Laravel\Mfa\Enums\FailureReason
      */
@@ -389,8 +339,8 @@ final class OperationGuardTest extends TestCase
     }
 
     /**
-     * Give the factor table a collation that matches its owner columns and its
-     * key whatever their case, as a case-insensitive database does.
+     * Match the owner columns and the key whatever their case, as a
+     * case-insensitive database does.
      *
      * @return void
      */
@@ -412,8 +362,6 @@ final class OperationGuardTest extends TestCase
     }
 
     /**
-     * Create a test user.
-     *
      * @param  string  $email
      * @return \Tests\Fixtures\Identities\TestUser
      */
@@ -423,8 +371,6 @@ final class OperationGuardTest extends TestCase
     }
 
     /**
-     * Create a factor owned by the given type and key.
-     *
      * @param  string  $ownerType
      * @param  string  $ownerKey
      * @param  \SineMacula\Laravel\Mfa\Enums\FactorStatus  $status

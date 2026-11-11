@@ -25,14 +25,8 @@ use Tests\Fixtures\Factors\UnrecordableTotpFactor;
 use Tests\TestCase;
 
 /**
- * Unit tests for `TotpDriver`: the RFC 6238 test vectors, the window and the
- * application's own, the single use of a time step at verification and
- * confirmation, the secrets and parameters of a new enrolment, and the
- * provisioning URI.
- *
- * Time is frozen in the middle of a step, so no assertion straddles a step
- * boundary. At that moment the authenticator app's secret shows `768147`, and
- * `385088` and `050219` one step before and after.
+ * Time is frozen mid-step, where the secret shows `768147`, with `385088` and
+ * `050219` one step before and after.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -55,8 +49,6 @@ final class TotpDriverTest extends TestCase
     private const string ACCOUNT_NAME = 'user@example.com';
 
     /**
-     * Freeze time in the middle of a step.
-     *
      * @return void
      */
     #[\Override]
@@ -68,8 +60,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * The code the app shows now verifies, and its step is recorded.
-     *
      * @return void
      */
     public function testAcceptsTheCurrentCodeAndRecordsItsStep(): void
@@ -81,7 +71,7 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * Rows of `[algorithm, key, time, code]`: RFC 6238 Appendix B, 8 digits.
+     * RFC 6238 Appendix B, 8 digits.
      *
      * @return iterable<string, array{string, string, int, string}>
      */
@@ -110,9 +100,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * Each published code verifies at its time against a factor enrolled with
-     * the published key, and only in its own step.
-     *
      * @param  string  $algorithm
      * @param  string  $key
      * @param  int  $time
@@ -134,9 +121,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * The default window accepts a code from one step either side of the
-     * current one, and refuses one from two steps away.
-     *
      * @return void
      */
     public function testTheDefaultWindowAcceptsOneStepEitherSideOnly(): void
@@ -148,9 +132,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * The window is read from the configuration on every call: a driver built
-     * before it changes applies the new one.
-     *
      * @return void
      */
     public function testTheWindowIsReadOnEveryCall(): void
@@ -172,10 +153,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * A verification's window is the `totp_window` of the application its
-     * binding names, through a driver built once; an application that sets
-     * none, or is not configured, takes the package-wide window.
-     *
      * @return void
      */
     public function testAVerificationsWindowIsItsBindingsApplications(): void
@@ -199,9 +176,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * A confirmation's window is the `totp_window` of the application its
-     * binding names, whichever application the request is for.
-     *
      * @return void
      */
     public function testAConfirmationsWindowIsItsBindingsApplicationsOwn(): void
@@ -226,8 +200,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * Failures never widen the window.
-     *
      * @return void
      */
     public function testTheWindowNeverWidensAfterFailures(): void
@@ -244,8 +216,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * The same code, and so the same step, is accepted once.
-     *
      * @return void
      */
     public function testRefusesTheSameStepTwice(): void
@@ -259,9 +229,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * Once a code is accepted, a code for an earlier step of the window is
-     * refused, though it is still in the window.
-     *
      * @return void
      */
     public function testRefusesAnEarlierStepOnceALaterOneIsAccepted(): void
@@ -276,9 +243,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * Codes for later and later steps are each accepted, and the step each
-     * matched is the one recorded.
-     *
      * @return void
      */
     public function testAcceptsEachLaterStepAndRecordsTheStepItMatched(): void
@@ -297,9 +261,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * Confirming records the step as verifying does, so the confirming code is
-     * refused at the next verification, and at a second confirmation.
-     *
      * @return void
      */
     public function testTheConfirmingCodeIsRefusedAtTheNextVerification(): void
@@ -314,9 +275,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * A code matching no step of the window, or of another length, is refused
-     * and records nothing.
-     *
      * @return void
      */
     public function testRefusesAWrongCodeAndRecordsNothing(): void
@@ -332,8 +290,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * Rows of `[secret]` a factor cannot verify with.
-     *
      * @return iterable<string, array{?string}>
      */
     public static function unusableSecrets(): iterable
@@ -345,8 +301,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * A factor without a usable secret verifies nothing.
-     *
      * @param  ?string  $secret
      * @return void
      */
@@ -357,8 +311,7 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * An empty secret is refused even with the code an empty key makes, which
-     * anyone could compute.
+     * Anyone could compute an empty key's code.
      *
      * @return void
      */
@@ -371,8 +324,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * Rows of `[algorithm, digits, period]` a factor cannot verify with.
-     *
      * @return iterable<string, array{?string, ?int, ?int}>
      */
     public static function unusableParameters(): iterable
@@ -385,8 +336,7 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * A factor that holds no parameters, or parameters out of bounds, verifies
-     * nothing, rather than taking the configured ones.
+     * The configured parameters are not taken in their place.
      *
      * @param  ?string  $algorithm
      * @param  ?int  $digits
@@ -400,8 +350,7 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * A factor with nowhere to record an accepted step cannot be held to single
-     * use, so even its current code is refused.
+     * Without somewhere to record the step, single use cannot hold.
      *
      * @return void
      */
@@ -412,8 +361,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * Rows of `[algorithm, bytes]`: the length of a new secret.
-     *
      * @return iterable<string, array{string, int}>
      */
     public static function secretLengths(): iterable
@@ -424,9 +371,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * A new secret is random, in Base32, and as long as the configured
-     * algorithm's output.
-     *
      * @param  string  $algorithm
      * @param  int  $bytes
      * @return void
@@ -447,9 +391,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * Starting an enrolment stamps the configured parameters on the factor,
-     * with no step accepted yet.
-     *
      * @return void
      *
      * @throws \Random\RandomException
@@ -469,10 +410,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * A factor enrolled with the configured parameters verifies the code its
-     * app makes from the new secret with them, and keeps them after the
-     * configuration changes.
-     *
      * @return void
      *
      * @throws \Random\RandomException
@@ -495,8 +432,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * The parameters of a new enrolment are the configured ones.
-     *
      * @return void
      */
     public function testTheParametersAreTheConfiguredOnes(): void
@@ -509,9 +444,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * The provisioning URI is in the `otpauth://` key URI format, with the
-     * label, the secret, the issuer and the factor's parameters.
-     *
      * @return void
      */
     public function testTheProvisioningUriCarriesTheLabelSecretAndParameters(): void
@@ -522,9 +454,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * The provisioning URI carries the factor's own parameters, not the
-     * configured ones.
-     *
      * @return void
      */
     public function testTheProvisioningUriCarriesTheFactorsOwnParameters(): void
@@ -537,8 +466,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * An issuer holding a space is encoded once, in the label and the query.
-     *
      * @return void
      */
     public function testTheProvisioningUriEncodesTheIssuerOnce(): void
@@ -551,8 +478,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * Rows of `[issuer, account name, message]` a provisioning URI refuses.
-     *
      * @return iterable<string, array{string, string, string}>
      */
     public static function unusableNames(): iterable
@@ -567,9 +492,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * An empty issuer or account name, or one holding the colon that separates
-     * them in the label, is refused.
-     *
      * @param  string  $issuer
      * @param  string  $accountName
      * @param  string  $message
@@ -585,9 +507,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * A factor whose enrolment has not started has no parameters to put in a
-     * provisioning URI.
-     *
      * @return void
      */
     public function testTheProvisioningUriRefusesAFactorWithoutParameters(): void
@@ -599,9 +518,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * The secret and code parameters carry `#[\SensitiveParameter]`, so they
-     * never reach a stack trace.
-     *
      * @return void
      */
     public function testSecretsAndCodesAreSensitiveParameters(): void
@@ -615,8 +531,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * What a verification through the driver is bound to.
-     *
      * @param  string  $application
      * @return \SineMacula\Laravel\Mfa\Proofs\ProofBinding
      */
@@ -626,8 +540,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * Make the current request one for the named application.
-     *
      * @param  string  $application
      * @return void
      */
@@ -637,8 +549,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * Build the driver over the application's configuration.
-     *
      * @return \SineMacula\Laravel\Mfa\Drivers\TotpDriver
      */
     private function driver(): TotpDriver
@@ -647,8 +557,7 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * Build a factor enrolled in the authenticator app with the default
-     * parameters and no step accepted.
+     * Enrolled with the default parameters and no step accepted.
      *
      * @return \Tests\Fixtures\Factors\TotpStubFactor
      */
@@ -658,8 +567,6 @@ final class TotpDriverTest extends TestCase
     }
 
     /**
-     * The application's configuration.
-     *
      * @return \Illuminate\Config\Repository
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

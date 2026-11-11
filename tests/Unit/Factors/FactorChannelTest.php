@@ -12,10 +12,6 @@ use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\TestCase;
 
 /**
- * Unit tests for `FactorChannel`: a factor's channel names its destination, its
- * passkey credential, or the factor itself, and a kind that cannot carry a
- * factor, or an identifier that cannot name one, has none.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -25,9 +21,6 @@ use Tests\TestCase;
 final class FactorChannelTest extends TestCase
 {
     /**
-     * The channel names the destination first, then the credential, then the
-     * factor.
-     *
      * @return void
      */
     public function testNamesTheDestinationThenTheCredentialThenTheFactor(): void
@@ -55,9 +48,6 @@ final class FactorChannelTest extends TestCase
     }
 
     /**
-     * A kind that cannot carry a factor, or a factor that cannot be named, has
-     * no channel.
-     *
      * @return void
      */
     public function testHasNoChannelItCannotName(): void

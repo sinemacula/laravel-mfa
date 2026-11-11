@@ -22,10 +22,7 @@ use Tests\Fixtures\Factors\TotpStubFactor;
 use Tests\TestCase;
 
 /**
- * Unit tests for what each shipped driver states of its type: the channel kind
- * its factors travel on and the `amr` values a proof by it adds, so the
- * combination policy never infers either from a type's name, and how it
- * confirms a pending factor.
+ * The combination policy reads these, never inferring them from a type's name.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -38,8 +35,6 @@ use Tests\TestCase;
 final class DriverChannelsTest extends TestCase
 {
     /**
-     * Each driver's channel kind and `amr` values.
-     *
      * @return void
      */
     public function testEachDriverStatesItsChannelKindAndAmr(): void
@@ -58,9 +53,6 @@ final class DriverChannelsTest extends TestCase
     }
 
     /**
-     * A TOTP factor is confirmed by the code its authenticator app shows now,
-     * and not by another, nor by a factor with no secret.
-     *
      * @return void
      *
      * @throws \Random\RandomException

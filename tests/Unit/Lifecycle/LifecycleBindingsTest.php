@@ -14,10 +14,6 @@ use SineMacula\Laravel\Mfa\Lifecycle\RequiredFactorPolicy;
 use Tests\TestCase;
 
 /**
- * Tests for `LifecycleBindings`: the lifecycle service is built afresh, and the
- * last factor policy defaults to `RequiredFactorPolicy`, which an application
- * may rebind.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -27,8 +23,6 @@ use Tests\TestCase;
 final class LifecycleBindingsTest extends TestCase
 {
     /**
-     * The lifecycle service is built on every resolution.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -41,9 +35,6 @@ final class LifecycleBindingsTest extends TestCase
     }
 
     /**
-     * The last factor policy defaults to the required factor policy, built
-     * afresh, and a binding of the application's own replaces it.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -61,8 +52,6 @@ final class LifecycleBindingsTest extends TestCase
     }
 
     /**
-     * Self-service recovery defaults to none, built afresh.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

@@ -13,10 +13,6 @@ use SineMacula\Laravel\Mfa\Lifecycle\FactorRemovalResult;
 use Tests\Fixtures\Verification\Dumps;
 
 /**
- * Unit tests for `FactorRemovalResult`: a removal made carries its factor, the
- * assessment and the completion, hidden from every dump; a refused one its
- * reason alone.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -26,8 +22,6 @@ use Tests\Fixtures\Verification\Dumps;
 final class FactorRemovalResultTest extends TestCase
 {
     /**
-     * A removal made returns its completion as given; a refused one has none.
-     *
      * @return void
      */
     public function testCarriesTheCompletionOfARemovalMade(): void
@@ -42,8 +36,6 @@ final class FactorRemovalResultTest extends TestCase
     }
 
     /**
-     * No way of dumping it shows the completion.
-     *
      * @return void
      */
     public function testNoDumpShowsTheCompletion(): void
@@ -64,8 +56,6 @@ final class FactorRemovalResultTest extends TestCase
     }
 
     /**
-     * A confirmed TOTP factor.
-     *
      * @return \SineMacula\Laravel\Mfa\Factors\FactorSummary
      */
     private static function factor(): FactorSummary

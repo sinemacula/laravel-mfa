@@ -20,9 +20,6 @@ use Tests\Fixtures\Factors\CustomFactor;
 use Tests\Fixtures\RecoveryCodes\SecondaryConnectionRecoveryCode;
 
 /**
- * Unit tests for `ConfiguredModels`: the factor and recovery code models an
- * application may replace, and the settings it refuses.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -33,8 +30,6 @@ use Tests\Fixtures\RecoveryCodes\SecondaryConnectionRecoveryCode;
 final class ConfiguredModelsTest extends TestCase
 {
     /**
-     * With nothing configured, the shipped models.
-     *
      * @return void
      */
     public function testWithNothingConfiguredTheShippedModels(): void
@@ -46,8 +41,6 @@ final class ConfiguredModelsTest extends TestCase
     }
 
     /**
-     * A configured subclass is taken.
-     *
      * @return void
      */
     public function testAConfiguredSubclassIsTaken(): void
@@ -62,8 +55,6 @@ final class ConfiguredModelsTest extends TestCase
     }
 
     /**
-     * Rows of a setting, a value it refuses and the problem.
-     *
      * @return iterable<string, array{string, mixed, string}>
      */
     public static function refused(): iterable
@@ -89,8 +80,6 @@ final class ConfiguredModelsTest extends TestCase
     }
 
     /**
-     * A setting that names no model implementing the contract is refused.
-     *
      * @param  string  $block
      * @param  mixed  $value
      * @param  string  $problem
@@ -108,8 +97,6 @@ final class ConfiguredModelsTest extends TestCase
     }
 
     /**
-     * A contract implementation that is not an Eloquent model is refused.
-     *
      * @return void
      */
     public function testAContractImplementationThatIsNotAModelIsRefused(): void

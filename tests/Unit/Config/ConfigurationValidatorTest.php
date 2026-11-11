@@ -29,10 +29,6 @@ use Tests\Fixtures\RecoveryCodes\SecondaryConnectionRecoveryCode;
 use Tests\TestCase;
 
 /**
- * Unit tests for `ConfigurationValidator`: every subject it checks, the problem
- * each out-of-range setting or missing binding is reported as, and the
- * exception that lists them.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -60,8 +56,6 @@ final class ConfigurationValidatorTest extends TestCase
     private const string NO_FIRST_FACTOR = 'The application declares no first_factor, and no ' . FirstFactorResolver::class . ' is bound to report it.';
 
     /**
-     * The shipped configuration has no problem in any subject, and validates.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -74,9 +68,6 @@ final class ConfigurationValidatorTest extends TestCase
     }
 
     /**
-     * Rows of a setting, its value, the subject it is reported under, and the
-     * problem.
-     *
      * @return iterable<string, array{string, mixed, string, string}>
      */
     public static function packageProblems(): iterable
@@ -154,9 +145,7 @@ final class ConfigurationValidatorTest extends TestCase
     }
 
     /**
-     * A package-wide setting out of range is reported under its subject alone,
-     * and every other subject has none. The setting is put back afterwards, so
-     * the test's migrations roll back.
+     * The setting is put back afterwards so the test's migrations roll back.
      *
      * @param  string  $key
      * @param  mixed  $value
@@ -181,8 +170,7 @@ final class ConfigurationValidatorTest extends TestCase
 
         $expected = [...self::SHIPPED, $subject => [$problem]];
 
-        // The model checks read the storage connection too, so a connection
-        // that is not a name is reported under each model's subject as well.
+        // The model checks read the storage connection too.
         if ($subject === 'storage' && !is_string($value)) {
             $expected['factor']         = [$problem];
             $expected['recovery_codes'] = [$problem];
@@ -192,9 +180,6 @@ final class ConfigurationValidatorTest extends TestCase
     }
 
     /**
-     * Unset table settings take the shipped names, and the default storage
-     * connection is always configured.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -209,9 +194,7 @@ final class ConfigurationValidatorTest extends TestCase
     }
 
     /**
-     * The shipped factor model follows the storage connection wherever it is,
-     * and a model naming the storage connection as its own is accepted. The
-     * settings are put back afterwards, so the test's migrations roll back.
+     * The settings are put back afterwards so the test's migrations roll back.
      *
      * @return void
      *
@@ -239,9 +222,6 @@ final class ConfigurationValidatorTest extends TestCase
     }
 
     /**
-     * A configured application with a declared first factor and a type that
-     * needs no delivery binding has no problem.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -254,9 +234,6 @@ final class ConfigurationValidatorTest extends TestCase
     }
 
     /**
-     * An application that neither declares its first factor nor has a resolver
-     * bound is refused; binding one is enough.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -273,9 +250,8 @@ final class ConfigurationValidatorTest extends TestCase
     }
 
     /**
-     * An application that enables `passkey` while the package's unavailable
-     * gateway is still bound is refused; binding a gateway is enough, even one
-     * that reports itself unavailable at run time.
+     * Any bound gateway is enough, even one that reports itself unavailable at
+     * run time.
      *
      * @return void
      *
@@ -296,8 +272,8 @@ final class ConfigurationValidatorTest extends TestCase
     }
 
     /**
-     * The default first factor resolver reads the declaration, so binding it
-     * explicitly does not stand in for one.
+     * The default resolver reads the declaration, so binding it explicitly does
+     * not stand in for one.
      *
      * @return void
      *
@@ -313,9 +289,6 @@ final class ConfigurationValidatorTest extends TestCase
     }
 
     /**
-     * An application that enables `sms` while the package's null sender is
-     * still bound is refused; binding a sender is enough.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -335,10 +308,6 @@ final class ConfigurationValidatorTest extends TestCase
     }
 
     /**
-     * An application that enables `email` while the package's null sender is
-     * still bound is refused; binding a sender, the package's mailer sender
-     * included, is enough, and one that does not enable it needs none.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -366,9 +335,7 @@ final class ConfigurationValidatorTest extends TestCase
     }
 
     /**
-     * Checking an email application with the package's mailer sender bound
-     * looks up no mailer, so the check that runs on every request builds no
-     * mail transport.
+     * The check runs on every request, so it must not build a mail transport.
      *
      * @return void
      *
@@ -389,9 +356,6 @@ final class ConfigurationValidatorTest extends TestCase
     }
 
     /**
-     * An application that enables a type delivering codes needs an application
-     * key to hash them with; one that enables none does not.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -414,9 +378,6 @@ final class ConfigurationValidatorTest extends TestCase
     }
 
     /**
-     * A binding the container cannot build is reported under the subject that
-     * needs it, rather than escaping the report.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -434,9 +395,6 @@ final class ConfigurationValidatorTest extends TestCase
     }
 
     /**
-     * A malformed application is reported once per problem, even where two
-     * checks read the same setting, alongside the other checks' problems.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -452,8 +410,6 @@ final class ConfigurationValidatorTest extends TestCase
     }
 
     /**
-     * Every configured application is a subject of its own, in order.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -469,9 +425,6 @@ final class ConfigurationValidatorTest extends TestCase
     }
 
     /**
-     * Validating throws an exception listing every problem with its subject, in
-     * the order the report holds them.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -507,8 +460,6 @@ final class ConfigurationValidatorTest extends TestCase
     }
 
     /**
-     * The application's configuration.
-     *
      * @return \Illuminate\Config\Repository
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -519,8 +470,6 @@ final class ConfigurationValidatorTest extends TestCase
     }
 
     /**
-     * A validator over the application's container and configuration.
-     *
      * @return \SineMacula\Laravel\Mfa\Config\ConfigurationValidator
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

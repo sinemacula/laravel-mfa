@@ -11,9 +11,6 @@ use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleSettings;
 
 /**
- * Unit tests for `LifecycleSettings`: each setting's default, the bounds it
- * accepts, and the message a value past them fails with.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -33,11 +30,7 @@ final class LifecycleSettingsTest extends TestCase
     }
 
     /**
-     * Each setting takes its default (within its bounds) when unset, reads
-     * either bound as an integer or the digit string `env()` returns, and
-     * refuses a value past either bound, or one that is not an integer, naming
-     * the key and its bounds, both as it is read and when every setting is
-     * validated.
+     * A bound reads as an integer or as the digit string `env()` returns.
      *
      * @param  string  $key
      * @param  \Closure(\SineMacula\Laravel\Mfa\Lifecycle\LifecycleSettings): int  $read
@@ -74,8 +67,6 @@ final class LifecycleSettingsTest extends TestCase
     }
 
     /**
-     * The defaults validate.
-     *
      * @return void
      */
     public function testTheDefaultsValidate(): void
@@ -86,8 +77,6 @@ final class LifecycleSettingsTest extends TestCase
     }
 
     /**
-     * Build the settings over an `mfa.lifecycle` block.
-     *
      * @param  array<string, mixed>  $block
      * @return \SineMacula\Laravel\Mfa\Lifecycle\LifecycleSettings
      */

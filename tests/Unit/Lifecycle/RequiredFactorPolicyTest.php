@@ -19,10 +19,6 @@ use Tests\Fixtures\Passkeys\Concerns\ArrangesPasskeys;
 use Tests\TestCase;
 
 /**
- * Tests for `RequiredFactorPolicy`, the default last factor policy: while a
- * factor is required, the last one an application accepts may not be removed;
- * otherwise any may.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -35,8 +31,6 @@ final class RequiredFactorPolicyTest extends TestCase
     use ArrangesPasskeys;
 
     /**
-     * With no factor required, the only factor may be removed.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -51,9 +45,6 @@ final class RequiredFactorPolicyTest extends TestCase
     }
 
     /**
-     * While an application always requires a factor, the last acceptable one
-     * stays; another confirmed factor of an enabled type lets it go.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -84,8 +75,6 @@ final class RequiredFactorPolicyTest extends TestCase
     }
 
     /**
-     * The identity's own requirement keeps its last acceptable factor too.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -102,9 +91,7 @@ final class RequiredFactorPolicyTest extends TestCase
     }
 
     /**
-     * A remaining passkey counts only while its association matches it: one
-     * whose association is missing, names another credential or belongs to
-     * another identity does not let the last usable factor go.
+     * A passkey counts only while its association matches it.
      *
      * @return void
      *
@@ -136,9 +123,7 @@ final class RequiredFactorPolicyTest extends TestCase
     }
 
     /**
-     * A factor disabled at the failure ceiling does not keep the identity
-     * covered, and neither does a factor the caller did not hand over: the
-     * policy decides on the factors it is given.
+     * The policy decides on the factors it is given.
      *
      * @return void
      *
@@ -163,9 +148,6 @@ final class RequiredFactorPolicyTest extends TestCase
     }
 
     /**
-     * The identity's part is read from the bound seam, for the acting
-     * application, not from the identity's contract directly.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -188,7 +170,7 @@ final class RequiredFactorPolicyTest extends TestCase
     }
 
     /**
-     * The identity's factors, as a caller hands them to the policy.
+     * As a caller hands them to the policy.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>
@@ -199,8 +181,6 @@ final class RequiredFactorPolicyTest extends TestCase
     }
 
     /**
-     * The policy under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Lifecycle\RequiredFactorPolicy
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

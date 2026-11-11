@@ -26,11 +26,6 @@ use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\TestCase;
 
 /**
- * Tests for `CallerContextResolver`: a pending session is served only an action
- * its credential allows, and never in the guard's user's place; without one the
- * guard's user is served; only a person is served; and what the caller's
- * challenges are bound to.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -41,9 +36,6 @@ use Tests\TestCase;
 final class CallerContextResolverTest extends TestCase
 {
     /**
-     * Without a pending session the guard's person is served, for any action
-     * and for none, on the current application.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -63,9 +55,6 @@ final class CallerContextResolverTest extends TestCase
     }
 
     /**
-     * Nobody is served without a signed-in identity, or for one that is not a
-     * person.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -80,8 +69,6 @@ final class CallerContextResolverTest extends TestCase
     }
 
     /**
-     * A bound subject type resolver decides who is a person.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -99,9 +86,6 @@ final class CallerContextResolverTest extends TestCase
     }
 
     /**
-     * A pending session is served for an action its credential allows, as its
-     * own identity, not the guard's user.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -119,10 +103,6 @@ final class CallerContextResolverTest extends TestCase
     }
 
     /**
-     * A pending session is served nothing for an action its credential does not
-     * allow, nor for a helper that serves active sessions only; the guard's
-     * user is never served in its place.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -137,8 +117,6 @@ final class CallerContextResolverTest extends TestCase
     }
 
     /**
-     * A pending session of an identity that is not a person is served nothing.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -151,9 +129,6 @@ final class CallerContextResolverTest extends TestCase
     }
 
     /**
-     * A pending credential that does not validate is refused, not served as the
-     * guard's user.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -170,8 +145,7 @@ final class CallerContextResolverTest extends TestCase
     }
 
     /**
-     * A caller who is nobody is served nothing, whatever the action, and no
-     * request or pending resolver is asked.
+     * No request or pending resolver is asked.
      *
      * @return void
      *
@@ -187,9 +161,6 @@ final class CallerContextResolverTest extends TestCase
     }
 
     /**
-     * A caller's binding names it, its application and its session: the pending
-     * session's, or the current sign-in's, and none without one.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -218,8 +189,7 @@ final class CallerContextResolverTest extends TestCase
     }
 
     /**
-     * The caller is still the one a binding was captured for only while nothing
-     * has changed: the action, the sign-in and the purpose are all part of it.
+     * The action, the sign-in and the purpose are all part of the binding.
      *
      * @return void
      *
@@ -249,10 +219,6 @@ final class CallerContextResolverTest extends TestCase
     }
 
     /**
-     * A pending caller is checked again through the bound resolver: served as
-     * the pending session stands now while it still allows the action, and
-     * nothing once it no longer stands, or no longer allows it.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -277,7 +243,7 @@ final class CallerContextResolverTest extends TestCase
     }
 
     /**
-     * Sign a person in through the guard, with a sign-in the proof store knows.
+     * With a sign-in the proof store knows.
      *
      * @return \Tests\Fixtures\Identities\TestUser
      *
@@ -296,8 +262,8 @@ final class CallerContextResolverTest extends TestCase
     }
 
     /**
-     * Make every request carry a pending session on the `admin` application, of
-     * another person unless given, allowing the actions.
+     * Every request carries a pending session on `admin`, of another person
+     * unless given.
      *
      * @param  list<\SineMacula\Laravel\Mfa\Enums\PendingAction>  $actions
      * @param  ?\Tests\Fixtures\Identities\NonEloquentIdentity  $identity
@@ -323,8 +289,6 @@ final class CallerContextResolverTest extends TestCase
     }
 
     /**
-     * The resolver under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Context\CallerContextResolver
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

@@ -10,9 +10,6 @@ use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Drivers\Base32;
 
 /**
- * Unit tests for `Base32`: the RFC 4648 test vectors both ways, the forms of a
- * secret decoding accepts, and the text it refuses.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -22,8 +19,8 @@ use SineMacula\Laravel\Mfa\Drivers\Base32;
 final class Base32Test extends TestCase
 {
     /**
-     * Rows of `[bytes, encoded]`: the RFC 4648 §10 vectors without their
-     * padding, and bytes at both ends of the range.
+     * The RFC 4648 section 10 vectors without padding, and bytes at both ends
+     * of the range.
      *
      * @return iterable<string, array{string, string}>
      */
@@ -41,8 +38,6 @@ final class Base32Test extends TestCase
     }
 
     /**
-     * Encoding gives the vector, upper case and unpadded.
-     *
      * @param  string  $bytes
      * @param  string  $encoded
      * @return void
@@ -54,8 +49,6 @@ final class Base32Test extends TestCase
     }
 
     /**
-     * Decoding the vector gives back its bytes.
-     *
      * @param  string  $bytes
      * @param  string  $encoded
      * @return void
@@ -67,8 +60,6 @@ final class Base32Test extends TestCase
     }
 
     /**
-     * Lower case and trailing padding decode as the canonical form does.
-     *
      * @return void
      */
     public function testDecodesLowerCaseAndPaddedText(): void
@@ -79,9 +70,6 @@ final class Base32Test extends TestCase
     }
 
     /**
-     * Bits left over after the last whole byte are dropped, even when they are
-     * one short of another byte.
-     *
      * @return void
      */
     public function testDropsBitsLeftOverAfterTheLastWholeByte(): void
@@ -90,9 +78,6 @@ final class Base32Test extends TestCase
     }
 
     /**
-     * Text holding a character outside the alphabet, padding before the end
-     * included, decodes to nothing.
-     *
      * @return void
      */
     public function testRefusesTextOutsideTheAlphabet(): void
@@ -103,8 +88,6 @@ final class Base32Test extends TestCase
     }
 
     /**
-     * Random bytes survive a round trip, whatever their length.
-     *
      * @return void
      *
      * @throws \Random\RandomException

@@ -13,14 +13,6 @@ use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use Tests\Unit\Concerns\BuildsFactorSummaries;
 
 /**
- * Unit tests for the `FactorSummary` projection.
- *
- * Covers construction via `fromFactor()`, destination masking for email / phone
- * / short strings / empty values, and `jsonSerialize()` shape. Stub-builder
- * helpers live on the `BuildsFactorSummaries` trait so the consuming class
- * stays focused on its assertions and below the project's max-methods-per-class
- * threshold.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -38,8 +30,6 @@ final class FactorSummaryTest extends TestCase
     private const string SAMPLE_MASKED_EMAIL = 'al***@example.com';
 
     /**
-     * Test is final readonly class.
-     *
      * @return void
      */
     public function testIsFinalReadonlyClass(): void
@@ -51,9 +41,6 @@ final class FactorSummaryTest extends TestCase
     }
 
     /**
-     * A summary says whether the failure ceiling disabled the factor, and shows
-     * it in its JSON.
-     *
      * @return void
      */
     public function testSaysWhetherTheFactorIsDisabled(): void
@@ -75,8 +62,6 @@ final class FactorSummaryTest extends TestCase
     }
 
     /**
-     * Test implements json serializable.
-     *
      * @return void
      */
     public function testImplementsJsonSerializable(): void
@@ -85,8 +70,6 @@ final class FactorSummaryTest extends TestCase
     }
 
     /**
-     * Test from factor captures all fields.
-     *
      * @return void
      */
     public function testFromFactorCapturesAllFields(): void
@@ -114,8 +97,6 @@ final class FactorSummaryTest extends TestCase
     }
 
     /**
-     * Test from factor stringifies integer identifier.
-     *
      * @return void
      */
     public function testFromFactorStringifiesIntegerIdentifier(): void
@@ -134,8 +115,6 @@ final class FactorSummaryTest extends TestCase
     }
 
     /**
-     * Test from factor collapses non scalar identifier to empty string.
-     *
      * @return void
      */
     public function testFromFactorCollapsesNonScalarIdentifierToEmptyString(): void
@@ -154,8 +133,6 @@ final class FactorSummaryTest extends TestCase
     }
 
     /**
-     * Test masking keeps null destination as null.
-     *
      * @return void
      */
     public function testMaskingKeepsNullDestinationAsNull(): void
@@ -174,8 +151,6 @@ final class FactorSummaryTest extends TestCase
     }
 
     /**
-     * Test masking keeps empty string destination as empty string.
-     *
      * @return void
      */
     public function testMaskingKeepsEmptyStringDestinationAsEmptyString(): void
@@ -194,36 +169,27 @@ final class FactorSummaryTest extends TestCase
     }
 
     /**
-     * Test masking email with short single char local part.
-     *
      * @return void
      */
     public function testMaskingEmailWithShortSingleCharLocalPart(): void
     {
         $summary = $this->buildSummaryWithDestination('a@example.com');
 
-        // Local-part length 1 → keep min(2, max(1, floor(1/2))) = 1 char → `a`
-        // + at least one `*` → `a*@example.com`.
         self::assertSame('a*@example.com', $summary->maskedDestination);
     }
 
     /**
-     * Test masking email with two char local part.
-     *
      * @return void
      */
     public function testMaskingEmailWithTwoCharLocalPart(): void
     {
         $summary = $this->buildSummaryWithDestination('ab@example.com');
 
-        // Local-part length 2 → keep min(2, max(1, floor(2/2))) = 1 char → `a`
-        // + `*` → `a*@example.com`.
         self::assertSame('a*@example.com', $summary->maskedDestination);
     }
 
     /**
-     * A three-character local-part keeps one character: `floor(3/2) = 1`, where
-     * `round(3/2)` and `ceil(3/2)` would keep two, more than half of it.
+     * `round` or `ceil` of 3/2 would keep two, more than half.
      *
      * @return void
      */
@@ -235,24 +201,17 @@ final class FactorSummaryTest extends TestCase
     }
 
     /**
-     * Test masking email with four char local part.
-     *
      * @return void
      */
     public function testMaskingEmailWithFourCharLocalPart(): void
     {
         $summary = $this->buildSummaryWithDestination('abcd@example.com');
 
-        // Local-part length 4 → keep min(2, max(1, floor(4/2))) = 2 chars →
-        // `ab` + `**` → `ab**@example.com`.
         self::assertSame('ab**@example.com', $summary->maskedDestination);
     }
 
     /**
-     * A five-character local-part exercises the `min(2, floor(n/2))` boundary:
-     * `floor(5/2) = 2` — but `ceil(5/2) = 3` and `round(5/2) = 3`, so a
-     * regression that swaps `floor` for either would hand back three plaintext
-     * characters. Keep the assertion exact so the mutation can't slip past.
+     * `round` or `ceil` of 5/2 would keep three plaintext characters.
      *
      * @return void
      */
@@ -260,15 +219,12 @@ final class FactorSummaryTest extends TestCase
     {
         $summary = $this->buildSummaryWithDestination('alice@example.com');
 
-        // Local-part length 5 → keep min(2, max(1, floor(5/2))) = 2 chars →
-        // `al` + `***` → `al***@example.com`.
         self::assertSame('al***@example.com', $summary->maskedDestination);
     }
 
     /**
-     * A six-character local-part exercises the outer `min(2, …)` cap:
-     * `floor(6/2) = 3`, but `min(2, 3) = 2`. A regression to `min(3, …)` would
-     * expose three plaintext characters.
+     * `floor(6/2)` is 3, so a looser cap would expose three plaintext
+     * characters.
      *
      * @return void
      */
@@ -276,15 +232,11 @@ final class FactorSummaryTest extends TestCase
     {
         $summary = $this->buildSummaryWithDestination('foobar@example.com');
 
-        // Local-part length 6 → min(2, floor(6/2)) = min(2, 3) = 2 → `fo` +
-        // `****` → `fo****@example.com`.
         self::assertSame('fo****@example.com', $summary->maskedDestination);
     }
 
     /**
-     * A destination containing more than one `@` exercises the `explode(...,
-     * 2)` limit: only the FIRST `@` may split the local-part from the domain,
-     * so a second `@` belongs in the domain side untouched.
+     * Only the first `@` splits the local part from the domain.
      *
      * @return void
      */
@@ -292,14 +244,10 @@ final class FactorSummaryTest extends TestCase
     {
         $summary = $this->buildSummaryWithDestination('alice@inner@example.com');
 
-        // explode('@', $r, 2) → ['alice', 'inner@example.com']. Local-part
-        // length 5 → keep 2, mask 3 → 'al***'.
         self::assertSame('al***@inner@example.com', $summary->maskedDestination);
     }
 
     /**
-     * Test masking email preserves domain.
-     *
      * @return void
      */
     public function testMaskingEmailPreservesDomain(): void
@@ -310,8 +258,6 @@ final class FactorSummaryTest extends TestCase
     }
 
     /**
-     * Test masking phone preserves last four digits.
-     *
      * @return void
      */
     public function testMaskingPhonePreservesLastFourDigits(): void
@@ -322,8 +268,6 @@ final class FactorSummaryTest extends TestCase
     }
 
     /**
-     * Test masking short strings are fully masked.
-     *
      * @return void
      */
     public function testMaskingShortStringsAreFullyMasked(): void
@@ -334,8 +278,6 @@ final class FactorSummaryTest extends TestCase
     }
 
     /**
-     * Test masking single character destination is fully masked.
-     *
      * @return void
      */
     public function testMaskingSingleCharacterDestinationIsFullyMasked(): void
@@ -346,9 +288,6 @@ final class FactorSummaryTest extends TestCase
     }
 
     /**
-     * The JSON shape of a used, preferred factor carries its last use as ISO
-     * 8601.
-     *
      * @return void
      */
     public function testJsonSerializeShapeWithLastUse(): void
@@ -378,8 +317,6 @@ final class FactorSummaryTest extends TestCase
     }
 
     /**
-     * Test json serialize shape with null fields.
-     *
      * @return void
      */
     public function testJsonSerializeShapeWithNullFields(): void
@@ -407,8 +344,6 @@ final class FactorSummaryTest extends TestCase
     }
 
     /**
-     * Test json encodes via json serializable.
-     *
      * @return void
      */
     public function testJsonEncodesViaJsonSerializable(): void
