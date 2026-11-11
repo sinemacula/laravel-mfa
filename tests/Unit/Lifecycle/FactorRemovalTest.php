@@ -245,6 +245,38 @@ final class FactorRemovalTest extends TestCase
     }
 
     /**
+     * The session's other proofs still count once the removed factor's are left
+     * out.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testTheOtherProofsStillMeetTheRequirement(): void
+    {
+        $requirement = Requirement::none()->withAdditionalVerification();
+
+        $lagging = new InterceptedProofStore($this->container()->make(ProofStore::class), static function (): void {});
+
+        $this->container()->instance(ProofStore::class, $lagging);
+        $this->container()->instance(SessionRevoker::class, new RecordingSessionRevoker(judges: true));
+        $this->container()->instance(IdentityRequirement::class, new FixedIdentityRequirement($requirement));
+
+        $user   = $this->signedInPerson();
+        $factor = $this->confirmedFactor($user);
+        $other  = $this->confirmedFactor($user);
+
+        $this->container()->make(ProofStore::class)->record($user, SignInProofs::of($user)->password());
+        $this->stepUpWith($user, $other);
+        $this->stepUpWith($user, $factor);
+
+        $factors = FactorSets::of($factor, $other);
+        $result  = DB::transaction(fn (): FactorRemovalResult => $this->removal()->remove($user, self::APPLICATION, $factor, $factors, SignInProofs::SESSION));
+
+        self::assertNull($result->outstanding);
+    }
+
+    /**
      * @return \SineMacula\Laravel\Mfa\Lifecycle\FactorRemoval
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

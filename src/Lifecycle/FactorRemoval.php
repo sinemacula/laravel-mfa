@@ -21,7 +21,6 @@ use SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException;
 use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociations;
-use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\Requirements\SessionJudgement;
@@ -107,10 +106,13 @@ final readonly class FactorRemoval
 
         // Read first: the revocation hides proofs it does not record again.
         // A store may list the removed factor's proofs until they are voided.
-        $kept = array_values(array_filter(
-            $this->container->make(SessionFirstFactor::class)->proofsOf($identity, $application, $session),
-            static fn (Proof $proof): bool => $proof->reference !== $id,
-        ));
+        $kept = [];
+
+        foreach ($this->container->make(SessionFirstFactor::class)->proofsOf($identity, $application, $session) as $proof) {
+            if ($proof->reference !== $id) {
+                $kept[] = $proof;
+            }
+        }
 
         $revocation   = $this->container->make(SessionRevoker::class)->factorRemoved($identity, $id, $application, $session);
         $reevaluation = $this->container->make(SessionReevaluation::class);
