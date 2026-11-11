@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Model;
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
- * @internal
+ * @api
  */
 final class IdentityType
 {

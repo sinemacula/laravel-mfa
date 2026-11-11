@@ -6,12 +6,14 @@ namespace Tests\Unit;
 
 use Illuminate\Config\Repository;
 use Illuminate\Console\Application as ConsoleApplication;
+use Illuminate\Container\Container;
 use Illuminate\Events\Dispatcher;
 use Illuminate\Foundation\Application;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\ServiceProvider;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Codes\CodeService;
 use SineMacula\Laravel\Mfa\Codes\NullEmailSender;
 use SineMacula\Laravel\Mfa\Codes\NullSmsSender;
@@ -503,5 +505,92 @@ final class MfaServiceProviderTest extends TestCase
         $this->expectExceptionMessage('[attempts] mfa.attempts.lockout_seconds must be an integer from 60 to 86400.');
 
         $this->container()->make('mfa');
+    }
+
+    /**
+     * The defaults this package binds, by class or by its own closure.
+     *
+     * @return void
+     */
+    public function testTheShippedDefaultsAreThePackages(): void
+    {
+        foreach ([SmsSender::class, ProofStore::class, PasskeyGateway::class, SessionRevoker::class] as $contract) {
+            self::assertTrue(MfaServiceProvider::isPackageDefault($this->container(), $contract), $contract);
+        }
+    }
+
+    /**
+     * No default is shared, so resolving one leaves it the default.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAResolvedDefaultIsStillThePackages(): void
+    {
+        foreach ([SmsSender::class, ProofStore::class, PasskeyGateway::class, SessionRevoker::class] as $contract) {
+            $this->container()->make($contract);
+
+            self::assertTrue(MfaServiceProvider::isPackageDefault($this->container(), $contract), $contract);
+        }
+    }
+
+    /**
+     * Ways an application binds, holds or changes a contract.
+     *
+     * @return iterable<string, array{\Closure(\Illuminate\Container\Container): void}>
+     */
+    public static function applicationBindings(): iterable
+    {
+        yield 'unbound' => [static function (): void {}];
+        yield 'another class' => [static fn (Container $container) => $container->bind('contract', \stdClass::class)];
+        yield 'a closure' => [static fn (Container $container) => $container->bind('contract', static fn (): \stdClass => new \stdClass)];
+        yield 'shared' => [static fn (Container $container) => $container->singleton('contract', NullSmsSender::class)];
+        yield 'an instance' => [static function (Container $container): void {
+            $container->bind('contract', NullSmsSender::class);
+            $container->instance('contract', new NullSmsSender);
+        }];
+        yield 'an alias' => [static function (Container $container): void {
+            $container->bind('contract', NullSmsSender::class);
+            $container->alias(\stdClass::class, 'contract');
+        }];
+        yield 'an extender' => [static function (Container $container): void {
+            $container->bind('contract', NullSmsSender::class);
+            $container->extend('contract', static fn (object $sender): object => $sender);
+        }];
+        yield 'the class rebound' => [static function (Container $container): void {
+            $container->bind('contract', NullSmsSender::class);
+            $container->bind(NullSmsSender::class, \stdClass::class);
+        }];
+    }
+
+    /**
+     * Anything an application binds, holds or changes is not the default.
+     *
+     * @param  \Closure(\Illuminate\Container\Container): void  $arrange
+     * @return void
+     */
+    #[DataProvider('applicationBindings')]
+    public function testAnApplicationsBindingIsNotThePackages(\Closure $arrange): void
+    {
+        $container = new Container;
+
+        $arrange($container);
+
+        self::assertFalse(MfaServiceProvider::isPackageDefault($container, 'contract'));
+    }
+
+    /**
+     * A package class bound by name counts as the default, whoever bound it.
+     *
+     * @return void
+     */
+    public function testAPackageClassBoundByNameIsThePackages(): void
+    {
+        $container = new Container;
+
+        $container->bind(SmsSender::class, NullSmsSender::class);
+
+        self::assertTrue(MfaServiceProvider::isPackageDefault($container, SmsSender::class));
     }
 }
