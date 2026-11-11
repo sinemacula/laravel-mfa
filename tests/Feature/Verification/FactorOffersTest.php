@@ -127,6 +127,7 @@ final class FactorOffersTest extends TestCase
         $factor  = $this->passkeyFactor($user);
 
         self::assertCount(1, $this->mfa()->offeredFactors(Callers::current()));
+        self::assertSame([self::APPLICATION], $gateway->listedFor);
 
         $gateway->available = false;
 
