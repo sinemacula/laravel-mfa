@@ -7,10 +7,7 @@ namespace SineMacula\Laravel\Mfa\Passkeys;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 
 /**
- * What a verified passkey assertion observed: the credential that made it and
- * the properties its authenticator data showed (user presence, user
- * verification, backup eligibility and state), never what was requested; and
- * the challenge it answered, when the gateway reports one.
+ * What a verified passkey assertion observed, never what was requested.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -18,8 +15,6 @@ use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 final readonly class PasskeyAssertion
 {
     /**
-     * Constructor.
-     *
      * @param  string  $credentialId
      * @param  \SineMacula\Laravel\Mfa\Assurance\ObservedProperties  $properties
      * @param  ?string  $challengeId
@@ -28,14 +23,14 @@ final readonly class PasskeyAssertion
      */
     public function __construct(
 
-        /** The id of the credential that made the assertion. */
+        /** The credential that made the assertion. */
         #[\SensitiveParameter]
         public string $credentialId,
 
-        /** The properties the assertion observed. */
+        /** From the authenticator data. */
         public ObservedProperties $properties,
 
-        /** The challenge the assertion answered, for events and the proof, when the gateway reports one. */
+        /** The challenge answered, when the gateway reports one. */
         public ?string $challengeId = null,
     ) {
         if (trim($credentialId) === '') {

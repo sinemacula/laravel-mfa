@@ -16,20 +16,8 @@ use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 
 /**
- * Reads and writes the association records that make a passkey a factor.
- *
- * A passkey factor counts only with an association whose owner and credential
- * are the factor's own: the factor's credential reference and the association
- * are written and deleted together, in one factor state transaction, and any
- * mismatch between them leaves the factor unusable, as if it did not exist. A
- * credential is associated at most once, whoever holds it: the unique index on
- * its digest refuses a second association, a concurrent one included. Records
- * are read from the write connection. `ownedCredential()` names its owner in
- * the locking query, so another identity's association is never returned or
- * acted on, and `forFactor()` locks the association of a factor its caller
- * holds. The one locking read that names no owner is the lookup `save()` makes
- * after a unique violation. `exists()` and `associates()` take no lock, for the
- * checks made before the identity's factor state lock.
+ * The association records that make a passkey a factor. A mismatch with the
+ * factor leaves it unusable, and a unique index associates a credential once.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -39,10 +27,8 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 final readonly class PasskeyAssociations
 {
     /**
-     * The owner's association of the canonical credential id, or `null` when
-     * the owner holds no association of it, locked as it is read under the
-     * owner's factor state lock. The owner and the id are matched in the query
-     * and again here, exactly, since a column's collation may ignore case.
+     * Locked under the owner's lock. Matched again here, as a column's
+     * collation may ignore case.
      *
      * @param  string  $credentialId
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofOwner  $owner
@@ -66,9 +52,8 @@ final readonly class PasskeyAssociations
     }
 
     /**
-     * Whether the canonical credential id is associated with anybody, read
-     * without a lock, so it may be asked before the identity's factor state
-     * lock is taken.
+     * Whether anybody holds the credential. Unlocked, for checks made before
+     * the factor state lock.
      *
      * @param  string  $credentialId
      * @return bool
@@ -79,12 +64,8 @@ final readonly class PasskeyAssociations
     }
 
     /**
-     * Whether the factor has an association that matches it (see `matches()`),
-     * read without a lock, so it may be asked before the identity's factor
-     * state lock is held. An association changes only with its factor, under
-     * that lock, so what this reads cannot outlive the factor it was read for,
-     * and a read older than the lock can only miss one, which counts as no
-     * association.
+     * Unlocked: an association changes only with its factor, so a stale read
+     * can only miss one.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofOwner  $owner
@@ -104,8 +85,6 @@ final readonly class PasskeyAssociations
     }
 
     /**
-     * The association of the factor, or `null` when it has none.
-     *
      * @param  string  $factorId
      * @return ?\SineMacula\Laravel\Mfa\Models\PasskeyAssociation
      */
@@ -120,8 +99,6 @@ final readonly class PasskeyAssociations
     }
 
     /**
-     * Associate the canonical credential id with the owner's factor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofOwner  $owner
      * @param  string  $factorId
      * @param  string  $credentialId
@@ -154,8 +131,6 @@ final readonly class PasskeyAssociations
     }
 
     /**
-     * Delete the factor's association, if it has one.
-     *
      * @param  string  $factorId
      * @return void
      */
@@ -165,9 +140,6 @@ final readonly class PasskeyAssociations
     }
 
     /**
-     * Whether the association belongs to the owner's factor and names the
-     * factor's own credential.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofOwner  $owner
      * @param  ?\SineMacula\Laravel\Mfa\Models\PasskeyAssociation  $association
@@ -187,19 +159,11 @@ final readonly class PasskeyAssociations
     }
 
     /**
-     * Save the association: `false` when a model event cancels it, and `null`
-     * when a unique index refuses it and the credential turns out to be
-     * associated, because another change associated it first and committed,
-     * with this identity or another.
+     * False when a model event cancels the save, null when another change
+     * associated the credential first.
      *
-     * The insert runs in a nested transaction, as a statement's failure aborts
-     * the whole of a PostgreSQL transaction unless a savepoint contains it, and
-     * a violation leaves it masked with its class unchanged. The credential is
-     * looked up again with a locking read, as a plain read in a
-     * MySQL transaction reads its snapshot, which can miss the row that was
-     * committed after it. Finding it establishes the conflict, not which index
-     * fired; finding nothing means the failure is something else, which is a
-     * database error like any other and is thrown.
+     * A savepoint keeps a failed insert from aborting a PostgreSQL transaction,
+     * and the locking re-read sees rows a MySQL snapshot would miss.
      *
      * @param  \SineMacula\Laravel\Mfa\Models\PasskeyAssociation  $association
      * @return ?bool
@@ -222,9 +186,6 @@ final readonly class PasskeyAssociations
     }
 
     /**
-     * The association of the canonical credential id, read from the write
-     * connection with or without a lock.
-     *
      * @param  string  $credentialId
      * @param  bool  $lock
      * @return ?\SineMacula\Laravel\Mfa\Models\PasskeyAssociation
@@ -235,8 +196,7 @@ final readonly class PasskeyAssociations
 
         $association = ($lock ? $query->lockForUpdate() : $query)->first();
 
-        // The digest is compared by the database; the id itself is compared
-        // here, exactly, since a column's collation may ignore case.
+        // A column's collation may ignore case.
         return $association instanceof PasskeyAssociation && $association->credential_id === $credentialId ? $association : null;
     }
 }

@@ -5,10 +5,8 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Events;
 
 /**
- * Dispatched when someone resets the identity's factors: every factor removed,
- * lockouts lifted, sessions revoked and proofs invalidated. A factor whose
- * stored state could not be read is removed without an event of its own, as its
- * summary cannot be built honestly, and counted here instead.
+ * Dispatched when someone resets the identity's factors: all removed, lockouts
+ * lifted, sessions revoked and proofs invalidated.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -16,8 +14,6 @@ namespace SineMacula\Laravel\Mfa\Events;
 final readonly class FactorsReset extends ContextEvent
 {
     /**
-     * Constructor.
-     *
      * @param  array<string, int|string|null>  $context
      * @param  \SineMacula\Laravel\Mfa\Events\Actor  $actor
      * @param  string  $reason
@@ -38,7 +34,7 @@ final readonly class FactorsReset extends ContextEvent
         /** Whether the identity must enrol again at its next sign-in. */
         public bool $reenrollmentRequired = true,
 
-        /** How many of the factors removed had a stored state that could not be read, each reported by nothing else. */
+        /** Unreadable factors removed without a `FactorRemoved`, as no summary could be built. */
         public int $unreadableFactors = 0,
     ) {
         parent::__construct($context);

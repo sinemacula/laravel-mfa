@@ -5,10 +5,8 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Exceptions;
 
 /**
- * Unsupported factor exception.
- *
- * Thrown when a factor does not satisfy a stricter capability requirement:
- * typically a factor that is not a stored model, which delivered codes need.
+ * Thrown when a factor lacks a capability, such as delivered codes needing a
+ * stored model.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

@@ -5,11 +5,8 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Exceptions;
 
 /**
- * Thrown when the package's configuration, or a binding it needs, is wrong:
- * when the application boots and when the `mfa` manager is resolved, so a
- * misconfiguration fails before a person's first verification rather than at
- * it. The message lists every problem found, one per line, as `mfa:check`
- * prints them.
+ * Thrown at boot and when the `mfa` manager resolves, so a misconfiguration
+ * fails before anyone's first verification.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -17,8 +14,6 @@ namespace SineMacula\Laravel\Mfa\Exceptions;
 final class InvalidConfigurationException extends \LogicException
 {
     /**
-     * Constructor.
-     *
      * @param  non-empty-list<string>  $problems
      */
     public function __construct(

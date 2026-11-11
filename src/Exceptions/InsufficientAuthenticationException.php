@@ -10,37 +10,12 @@ use SineMacula\Laravel\Mfa\Support\ConsumerMessages;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
- * Raised when a request needs a factor, a level or fresher authentication than
- * it has, carrying what an application needs to answer as RFC 9470 describes.
+ * An RFC 9470 401 for a request that needs more authentication. It sets no
+ * `WWW-Authenticate` header, as cookie guards use it too; see
+ * `wwwAuthenticate()`.
  *
- * It is a 401 and sets no `WWW-Authenticate` header of its own: the package
- * also serves cookie guards, and the RFC is about a presented access token, so
- * the application chooses the answer and builds the header with
- * `wwwAuthenticate()`, or its own from `maxAge()` and `acrValues()`. Laravel
- * renders it with its message alone; `toArray()` is what an application's own
- * rendering sends.
- *
- * Its message is translated in the locale it is raised in, so a locale
- * middleware must run before `mfa`. The header's description is the shipped
- * English instead: RFC 6750 makes it a developer's diagnostic in a subset of
- * ASCII, which a translation or an application's override of `en` could break.
- *
- * The requirement is the whole effective one, not what is left of it, and it is
- * the authority. `maxAge()` and `acrValues()` are lossy projections of it: each
- * part is bounded on its own, and neither can state multifactor authentication
- * or phishing resistance.
- *
- * The factors are candidates and not a promise: they are what could follow the
- * first factor, not what would meet this requirement, so a refusal asking for
- * AAL2 can offer only an email code. They are summaries, with destinations
- * masked, and Laravel does not report an HTTP exception, so nothing secret
- * reaches a log.
- *
- * `hasConfirmedFactor` is a fact: whether the identity has a factor whose
- * stored status is exactly `confirmed`, a status the package does not know
- * counting as none. It is no authority to bootstrap. Having none does not mean
- * enrolment is needed, as a multi-factor first factor can meet a requirement,
- * and it is no grant: enrolment has its own checks.
+ * The message is translated, so locale middleware must run before `mfa`; the
+ * header's description stays English, as RFC 6750 limits it to ASCII.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -51,8 +26,6 @@ final class InsufficientAuthenticationException extends HttpException
     public const string ERROR = 'insufficient_user_authentication';
 
     /**
-     * Constructor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @param  list<\SineMacula\Laravel\Mfa\Factors\FactorSummary>  $offered
      * @param  ?string  $operation
@@ -60,24 +33,24 @@ final class InsufficientAuthenticationException extends HttpException
      */
     public function __construct(
 
-        /** The whole requirement the request is held to. */
+        /** The whole effective requirement, not what is left of it. */
         public readonly Requirement $requirement,
 
-        /** The factors the session could use next, masked. */
+        /** Candidates that could follow the first factor, not a promise to meet the requirement. */
         public readonly array $offered = [],
 
         /** The operation the route names, when it names one. */
         public readonly ?string $operation = null,
 
-        /** Whether the identity has a factor whose stored status is exactly `confirmed`. */
+        /** A fact, not a grant: enrolment has its own checks. */
         public readonly bool $hasConfirmedFactor = false,
     ) {
         parent::__construct(401, ConsumerMessages::line(ConsumerMessages::FURTHER_AUTHENTICATION_REQUIRED));
     }
 
     /**
-     * The shortest bound of any part, in seconds, or `null` when none is
-     * bounded.
+     * The shortest bound of any part, in seconds. A lossy projection of the
+     * requirement.
      *
      * @return ?int
      */
@@ -92,8 +65,8 @@ final class InsufficientAuthenticationException extends HttpException
     }
 
     /**
-     * The `acr` values that would meet the requirement's level: its minimum
-     * level's value, or none when it asks for none.
+     * The minimum level's `acr` value, if any. A lossy projection of the
+     * requirement.
      *
      * @return list<string>
      */
@@ -105,7 +78,7 @@ final class InsufficientAuthenticationException extends HttpException
     }
 
     /**
-     * What an application's own rendering sends, with every factor masked.
+     * What an application's own rendering sends; Laravel's uses the message.
      *
      * @formatter:off
      *
@@ -136,8 +109,7 @@ final class InsufficientAuthenticationException extends HttpException
 
     /**
      * An RFC 9470 `WWW-Authenticate` value, omitting what the requirement does
-     * not state. An adapter that maps levels to `acr` names builds its own from
-     * `maxAge()` and `acrValues()`.
+     * not state.
      *
      * @param  string  $scheme
      * @return string

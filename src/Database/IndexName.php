@@ -5,11 +5,8 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Database;
 
 /**
- * Names the shipped migrations give their indexes: the table's name and a
- * suffix naming what the index is for, or, when that would pass the 63
- * characters PostgreSQL keeps (MySQL keeps 64), the start of the table's name
- * and a hash of the whole, so a long configured table name still gives one
- * index name, the same on every run, that every engine accepts.
+ * Index names for the shipped migrations, shortened with a hash of the table
+ * name when they would pass PostgreSQL's 63 characters.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -18,7 +15,7 @@ namespace SineMacula\Laravel\Mfa\Database;
  */
 final class IndexName
 {
-    /** @var int The longest identifier every supported engine keeps. */
+    /** @var int PostgreSQL's limit; MySQL keeps 64. */
     private const int LONGEST = 63;
 
     /**
@@ -27,9 +24,6 @@ final class IndexName
     private function __construct() {}
 
     /**
-     * The name of the table's index with the given suffix (such as
-     * `_owner_index`).
-     *
      * @param  string  $table
      * @param  string  $suffix
      * @return string

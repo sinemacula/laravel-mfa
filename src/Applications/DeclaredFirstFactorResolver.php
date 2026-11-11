@@ -20,21 +20,9 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 
 /**
- * The default `FirstFactorResolver`, which reads the first factor an
- * application declares (`mfa.applications.{name}.first_factor`) when no
- * authentication layer reports one.
- *
- * It answers only for an application that declares one and an identity with a
- * sign-in on it the proof store knows of: a first factor of the declared method
- * and channel kind, naming no destination or credential, observing nothing,
- * made for sign-in, bound to that sign-in and stamped with the identity's
- * current verification generation. When it was made is not known, so it is
- * dated at the Unix epoch: it establishes the channel a further factor must be
- * independent of, but supplies no freshness of its own, so it never meets a
- * part with a maximum age by itself. Otherwise it answers `null`, and no
- * combination is accepted.
- *
- * Stateless: the configuration and the store are resolved on every call.
+ * The default `FirstFactorResolver`, reading the application's declared
+ * `first_factor`. The proof is dated at the Unix epoch, so it establishes a
+ * channel but never satisfies a maximum age.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -42,19 +30,16 @@ use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 final readonly class DeclaredFirstFactorResolver implements FirstFactorResolver
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      */
     public function __construct(
 
-        /** The container the configuration and the store are resolved from. */
+        /** Resolves the configuration and the store per call. */
         private Container $container,
     ) {}
 
     /**
-     * The declared first factor of the identity's current sign-in on the
-     * application, or `null` without a declaration or a sign-in.
+     * Null without a declaration or a sign-in the proof store knows.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application

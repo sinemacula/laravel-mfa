@@ -5,11 +5,8 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Exceptions;
 
 /**
- * Sender not configured exception.
- *
- * Thrown by the default SMS and email senders, which the package binds until
- * the application binds its own: a code is never dropped silently because
- * nothing was bound to deliver it.
+ * Thrown by the default SMS and email senders, so a code is never dropped
+ * silently when the application has bound none.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -17,8 +14,6 @@ namespace SineMacula\Laravel\Mfa\Exceptions;
 final class SenderNotConfiguredException extends \RuntimeException
 {
     /**
-     * Build the exception naming the contract the application must bind.
-     *
      * @param  class-string  $contract
      * @return self
      */

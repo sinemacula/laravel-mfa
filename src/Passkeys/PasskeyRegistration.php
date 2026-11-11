@@ -9,14 +9,8 @@ use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
 /**
- * A passkey an authentication layer is registering, as it hands it to the
- * change gate before it stores it: the credential's id, what the registration
- * ceremony observed, and what the ceremony was bound to. The authentication
- * layer has verified the attestation; the gate checks the binding against its
- * caller.
- *
- * The rules are checked on construction: the credential id is canonical (see
- * `CredentialId`), and the binding is for enrolment.
+ * A passkey an authentication layer has verified the attestation of and hands
+ * to the change gate before storing it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -26,8 +20,6 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 final readonly class PasskeyRegistration
 {
     /**
-     * Constructor.
-     *
      * @param  string  $credentialId
      * @param  \SineMacula\Laravel\Mfa\Assurance\ObservedProperties  $properties
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -36,14 +28,14 @@ final readonly class PasskeyRegistration
      */
     public function __construct(
 
-        /** The credential's id, canonical unpadded base64url. */
+        /** Canonical unpadded base64url. */
         #[\SensitiveParameter]
         public string $credentialId,
 
-        /** What the registration ceremony observed. */
+        /** What the ceremony observed. */
         public ObservedProperties $properties,
 
-        /** What the ceremony was bound to. */
+        /** Must be for enrolment. */
         public ProofBinding $binding,
     ) {
         CredentialId::canonical($credentialId);

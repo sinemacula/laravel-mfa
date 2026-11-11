@@ -11,9 +11,7 @@ use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 
 /**
- * Create the MFA identity states table: one row per identity that owns factors,
- * holding its factor state as a whole, and the row every change to that state
- * locks first.
+ * One row of factor state per identity, locked first by every change to it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -21,8 +19,6 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
 
 return new class extends Migration {
     /**
-     * Run the migrations.
-     *
      * @return void
      *
      * @throws \InvalidArgumentException
@@ -38,29 +34,22 @@ return new class extends Migration {
         $schema->create($table, static function (Blueprint $blueprint) use ($table): void {
             $blueprint->ulid('id')->primary();
 
-            // Plain string polymorphic columns, as on the factors table, so any
-            // key type fits. One row per identity: the lock that serialises
-            // changes to its factor state is taken by inserting or updating
-            // this row, which the unique index makes a single row per owner.
+            // The unique index keeps one row per owner, which the factor state
+            // lock upserts.
             $blueprint->string('authenticatable_type');
             $blueprint->string('authenticatable_id');
             $blueprint->unique(['authenticatable_type', 'authenticatable_id'], IndexName::for($table, '_owner_unique'));
 
-            // Advanced to invalidate every proof recorded under an earlier
-            // generation, so other sessions must verify again.
+            // Advanced to invalidate every earlier proof.
             $blueprint->unsignedBigInteger('verification_generation')->default(0);
 
-            // Whether a reset obliges the identity to enrol again at its next
-            // sign-in, until a factor is confirmed.
+            // Set by a reset until a factor is confirmed.
             $blueprint->boolean('reenrollment_required')->default(false);
 
-            // The identity's consecutive failures across all its factors, and
-            // the lockout they applied.
+            // Across every factor.
             $blueprint->unsignedInteger('consecutive_failures')->default(0);
             $blueprint->timestamp('locked_until')->nullable();
 
-            // The generation of the identity's current recovery code set and
-            // when it was generated.
             $blueprint->unsignedInteger('recovery_codes_generation')->default(0);
             $blueprint->timestamp('recovery_codes_generated_at')->nullable();
 
@@ -69,8 +58,6 @@ return new class extends Migration {
     }
 
     /**
-     * Reverse the migrations.
-     *
      * @return void
      *
      * @throws \InvalidArgumentException
@@ -81,9 +68,6 @@ return new class extends Migration {
     }
 
     /**
-     * The connection the package's tables live on (see `StorageConnection`),
-     * the one every serialised change locks this table's rows on.
-     *
      * @return ?string
      *
      * @throws \InvalidArgumentException

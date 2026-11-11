@@ -5,14 +5,8 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Support;
 
 /**
- * Reads the typed fields of a value's serialised form back, so a value read
- * from a session, a cache or JSON is refused rather than half-built when a
- * field is missing or of another type.
- *
- * Every refusal is an `InvalidArgumentException` naming the field and what it
- * belongs to. A nullable reader treats a missing field as `null`, and a field
- * the form does not know is refused, so a mistyped key is never read as a
- * missing one.
+ * Typed reads of a serialised form, refusing a missing or mistyped field rather
+ * than half-building the value.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -22,8 +16,6 @@ namespace SineMacula\Laravel\Mfa\Support;
 final readonly class SerializedFields
 {
     /**
-     * Constructor.
-     *
      * @param  array<array-key, mixed>  $data
      * @param  string  $subject
      */
@@ -32,12 +24,12 @@ final readonly class SerializedFields
         /** The serialised form. */
         private array $data,
 
-        /** What the form is of, as the messages name it, such as `a serialised proof`. */
+        /** Named in messages, such as `a serialised proof`. */
         private string $subject,
     ) {}
 
     /**
-     * Refuse any field other than the given ones.
+     * So a mistyped key is never read as a missing one.
      *
      * @param  string  ...$known
      * @return void
@@ -54,8 +46,6 @@ final readonly class SerializedFields
     }
 
     /**
-     * Read a field that must be a string.
-     *
      * @param  string  $key
      * @return string
      *
@@ -73,8 +63,6 @@ final readonly class SerializedFields
     }
 
     /**
-     * Read a field that must be a string or null.
-     *
      * @param  string  $key
      * @return ?string
      *
@@ -92,8 +80,6 @@ final readonly class SerializedFields
     }
 
     /**
-     * Read a field that must be a boolean or null.
-     *
      * @imperative
      *
      * @param  string  $key
@@ -113,8 +99,6 @@ final readonly class SerializedFields
     }
 
     /**
-     * Read a field that must be an integer.
-     *
      * @param  string  $key
      * @return int
      *
@@ -132,8 +116,6 @@ final readonly class SerializedFields
     }
 
     /**
-     * Read a field that must be an integer or null.
-     *
      * @param  string  $key
      * @return ?int
      *
@@ -151,8 +133,6 @@ final readonly class SerializedFields
     }
 
     /**
-     * Read a field that must be an array.
-     *
      * @param  string  $key
      * @return array<array-key, mixed>
      *
@@ -170,8 +150,6 @@ final readonly class SerializedFields
     }
 
     /**
-     * Read a field that must be an array or null.
-     *
      * @param  string  $key
      * @return ?array<array-key, mixed>
      *
@@ -189,8 +167,6 @@ final readonly class SerializedFields
     }
 
     /**
-     * Read a field that must be one of a string-backed enum's values.
-     *
      * @template T of \BackedEnum
      *
      * @param  string  $key
@@ -205,8 +181,6 @@ final readonly class SerializedFields
     }
 
     /**
-     * Read a field that must be one of a string-backed enum's values, or null.
-     *
      * @template T of \BackedEnum
      *
      * @param  string  $key
@@ -223,8 +197,6 @@ final readonly class SerializedFields
     }
 
     /**
-     * The enum case a field's value names.
-     *
      * @template T of \BackedEnum
      *
      * @param  string  $key
@@ -240,8 +212,6 @@ final readonly class SerializedFields
     }
 
     /**
-     * The refusal of a field.
-     *
      * @param  string  $key
      * @param  string  $problem
      * @return \InvalidArgumentException

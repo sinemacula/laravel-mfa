@@ -49,47 +49,13 @@ use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
 
 /**
- * MFA manager.
+ * The factor driver registry and the package's single entry point; each other
+ * method delegates to its capability's service.
  *
- * The factor driver registry (Laravel's `Manager`, so `Mfa::extend()` works as
- * for any manager) and the package's single entry point. Every other method is
- * a one-line delegation to the service of the capability it belongs to,
- * resolved from the application current at the time on each call:
+ * One instance may outlive many requests, so it keeps nothing: it resolves from
+ * `Container::getInstance()` and builds drivers on every call.
  *
- * - `Requirements\RequirementService`: what the current sign-in must prove
- *   (`requirement()`) and whether it is fresh enough for an operation
- *   (`isFresh()`).
- * - `Factors\FactorService`: the identity's factors and the factor model,
- *   `factors()`, `factor()`, `renameFactor()` and `setPreferredFactor()`.
- * - `Proofs\ProofService`: the proofs the current sign-in has recorded
- *   (`proofs()`).
- * - `Verification\VerificationService`: `verify()`.
- * - `Verification\ChallengeRequests`: `sendCode()` and `requestAssertion()`.
- * - `Verification\FactorOffers`: `offeredFactors()`.
- * - `Enrollment\EnrollmentService`: `startEnrollment()`, `confirmEnrollment()`,
- *   `resendEnrollmentCode()` and `cancelEnrollment()`.
- * - `Lifecycle\LifecycleService`: `removeFactor()`, `unlockFactor()` and
- *   `unlockIdentity()`.
- * - `Lifecycle\IdentityReset`: `resetIdentity()`.
- * - `Lifecycle\ForgetIdentity`: `forgetIdentity()`.
- * - `Lifecycle\RecordPruner`: `prune()`.
- * - `RecoveryCodes\RecoveryCodeIssuance`: `generateRecoveryCodes()`.
- * - `RecoveryCodes\RecoveryCodeService`: `recoveryCodeStatus()`.
- * - `Context\AuthenticationContextContributor`: `authenticationContext()`.
- *
- * The built-in drivers are registered by `Drivers\DriverBindings` through the
- * same `extend()` API a consumer uses.
- *
- * It keeps nothing a request gave it, as one instance may outlive many requests
- * on a long-running server: it declares no property, resolves from
- * `Container::getInstance()` rather than the container it was built with,
- * builds a driver on every call rather than caching it, and refuses a new
- * container. Calling a method it does not declare is refused too, as Laravel's
- * manager would forward it to the default driver, outside attempts, proofs and
- * events.
- *
- * Exceeds the project's max-methods-per-class threshold by design: it is the
- * one surface the facade exposes, and each method only delegates.
+ * The method count is the facade's whole surface.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -103,9 +69,8 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     // phpcs:disable Squiz.Commenting.FunctionComment.ScalarTypeHintMissing
 
     /**
-     * Refuse a method the manager does not declare: Laravel's manager would
-     * forward it to the default driver, outside attempts, proofs and events.
-     * The arguments may hold a secret, so they are not named.
+     * Laravel's manager would forward it to the default driver, outside
+     * attempts, proofs and events. The arguments may hold a secret.
      *
      * @param  string  $method
      * @param  array<int|string, mixed>  $parameters
@@ -122,8 +87,6 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     // phpcs:enable Squiz.Commenting.FunctionComment.ScalarTypeHintMissing
 
     /**
-     * Get the default driver name.
-     *
      * @return string
      */
     #[\Override]
@@ -133,9 +96,8 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Build the named driver, the default one when none is named: on every
-     * call, as a driver built here would otherwise keep the configuration and
-     * sender of the request that first asked for it.
+     * Built on every call, so a driver never keeps an earlier request's
+     * configuration or sender.
      *
      * @param  string|\UnitEnum|null  $driver
      * @return \SineMacula\Laravel\Mfa\Contracts\FactorDriver
@@ -156,8 +118,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Refuse a container: the inherited setter would keep a request's
-     * application.
+     * The inherited setter would keep a request's application.
      *
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @return never
@@ -171,10 +132,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * The requirement the current identity's sign-in on the current application
-     * must meet, composed from the application's configured mode, the
-     * identity's own requirement and its re-enrolment obligation: empty when it
-     * needs nothing further, and without an MFA-capable identity.
+     * What the current sign-in must meet; empty when nothing further is needed.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @return \SineMacula\Laravel\Mfa\Requirements\Requirement
@@ -189,10 +147,8 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Whether the current session is fresh enough for the named operation: the
-     * stricter of the requirement the application configures for it and the one
-     * given applies, either alone when the other is absent, and an operation
-     * with neither is never fresh.
+     * The stricter of the configured and the given requirement applies; an
+     * operation with neither is never fresh.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
@@ -208,15 +164,8 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * The refusal asking the caller to step up to the requirement, as the route
-     * gate raises it: the requirement as given, the factors offered to the
-     * caller, the operation as a label, and whether the identity has a factor
-     * whose stored status is exactly `confirmed`. Nothing is added to the
-     * requirement, and the operation adds no freshness; compose the requirement
-     * first, as with `requirement()` and `Requirement::strictest()`. A pending
-     * caller is reported as its pending session's identity; any other caller
-     * serving nobody, or naming an identity that is not a person, has no
-     * confirmed factor reported. It is returned, not thrown.
+     * The refusal the route gate raises, returned rather than thrown. Nothing
+     * is added to the requirement, so compose it first.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
@@ -233,9 +182,8 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * The proofs of the signed-in person's sign-in on the current application
-     * that still count, oldest first: none without an MFA-capable person or a
-     * sign-in, and none on a pending session.
+     * The current sign-in's proofs that still count, oldest first; none on a
+     * pending session.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @return list<\SineMacula\Laravel\Mfa\Proofs\Proof>
@@ -248,11 +196,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * The factors of the identity the request serves for listing them, as
-     * summaries, the preferred one first: a pending session's when its
-     * credential allows it, otherwise the signed-in person's; none when it
-     * serves nobody. Every factor is listed, pending ones and those enrolled
-     * through another application included.
+     * Every factor, pending and other applications' included, preferred first.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @return list<\SineMacula\Laravel\Mfa\Factors\FactorSummary>
@@ -265,9 +209,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * One factor of the identity the request serves for listing them, as a
-     * summary; `null` when it serves nobody or the id is not one of its
-     * factors, whoever else's it may be.
+     * Null for an id that is not one of the caller's factors.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  mixed  $factorId
@@ -281,9 +223,8 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * The factors offered to the session the request serves, as summaries:
-     * confirmed, of an enabled type and accepted after its first factor, the
-     * preferred one first; none when it serves nobody.
+     * Confirmed factors of an enabled type, accepted after the session's first
+     * factor, preferred first.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @return list<\SineMacula\Laravel\Mfa\Factors\FactorSummary>
@@ -297,9 +238,8 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Send a code for the identity's delivered factor, bound to its sign-in and
-     * the purpose: for a pending session, its sign-in; for an active one, a
-     * step-up unless `sign_in` is asked for. Verify under the same purpose.
+     * The purpose defaults to sign-in on a pending session and step-up on an
+     * active one. Verify under the same purpose.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  mixed  $factorId
@@ -315,9 +255,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Start an assertion request for the identity's passkey factor: its options
-     * for the client, or the reason there are none, `not_found` when the
-     * request serves nobody for verifying.
+     * Start a passkey assertion request, or say why not.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  mixed  $factorId
@@ -333,9 +271,8 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Verify a code for a factor, a code answering a challenge, a recovery code
-     * or a passkey's assertion, for the purpose given: for a pending session,
-     * its sign-in; for an active one, a step-up unless `sign_in` is asked for.
+     * The purpose defaults to sign-in on a pending session and step-up on an
+     * active one.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\Submission  $submission
@@ -351,9 +288,8 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Start an enrolment for the person the request serves: a pending factor, a
-     * grant that may confirm it, and by type a secret and its provisioning URI,
-     * or a first code to the destination; or the reason it may not start.
+     * A pending factor and the grant that may confirm it, or why it may not
+     * start.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Enrollment\EnrollmentRequest  $request
@@ -368,9 +304,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Confirm the enrolment the grant holds with the first valid code, in the
-     * session that started it: the factor, with any recovery codes that come
-     * with it; or the reason it was not confirmed.
+     * Confirm with the first valid code, in the session that started it.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Secrets\RevealedSecret|string  $grant
@@ -386,7 +320,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Send the code of the enrolment the grant holds again, renewing nothing.
+     * Renews nothing.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Secrets\RevealedSecret|string  $grant
@@ -401,8 +335,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Cancel the enrolment the grant holds; `false` for a grant that is not the
-     * caller's.
+     * False for a grant that is not the caller's.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Secrets\RevealedSecret|string  $grant
@@ -419,8 +352,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Give the signed-in person's factor, enrolled through the current
-     * application, a new label, with no step-up; a blank label is none.
+     * No step-up needed; a blank label clears it.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  mixed  $factorId
@@ -437,8 +369,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Make the signed-in person's confirmed factor their preferred one, which
-     * is offered first, with no step-up.
+     * No step-up needed.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  mixed  $factorId
@@ -453,8 +384,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Remove the signed-in person's factor enrolled through the current
-     * application, with a fresh step-up, or say why not.
+     * Needs a fresh step-up.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  mixed  $factorId
@@ -469,10 +399,8 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Reset an identity that has lost its factors, for someone else, with a
-     * reason: every factor, enrolment, recovery code, lockout, proof and
-     * session goes, and whether it must enrol again is recorded. Who may reset
-     * whom is the application's authorisation.
+     * Remove everything the identity holds. Who may reset whom is the
+     * application's to authorise.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Events\Actor  $actor
@@ -490,9 +418,8 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Lift the factor's temporary lockout, for the actor: whether a live one
-     * was lifted. Failures in a row stay, and a factor disabled at the failure
-     * ceiling stays disabled.
+     * Whether a live lockout was lifted. Failures in a row and a disabled state
+     * stay.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  mixed  $factorId
@@ -511,11 +438,8 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Enable the factor the failure ceiling disabled, for the actor: whether a
-     * disabled factor was enabled. Only the disabling goes: its failures in a
-     * row and any lockout stay, so its next failure disables it again, and
-     * nothing is proved or renewed. Who may enable whose factor, and whether a
-     * rebind is owed first, is the application's to decide.
+     * Whether a disabled factor was enabled. Its failures and any lockout stay,
+     * so its next failure disables it again.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  mixed  $factorId
@@ -534,8 +458,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Lift the identity's temporary lockout, for the actor: whether a live one
-     * was lifted. Failures in a row stay.
+     * Whether a live lockout was lifted. Failures in a row stay.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Events\Actor  $actor
@@ -553,10 +476,8 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Delete everything the package holds for an identity that has been
-     * deleted: its factors, enrolments, delivered codes, recovery codes,
-     * passkey associations and factor state. The `HasFactors` trait does this
-     * for an Eloquent identity; call it after deleting any other.
+     * Delete everything held for a deleted identity. `HasFactors` calls it for
+     * an Eloquent identity.
      *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
      * @return void
@@ -570,8 +491,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Delete abandoned enrolments, expired codes, used or replaced recovery
-     * codes and ended throttle windows, and say how many of each went.
+     * Delete stale records, counting each kind.
      *
      * @return \SineMacula\Laravel\Mfa\Lifecycle\PruneResult
      *
@@ -587,13 +507,8 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Generate a new recovery code set for the signed-in person, replacing any
-     * earlier one, and answer with its codes, once, as secrets for the
-     * response; or the reason it was refused, leaving the earlier set:
-     * `not_fresh` unless the session is fresh enough for
-     * `mfa.generate_recovery_codes` and reaches the level the application sets
-     * for issuing them, and `not_found` without an MFA-capable person signed
-     * in, or on a pending session.
+     * Replace the recovery code set, returning the codes once, or refuse and
+     * keep the earlier set.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @return \SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeGeneration
@@ -607,10 +522,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Where the recovery code set of the identity the request serves for
-     * listing factors stands, without a code: a pending session's when its
-     * credential allows listing them, otherwise the signed-in person's; `null`
-     * when it serves nobody.
+     * Never includes a code.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @return ?\SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeStatus
@@ -625,11 +537,8 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * The keys of the authentication context's `mfa` namespace for the caller's
-     * own sign-in: its proofs as the proof store holds them, with its first
-     * factor, given to `AuthenticationContextContributor::contributeFor()`. A
-     * pending session, nobody and an identity that is not a person have the
-     * neutral context.
+     * The `mfa` namespace of the caller's authentication context; neutral on a
+     * pending session.
      *
      * @formatter:off
      *
@@ -666,10 +575,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     }
 
     /**
-     * Resolve the configured factor model class.
-     *
-     * Consumers wire the resolved class into their identity's
-     * `morphMany(Mfa::factorModel(), 'authenticatable')` relation.
+     * For an identity's `morphMany(Mfa::factorModel(), 'authenticatable')`.
      *
      * @return class-string<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>
      *
@@ -684,8 +590,7 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     // phpcs:disable Squiz.Commenting.FunctionComment.ScalarTypeHintMissing
 
     /**
-     * Call a custom driver creator with the application current at the time,
-     * not the one the manager was built with.
+     * Passes the current application, not the one the manager was built with.
      *
      * @param  string  $driver
      * @return mixed
@@ -701,8 +606,6 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
     // phpcs:enable Squiz.Commenting.FunctionComment.ScalarTypeHintMissing
 
     /**
-     * Resolve a service from the application current at the time.
-     *
      * @template TService of object
      *
      * @param  class-string<TService>  $service

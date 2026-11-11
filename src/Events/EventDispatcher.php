@@ -13,20 +13,8 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Database\AfterStorageCommit;
 
 /**
- * The one way the package dispatches its events: once the change they report
- * has committed, so a listener never sees an event for a change that rolled
- * back, and each with the context the bound `EventContextResolver` gives.
- *
- * An event is dispatched at once when the storage connection has no open
- * transaction, otherwise when that transaction commits, and never when it rolls
- * back. A transaction open on another connection neither delays nor drops it,
- * since the package's changes are not made in it. The transactions manager is
- * read when an event is dispatched, as Laravel's dispatcher does, so the one
- * the testing traits swap in (which ignores their own wrapping transaction) is
- * the one consulted.
- *
- * Events report; they never enforce. Nothing security-relevant depends on a
- * listener running.
+ * Dispatches events once the storage connection's transaction commits, never on
+ * rollback. Events only report: nothing security-relevant needs a listener.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -36,21 +24,17 @@ use SineMacula\Laravel\Mfa\Database\AfterStorageCommit;
 final readonly class EventDispatcher
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      */
     public function __construct(
 
-        /** The container the resolver, request, dispatcher and transactions are read from. */
+        /** Resolved per dispatch so the testing traits' transactions manager is used. */
         private Container $container,
     ) {}
 
     /**
-     * The context of an event about the identity, from the bound resolver for
-     * the client the action was served to and the sign-in the operation was
-     * bound to when it captured one, cut down to `EventContext::KEYS`, on the
-     * application the operation ran through. No request is read.
+     * Context from the bound resolver, cut to `EventContext::KEYS`. No request
+     * is read.
      *
      * @param  ?\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  ?string  $application
@@ -71,10 +55,8 @@ final readonly class EventDispatcher
     }
 
     /**
-     * The context of an event about a stored owner, for a change made with no
-     * identity to hand, such as pruning: only what its row says, so nothing of
-     * whichever session or tenant the request or process happens to serve is
-     * attributed to it.
+     * Context from a stored row alone, for changes such as pruning, so the
+     * current request's session or tenant is never attributed to it.
      *
      * @param  string  $type
      * @param  string  $key
@@ -87,9 +69,6 @@ final readonly class EventDispatcher
     }
 
     /**
-     * Dispatch the event once the storage connection's open transaction, if
-     * any, commits.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MfaEvent  $event
      * @return void
      *

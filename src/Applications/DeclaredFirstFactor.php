@@ -7,11 +7,8 @@ namespace SineMacula\Laravel\Mfa\Applications;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 
 /**
- * The first factor an application declares its guard signs people in with, when
- * no authentication layer reports it: the method and the kind of channel it
- * proves. Without an authentication layer, a declaration (or a bound
- * `FirstFactorResolver`) is what lets the combination policy accept a further
- * factor; a channel the application cannot name is no declaration at all.
+ * The first factor an application declares its guard uses, so the combination
+ * policy can accept a further factor without an authentication layer.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -19,8 +16,6 @@ use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 final readonly class DeclaredFirstFactor
 {
     /**
-     * Constructor.
-     *
      * @param  string  $method
      * @param  \SineMacula\Laravel\Mfa\Enums\ChannelKind  $channel
      *
@@ -28,10 +23,10 @@ final readonly class DeclaredFirstFactor
      */
     public function __construct(
 
-        /** The method the guard signs people in with, such as `password`. */
+        /** Such as `password`. */
         public string $method,
 
-        /** The kind of channel that method proves. */
+        /** Never unknown. */
         public ChannelKind $channel,
     ) {
         if (trim($method) === '') {

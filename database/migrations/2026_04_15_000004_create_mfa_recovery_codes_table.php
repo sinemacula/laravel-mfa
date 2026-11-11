@@ -11,8 +11,7 @@ use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 
 /**
- * Create the MFA recovery codes table: the codes of each identity's recovery
- * code set, stored as salted hashes.
+ * Each identity's recovery code set, stored as salted hashes.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -20,8 +19,6 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
 
 return new class extends Migration {
     /**
-     * Run the migrations.
-     *
      * @return void
      *
      * @throws \InvalidArgumentException
@@ -37,21 +34,15 @@ return new class extends Migration {
         $schema->create($table, static function (Blueprint $blueprint) use ($table): void {
             $blueprint->ulid('id')->primary();
 
-            // Plain string polymorphic columns, as on the factors table, so any
-            // key type fits.
             $blueprint->string('authenticatable_type');
             $blueprint->string('authenticatable_id');
             $blueprint->index(['authenticatable_type', 'authenticatable_id', 'generation'], IndexName::for($table, '_owner_index'));
 
-            // The salted hash of the code, never the code: long enough for any
-            // of Laravel's hashers.
+            // Long enough for any of Laravel's hashers.
             $blueprint->string('code_hash');
 
-            // The generation of the set the code belongs to: a newer set
-            // replaces every code of an older one.
             $blueprint->unsignedInteger('generation');
 
-            // When the code was used, or its set replaced; either ends it.
             $blueprint->timestamp('used_at')->nullable();
             $blueprint->timestamp('replaced_at')->nullable();
 
@@ -60,8 +51,6 @@ return new class extends Migration {
     }
 
     /**
-     * Reverse the migrations.
-     *
      * @return void
      *
      * @throws \InvalidArgumentException
@@ -72,9 +61,6 @@ return new class extends Migration {
     }
 
     /**
-     * The connection the package's tables live on (see `StorageConnection`),
-     * the one the package reads and writes the table on.
-     *
      * @return ?string
      *
      * @throws \InvalidArgumentException

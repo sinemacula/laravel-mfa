@@ -9,9 +9,8 @@ use SineMacula\Laravel\Mfa\Context\DefaultEventContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\EventContextResolver;
 
 /**
- * Registers the event wiring: the default `EventContextResolver`, which an
- * authentication layer's adapter or the application rebinds, and the dispatcher
- * every event goes through.
+ * Binds the default `EventContextResolver`, which an authentication layer or
+ * the application rebinds, and the event dispatcher.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -26,8 +25,6 @@ final class EventBindings
     private function __construct() {}
 
     /**
-     * Register the default context resolver and the dispatcher.
-     *
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @return void
      */

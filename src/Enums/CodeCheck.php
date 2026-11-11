@@ -37,10 +37,8 @@ enum CodeCheck: string
     case MISSING = 'missing';
 
     /**
-     * Why a check that did not accept the code failed, as a failure reason, or
-     * `null` for one that did. A known challenge with no live code to check
-     * against, whatever the cause, is `expired`; a challenge that is absent, or
-     * another's, is `not_found`.
+     * Null when accepted. A known challenge with no live code is `expired`; an
+     * absent or another's challenge is `not_found`.
      *
      * @return ?\SineMacula\Laravel\Mfa\Enums\FailureReason
      */
@@ -56,8 +54,7 @@ enum CodeCheck: string
     }
 
     /**
-     * Why, in detail, for the internal record of a failure: events and logs,
-     * never the caller.
+     * For events and logs, never the caller.
      *
      * @return string
      */

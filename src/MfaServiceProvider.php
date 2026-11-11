@@ -27,31 +27,11 @@ use SineMacula\Laravel\Mfa\Secrets\SecretBindings;
 use SineMacula\Laravel\Mfa\Verification\VerificationBindings;
 
 /**
- * MFA service provider.
+ * Registers the `mfa` manager and hands each capability's wiring to its
+ * `*Bindings` class. Only `mfa` is shared, for long-running processes.
  *
- * Registers the configuration and the `mfa` manager singleton, then hands each
- * capability's container wiring to that capability's `*Bindings` class: its
- * service and its fail-closed defaults for the seams consumers rebind
- * (requirements, proof store, pending sessions, subject type, first factor,
- * reauthentication, session revocation and transition, challenges, passkeys,
- * the last factor, SMS and email senders, event context). The shipped drivers
- * are registered against the manager by their capability's `*Bindings` class
- * from inside the singleton's factory, once the configuration is checked. Boots
- * the translations, the middleware aliases, config, migration and translation
- * publishing, the `mfa:check` command, and the configuration check that runs
- * once the application has booted, which also refuses a factor model off the
- * storage connection.
- *
- * Only `mfa` is shared: every service and default is built when it is asked
- * for, on the application serving at the time (see the long-running processes
- * design note).
- *
- * Consumers with their own requirement policy, stateless proof store, or SMS
- * and email senders rebind the matching contracts in their own service
- * provider; `laravel-iam` ships an opinionated set of bindings for paired-mode
- * use. Every default, and `mfa` itself, is bound only when nothing is bound
- * yet, so a binding made before this provider registers is kept, and one made
- * after replaces the default.
+ * Every default is bound only when nothing is bound yet, so a consumer's
+ * binding wins whether made before or after this provider registers.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -59,8 +39,6 @@ use SineMacula\Laravel\Mfa\Verification\VerificationBindings;
 final class MfaServiceProvider extends ServiceProvider
 {
     /**
-     * Register any application services.
-     *
      * @return void
      */
     #[\Override]
@@ -88,8 +66,6 @@ final class MfaServiceProvider extends ServiceProvider
     }
 
     /**
-     * Bootstrap any application services.
-     *
      * @return void
      */
     public function boot(): void
@@ -105,14 +81,8 @@ final class MfaServiceProvider extends ServiceProvider
     }
 
     /**
-     * Register the MFA manager singleton with the shipped drivers, checking the
-     * configuration before building it, unless `mfa` is already bound.
-     *
-     * The shipped drivers are registered inside the factory, through the same
-     * `extend()` API a consumer uses, so they exist before the container runs
-     * any extender or resolving callback a consumer has attached to `mfa`. A
-     * consumer's own registration of a shipped driver's name, whether made
-     * there or later through `Mfa::extend()`, therefore always wins.
+     * The shipped drivers are registered inside the factory, before any
+     * consumer extender runs, so a consumer's registration always wins.
      *
      * @return void
      */
@@ -131,8 +101,6 @@ final class MfaServiceProvider extends ServiceProvider
     }
 
     /**
-     * Register the package's console commands when running in the console.
-     *
      * @return void
      */
     protected function registerCommands(): void
@@ -145,8 +113,6 @@ final class MfaServiceProvider extends ServiceProvider
     }
 
     /**
-     * Offer config, migration and translation publishing.
-     *
      * @return void
      */
     protected function offerPublishing(): void

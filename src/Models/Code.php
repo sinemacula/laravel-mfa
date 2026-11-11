@@ -10,10 +10,8 @@ use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 
 /**
- * A code sent by SMS or email for a factor: the keyed hash of the code and its
- * binding (factor, purpose, application and session), a keyed digest of what it
- * was sent to, the attempts made against it, how often and when it was sent
- * (last, and each time), when it expires and when it was used.
+ * A code sent by SMS or email, stored as a keyed hash bound to its factor,
+ * purpose, application and session.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -42,7 +40,7 @@ final class Code extends Model
 {
     use HasUlids;
 
-    /** @var list<string> The attributes that are mass assignable. */
+    /** @var list<string> */
     protected $fillable = [
         'factor_id',
         'authenticatable_type',
@@ -60,7 +58,7 @@ final class Code extends Model
         'consumed_at',
     ];
 
-    /** @var list<string> The attributes that should be hidden for serialisation. */
+    /** @var list<string> */
     protected $hidden = [
         'code_hash',
         'session_id',
@@ -68,9 +66,7 @@ final class Code extends Model
     ];
 
     /**
-     * Create the record on the table and connection the package configures (see
-     * `Database\TableNames` and `Database\StorageConnection`), read when it is
-     * built so a change in the configuration applies to the next one.
+     * Reads the table and connection per instance so config changes apply.
      *
      * @param  array<string, mixed>  $attributes
      *
@@ -86,8 +82,6 @@ final class Code extends Model
     }
 
     /**
-     * Columns that receive a generated unique identifier on insert.
-     *
      * @return array<int, string>
      */
     #[\Override]
@@ -97,8 +91,6 @@ final class Code extends Model
     }
 
     /**
-     * The attributes that should be cast.
-     *
      * @return array<string, string>
      */
     #[\Override]

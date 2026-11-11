@@ -9,23 +9,9 @@ use Illuminate\Support\Facades\Config;
 use SineMacula\Laravel\Mfa\Exceptions\ModelOffStorageConnectionException;
 
 /**
- * Where the package's tables live: the connection the shipped models read and
- * write, the one the shipped migrations create the tables on, and the one every
- * serialised change to an identity's factor state runs its transaction on, so
- * the three cannot disagree.
- *
- * Every table lives on `mfa.storage.connection` (`null` or empty for the
- * default connection). They are kept together because a change that depends on
- * the identity's whole factor state (confirming a factor, replacing the
- * recovery codes, removing a factor, a reset) writes several of them in one
- * transaction, which two connections cannot commit as one; a model on another
- * connection is refused rather than splitting one.
- *
- * A model takes its connection when it is built, so the setting must stay the
- * same for the life of a process: moving the tables is a deploy, with a worker
- * restart and a migration the application performs, not a runtime switch.
- * Connections are compared by name, a model's own or the default one, so no
- * connection is opened.
+ * The one connection for every package table, since a factor state change
+ * writes several tables in one transaction. The setting must not change during
+ * a process's life: models take their connection when built.
  *
  * @api
  *
@@ -34,7 +20,7 @@ use SineMacula\Laravel\Mfa\Exceptions\ModelOffStorageConnectionException;
  */
 final class StorageConnection
 {
-    /** @var string The setting that names the connection. */
+    /** @var string */
     private const string SETTING = 'mfa.storage.connection';
 
     /**
@@ -43,11 +29,7 @@ final class StorageConnection
     private function __construct() {}
 
     /**
-     * The connection the package's tables live on, or `null` for the default
-     * connection.
-     *
-     * A value that is neither a name nor `null` or empty fails closed rather
-     * than putting a table on another connection than the one meant.
+     * Null for the default connection.
      *
      * @return ?string
      *
@@ -65,9 +47,6 @@ final class StorageConnection
     }
 
     /**
-     * The name of the storage connection: the configured one, or the default
-     * one.
-     *
      * @return string
      *
      * @throws \InvalidArgumentException
@@ -78,10 +57,8 @@ final class StorageConnection
     }
 
     /**
-     * The connection a shipped model is built on: the storage connection by
-     * name, the default one included, since Eloquent gives a related model that
-     * names none its parent's connection; `null` (the default connection) while
-     * the configuration is not yet bootstrapped.
+     * Named even when default, since Eloquent gives a related model that names
+     * none its parent's connection. Null before configuration is bootstrapped.
      *
      * @return ?string
      *
@@ -93,8 +70,6 @@ final class StorageConnection
     }
 
     /**
-     * The name of the model's connection: its own, or the default one.
-     *
      * @param  \Illuminate\Database\Eloquent\Model  $model
      * @return string
      *
@@ -106,9 +81,6 @@ final class StorageConnection
     }
 
     /**
-     * Refuse a model that does not live on the storage connection, naming the
-     * setting that configures it and both connections.
-     *
      * @param  \Illuminate\Database\Eloquent\Model  $model
      * @param  string  $setting
      * @return void

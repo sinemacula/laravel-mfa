@@ -5,11 +5,8 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Enums;
 
 /**
- * The package's own named operations, each with a requirement and a maximum age
- * for the proof that satisfies it, checked as step-up before the change is
- * made. An application names its own operations alongside these, in the same
- * form: lower-case segments of letters, digits and underscores, each starting
- * with a letter, separated by dots.
+ * The package's own named operations, each checked as step-up before the change
+ * is made. Applications name their own in the same form.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -28,13 +25,10 @@ enum Operation: string
     // Generating a new recovery code set
     case GENERATE_RECOVERY_CODES = 'mfa.generate_recovery_codes';
 
-    /** @var string The form every operation's name takes, the package's and an application's alike. */
+    /** @var string Dot-separated lower-case segments, each starting with a letter. */
     public const string NAME_PATTERN = '/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$/D';
 
     /**
-     * Whether the name is in the form an operation's name takes, so a name in
-     * any other form is never an operation's.
-     *
      * @param  string  $name
      * @return bool
      */

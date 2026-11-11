@@ -11,12 +11,8 @@ use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
 /**
- * The default `PasskeyGateway`: this package stores no WebAuthn credentials and
- * runs no ceremonies, so without an authentication layer, or an application's
- * own binding, passkeys are unavailable. No identity has a registered passkey,
- * verifying an assertion is refused, counting nothing, and asking for one is a
- * programming error. The package refuses to boot with an application that
- * enables the `passkey` type while this gateway is still bound.
+ * The default `PasskeyGateway`: this package runs no WebAuthn ceremonies, so
+ * passkeys are unavailable until an authentication layer binds its own.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -24,8 +20,6 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 final readonly class UnavailablePasskeyGateway implements PasskeyGateway
 {
     /**
-     * Passkeys cannot be used.
-     *
      * @return bool
      */
     #[\Override]
@@ -35,8 +29,6 @@ final readonly class UnavailablePasskeyGateway implements PasskeyGateway
     }
 
     /**
-     * No registered passkeys.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return list<string>
      */
@@ -47,7 +39,7 @@ final readonly class UnavailablePasskeyGateway implements PasskeyGateway
     }
 
     /**
-     * Refuse: there is no ceremony to start.
+     * Asking for one is a programming error.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -63,7 +55,7 @@ final readonly class UnavailablePasskeyGateway implements PasskeyGateway
     }
 
     /**
-     * Refuse: nothing can verify, and nobody tried a wrong assertion.
+     * Refused without counting: nobody tried a wrong assertion.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding

@@ -5,11 +5,7 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Exceptions;
 
 /**
- * Missing destination exception.
- *
- * Thrown by OTP-delivery drivers when the factor they are asked to issue a
- * challenge against has no destination configured — the code would have nowhere
- * to go.
+ * Thrown by a delivery driver when the factor has no destination.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

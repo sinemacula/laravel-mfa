@@ -10,13 +10,9 @@ use Illuminate\Support\Facades\DB;
 use SineMacula\Laravel\Mfa\Secrets\QueryExceptionMask;
 
 /**
- * Every transaction the package opens on the storage connection, so that work
- * waiting for its commit (`AfterStorageCommit`) ends with it when the commit
- * fails, on every Laravel version the package supports, rather than running on
- * the connection's next commit, and so that a failed query leaves it with
- * nothing it was given (see `Secrets\QueryExceptionMask`). A transaction runs
- * once: a deadlock is a server error for the caller to retry, since running it
- * again here would run a driver again and could deliver a second code.
+ * Every transaction the package opens. On failure it drops after-commit work
+ * and masks query values. It never retries a deadlock, which could deliver a
+ * second code.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -31,8 +27,6 @@ final class StorageTransaction
     private function __construct() {}
 
     /**
-     * Run the callback in a transaction on the storage connection.
-     *
      * @template TReturn
      *
      * @param  \Closure(): TReturn  $callback
@@ -61,13 +55,8 @@ final class StorageTransaction
     }
 
     /**
-     * End the transaction a failed commit left open on the PDO. Laravel has
-     * already counted it as closed, so on a connection a long-running process
-     * reuses, the next request would otherwise read what never committed and
-     * fail to begin a transaction of its own. Only the transaction this class
-     * opened is ever ended, never one the application holds, and whatever goes
-     * wrong here gives way to the failure the caller is about to receive: a
-     * connection that cannot be rolled back is dropped, to be opened afresh.
+     * End the transaction a failed commit left open on the PDO, which Laravel
+     * counts as closed, so a long-running process does not reuse it.
      *
      * @param  \Illuminate\Database\Connection  $connection
      * @return void

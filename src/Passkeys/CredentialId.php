@@ -5,16 +5,9 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Passkeys;
 
 /**
- * A WebAuthn credential id as this package names it: the canonical unpadded
- * base64url encoding of its bytes (RFC 4648, section 5), compared exactly, case
- * included. Any other encoding of the same bytes (padded, the standard
- * alphabet, stray bits in the last character) is refused rather than
- * normalised, so two spellings of one credential can never pass as two, nor
- * slip past the rule that the passkey which started a sign-in is never its
- * second factor.
- *
- * An association record finds a credential by the SHA-256 hex digest of that
- * string, since a credential id may run to 1023 bytes.
+ * A WebAuthn credential id as canonical unpadded base64url (RFC 4648 section
+ * 5). Other spellings are refused, not normalised, so one credential can never
+ * pass as two and be both a sign-in's first and second factor.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -23,7 +16,7 @@ namespace SineMacula\Laravel\Mfa\Passkeys;
  */
 final class CredentialId
 {
-    /** @var int The longest credential id WebAuthn allows, in bytes. */
+    /** @var int WebAuthn's limit, in bytes. */
     public const int MAX_BYTES = 1023;
 
     /**
@@ -32,9 +25,6 @@ final class CredentialId
     private function __construct() {}
 
     /**
-     * The credential id, refused with an `InvalidArgumentException` unless it
-     * is the canonical unpadded base64url encoding of 1 to 1023 bytes.
-     *
      * @param  string  $credentialId
      * @return string
      *
@@ -52,8 +42,6 @@ final class CredentialId
     }
 
     /**
-     * Whether the credential id is in its canonical form.
-     *
      * @param  string  $credentialId
      * @return bool
      */
@@ -69,8 +57,6 @@ final class CredentialId
     }
 
     /**
-     * The canonical encoding of the bytes.
-     *
      * @param  string  $bytes
      * @return string
      */
@@ -80,7 +66,7 @@ final class CredentialId
     }
 
     /**
-     * The digest an association finds the canonical credential id by.
+     * SHA-256, since an id may run to 1023 bytes.
      *
      * @param  string  $credentialId
      * @return string
@@ -91,9 +77,6 @@ final class CredentialId
     }
 
     /**
-     * The bytes an unpadded base64url string encodes, or `null` when it is not
-     * one.
-     *
      * @param  string  $credentialId
      * @return ?string
      */

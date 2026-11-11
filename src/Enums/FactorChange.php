@@ -5,11 +5,9 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Enums;
 
 /**
- * A change to an identity's factors that the bound `Contracts\FactorChangeGate`
- * authorises from an active session, named by the same operation names as the
- * freshness the package's default judges it by. A first additional factor is a
- * change of its own: with no further factor to step up with, it rests on the
- * first factor proved again rather than on a step-up.
+ * A change to an identity's factors that `Contracts\FactorChangeGate`
+ * authorises. A first additional factor has no factor to step up with, so it
+ * rests on the first factor proved again.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -29,8 +27,6 @@ enum FactorChange: string
     case GENERATE_RECOVERY_CODES = 'mfa.generate_recovery_codes';
 
     /**
-     * Whether the change names the factor it is made to.
-     *
      * @return bool
      */
     public function namesFactor(): bool
@@ -39,8 +35,7 @@ enum FactorChange: string
     }
 
     /**
-     * Whether the change authorises a grant that outlives the request, whose
-     * lifetime ends when the authorisation does.
+     * Whether the change authorises a grant that outlives the request.
      *
      * @return bool
      */
@@ -50,9 +45,7 @@ enum FactorChange: string
     }
 
     /**
-     * The operation whose freshness the application configures for the change,
-     * or `null` for a first additional factor, which no step-up can be made
-     * for.
+     * Null for a first additional factor, which no step-up can be made for.
      *
      * @return ?\SineMacula\Laravel\Mfa\Enums\Operation
      */

@@ -15,8 +15,6 @@ use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 final readonly class FactorRenamed extends ContextEvent
 {
     /**
-     * Constructor.
-     *
      * @param  array<string, int|string|null>  $context
      * @param  \SineMacula\Laravel\Mfa\Factors\FactorSummary  $factor
      * @param  ?string  $previousLabel

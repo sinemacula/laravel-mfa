@@ -7,11 +7,8 @@ namespace SineMacula\Laravel\Mfa\Exceptions;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
 
 /**
- * Code not sent exception.
- *
- * Carries why an enrolment's first code was not sent out of the identity's
- * factor state transaction, so the pending factor and its grant roll back and
- * the entry point answers with the reason and how long to wait.
+ * Carries an unsent first enrolment code out of the factor state transaction,
+ * so the pending factor and its grant roll back.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -21,8 +18,6 @@ use SineMacula\Laravel\Mfa\Codes\SendResult;
 final class CodeNotSentException extends \RuntimeException
 {
     /**
-     * Constructor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Codes\SendResult  $result
      */
     public function __construct(

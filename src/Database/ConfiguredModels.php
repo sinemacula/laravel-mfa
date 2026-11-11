@@ -13,15 +13,8 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode as RecoveryCodeModel;
 
 /**
- * The model classes an application may replace through configuration: the
- * factor model (`mfa.factor.model`) and the recovery code model
- * (`mfa.recovery_codes.model`), each a subclass of the shipped one or the
- * application's own Eloquent model implementing the package's contract.
- *
- * A setting that is `null` takes the shipped model. Anything else that is not a
- * class extending Eloquent's model and implementing the contract is refused
- * with an `InvalidModelException`, never replaced by the shipped model, so a
- * typo cannot go unnoticed.
+ * The model classes an application may replace through configuration. An
+ * invalid class throws rather than falling back, so a typo cannot go unnoticed.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -30,10 +23,10 @@ use SineMacula\Laravel\Mfa\Models\RecoveryCode as RecoveryCodeModel;
  */
 final class ConfiguredModels
 {
-    /** @var string The setting naming the factor model. */
+    /** @var string */
     public const string FACTOR = 'mfa.factor.model';
 
-    /** @var string The setting naming the recovery code model. */
+    /** @var string */
     public const string RECOVERY_CODE = 'mfa.recovery_codes.model';
 
     /**
@@ -42,8 +35,6 @@ final class ConfiguredModels
     private function __construct() {}
 
     /**
-     * The configured factor model class.
-     *
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @return class-string<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>
      *
@@ -56,8 +47,6 @@ final class ConfiguredModels
     }
 
     /**
-     * The configured recovery code model class.
-     *
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @return class-string<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\RecoveryCode>
      *
@@ -70,8 +59,6 @@ final class ConfiguredModels
     }
 
     /**
-     * The class the setting names, the shipped one when it names none.
-     *
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @param  string  $setting
      * @param  class-string  $shipped

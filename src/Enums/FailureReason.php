@@ -5,16 +5,8 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Enums;
 
 /**
- * Machine-readable reason a verification, a code request, an enrolment or a
- * change to a factor failed, carried on a failed `VerificationResult`, on an
- * `OperationRefusedException` and on the failure events.
- *
- * Backed, so listeners count failure modes and applications word them without
- * scraping messages. The values are noun first, as in `laravel-authentication`,
- * and stable once released. The reason is what a caller may be told; why it
- * failed in detail stays internal, in the result's detail, the events and the
- * logs, so a factor that does not exist and one that belongs to someone else
- * both answer `not_found`.
+ * Machine-readable reason an operation failed, and all a caller is told: a
+ * missing factor and another identity's both answer `not_found`.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

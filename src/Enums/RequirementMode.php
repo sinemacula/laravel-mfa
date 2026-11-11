@@ -5,8 +5,7 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Enums;
 
 /**
- * When an application requires an additional factor at sign-in: the setting the
- * default requirement policy reads from the application's configuration.
+ * When an application requires an additional factor at sign-in.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

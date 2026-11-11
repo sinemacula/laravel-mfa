@@ -11,8 +11,7 @@ use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 
 /**
- * Create the MFA enrolments table: one row per enrolment in progress, binding
- * its pending factor to the grant that may confirm it.
+ * One row per enrolment in progress, binding its pending factor to its grant.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -20,8 +19,6 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
 
 return new class extends Migration {
     /**
-     * Run the migrations.
-     *
      * @return void
      *
      * @throws \InvalidArgumentException
@@ -37,37 +34,27 @@ return new class extends Migration {
         $schema->create($table, static function (Blueprint $blueprint) use ($table): void {
             $blueprint->ulid('id')->primary();
 
-            // The pending factor this enrolment confirms: one enrolment per
-            // factor.
             $blueprint->string('factor_id');
             $blueprint->unique('factor_id', IndexName::for($table, '_factor_unique'));
 
-            // Plain string polymorphic columns, as on the factors table, so any
-            // key type fits.
             $blueprint->string('authenticatable_type');
             $blueprint->string('authenticatable_id');
             $blueprint->index(['authenticatable_type', 'authenticatable_id'], IndexName::for($table, '_owner_index'));
 
-            // SHA-256 hex digest of the enrolment grant, never the grant.
+            // Never the grant itself.
             $blueprint->char('grant_hash', 64);
             $blueprint->unique('grant_hash', IndexName::for($table, '_grant_unique'));
 
-            // What the grant is bound to: the application, a keyed digest of
-            // the sign-in that started the enrolment, the verification
-            // generation it started under, so advancing that kills the grant,
-            // and what authorised it.
+            // Advancing the generation kills the grant; the session is a keyed
+            // digest.
             $blueprint->string('application');
             $blueprint->string('session_id');
             $blueprint->unsignedInteger('generation');
             $blueprint->string('authority', 32);
 
-            // The challenge the last delivered code went out under, written
-            // once it has been sent.
             $blueprint->string('challenge_id')->nullable();
 
-            // When the grant stops confirming, taken once from what authorised
-            // it and never renewed, indexed for pruning abandoned enrolments,
-            // and the confirmation attempts made against it.
+            // Never renewed.
             $blueprint->timestamp('expires_at')->index(IndexName::for($table, '_expiry_index'));
             $blueprint->unsignedInteger('attempts')->default(0);
 
@@ -76,8 +63,6 @@ return new class extends Migration {
     }
 
     /**
-     * Reverse the migrations.
-     *
      * @return void
      *
      * @throws \InvalidArgumentException
@@ -88,9 +73,6 @@ return new class extends Migration {
     }
 
     /**
-     * The connection the package's tables live on (see `StorageConnection`),
-     * the one the package reads and writes the table on.
-     *
      * @return ?string
      *
      * @throws \InvalidArgumentException

@@ -18,8 +18,6 @@ use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 final readonly class LockoutApplied extends ContextEvent
 {
     /**
-     * Constructor.
-     *
      * @param  array<string, int|string|null>  $context
      * @param  ?\SineMacula\Laravel\Mfa\Factors\FactorSummary  $factor
      * @param  \Carbon\CarbonImmutable  $lockedUntil
@@ -43,8 +41,6 @@ final readonly class LockoutApplied extends ContextEvent
     }
 
     /**
-     * What the action the event reports was for.
-     *
      * @return \SineMacula\Laravel\Mfa\Enums\Purpose
      */
     #[\Override]

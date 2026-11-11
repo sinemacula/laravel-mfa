@@ -11,9 +11,8 @@ use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 
 /**
- * Create the MFA attempts table: the temporary throttles, one counter per scope
- * (an identity or an IP address) and subject, counted atomically so no cache is
- * needed.
+ * Attempt throttles, one counter per scope and subject, counted atomically so
+ * no cache is needed.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -21,8 +20,6 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
 
 return new class extends Migration {
     /**
-     * Run the migrations.
-     *
      * @return void
      *
      * @throws \InvalidArgumentException
@@ -36,26 +33,18 @@ return new class extends Migration {
         (new MigrationCollisionGuard($schema))->ensureNotExists($table, TableNames::ATTEMPTS . '.table');
 
         $schema->create($table, static function (Blueprint $blueprint) use ($table): void {
-            // HMAC-SHA256 hex digest, keyed from the application key, of the
-            // scope and the subject it counts, so the table alone gives neither
-            // back.
+            // Keyed from `app.key`, so the table alone reveals no subject.
             $blueprint->char('key', 64)->primary();
 
-            // The scope the counter counts within: an identity or an IP
-            // address.
             $blueprint->string('scope', 16);
 
             $blueprint->unsignedInteger('hits');
 
-            // When the counter's window ends, indexed for pruning ended
-            // windows.
             $blueprint->timestamp('window_ends_at')->index(IndexName::for($table, '_window_index'));
         });
     }
 
     /**
-     * Reverse the migrations.
-     *
      * @return void
      *
      * @throws \InvalidArgumentException
@@ -66,9 +55,6 @@ return new class extends Migration {
     }
 
     /**
-     * The connection the package's tables live on (see `StorageConnection`),
-     * the one the package reads and writes the table on.
-     *
      * @return ?string
      *
      * @throws \InvalidArgumentException

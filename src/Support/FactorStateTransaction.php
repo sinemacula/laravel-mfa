@@ -18,31 +18,8 @@ use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 
 /**
- * The one transaction, and the one lock order, of every change that depends on
- * an identity's whole factor state: confirming its first additional factor,
- * replacing its recovery codes, removing a factor, a reset, and a verification
- * racing any of them.
- *
- * The transaction runs on the storage connection (see `StorageConnection`),
- * where every package table lives, so the change commits or rolls back as one.
- * Inside it the identity's row in the identity states table is locked first,
- * inserted when the identity has none yet, and the identity's factors second,
- * read `FOR UPDATE` from the write connection. Every change takes the locks in
- * that order, so two changes for one identity never wait on each other in
- * opposite orders: the second waits for the first to commit, then finds what it
- * left. The callback is handed the factors as stored under the lock, so it
- * checks its preconditions again on them rather than on what its caller read
- * before (a factor a concurrent change removed is gone). They are matched to
- * the owner exactly: a database's collation may read and lock another owner's
- * too, differing only in case, and those are not handed over.
- *
- * The identity's row is locked through `IdentityStateRow::lock()`, the one way
- * it is locked. A factor model on another connection is refused before the
- * transaction opens, as two connections cannot commit as one.
- *
- * Calls the change makes to another package that must be atomic with it, such
- * as revoking sessions, belong inside the callback; an adapter whose own
- * storage is on another connection cannot be.
+ * Locks the identity state row, then its factors, so two factor state changes
+ * never deadlock. The callback must recheck preconditions on what it is handed.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -57,13 +34,7 @@ final class FactorStateTransaction
     private function __construct() {}
 
     /**
-     * Run the callback in a transaction on the storage connection, holding the
-     * identity's state lock and then its factors' locks, and return what the
-     * callback returns.
-     *
-     * The factor model is the configured one (an instance only names the class
-     * and its connection); the callback is handed the identity's factors as
-     * stored under the lock.
+     * The factor model instance only names the class and its connection.
      *
      * @template TReturn
      *
@@ -86,9 +57,8 @@ final class FactorStateTransaction
     }
 
     /**
-     * Run the callback as `forIdentity()` does, for the identity that owns the
-     * factor, read from the factor's owner columns (see `FactorOwnerColumns`),
-     * so an owner that is not an Eloquent model is locked as one that is.
+     * Read from the owner columns, so an owner that is not a model is locked
+     * the same way.
      *
      * @template TReturn
      *
@@ -118,9 +88,7 @@ final class FactorStateTransaction
     }
 
     /**
-     * Run the callback as `forIdentity()` does, for the owner the type and key
-     * name, so a record whose factor is gone can still be changed under its
-     * owner's lock, with no identity object or factor to hand.
+     * For a record whose factor is gone, with no identity to hand.
      *
      * @template TReturn
      *
@@ -144,11 +112,8 @@ final class FactorStateTransaction
     }
 
     /**
-     * The identity's factors as stored now, read from the write connection with
-     * no lock and matched to the owner exactly, as the transaction matches
-     * them: what a check made before the lock decides on, and what a listing
-     * shows. An identity whose key is neither a string nor an integer holds
-     * none.
+     * The identity's factors without a lock, for checks before it and for
+     * listings.
      *
      * @formatter:off
      *
@@ -173,8 +138,6 @@ final class FactorStateTransaction
     }
 
     /**
-     * Open the transaction, take the locks in order and run the callback.
-     *
      * @template TReturn
      *
      * @formatter:off
@@ -204,8 +167,6 @@ final class FactorStateTransaction
     }
 
     /**
-     * What the query finds of the owner's factors, matched to it exactly.
-     *
      * @formatter:off
      *
      * @param  \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>  $query
@@ -229,9 +190,7 @@ final class FactorStateTransaction
     }
 
     /**
-     * An owner key as it is stored on the owner columns: a string or an
-     * integer, as a string. Anything else is refused rather than collapsing
-     * distinct identities onto one lock.
+     * Refuses a non-scalar key rather than collapse identities onto one lock.
      *
      * @param  mixed  $key
      * @return string

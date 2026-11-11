@@ -9,12 +9,8 @@ use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
 use SineMacula\Laravel\Mfa\Config\IntegerSetting;
 
 /**
- * The TOTP settings in `mfa.totp`, read on every call and validated as they are
- * read: the algorithm, digits and period new enrolments use, the window an
- * application that sets none of its own accepts, and the issuer an
- * authenticator app shows. A value outside its bounds fails closed with an
- * `InvalidArgumentException` naming the key; the package checks them when it
- * boots and `mfa:check` reports them.
+ * The `mfa.totp` settings, read on every call and failing closed when out of
+ * bounds.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -23,7 +19,7 @@ use SineMacula\Laravel\Mfa\Config\IntegerSetting;
  */
 final readonly class TotpSettings
 {
-    /** @var string Prefix of every TOTP setting's key. */
+    /** @var string */
     private const string PREFIX = 'mfa.totp.';
 
     /** @var array<string, array{0: int, 1: int, 2: int}> Default, least and greatest value of each numeric setting. */
@@ -34,19 +30,16 @@ final readonly class TotpSettings
     ];
 
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Config\Repository  $config
      */
     public function __construct(
 
-        /** Configuration the settings are read from on every call. */
+        /** Read on every call. */
         private Repository $config,
     ) {}
 
     /**
-     * The HMAC algorithm new enrolments use: `sha1` (the default, which every
-     * authenticator app supports), `sha256` or `sha512`.
+     * Defaults to `sha1`, which every authenticator app supports.
      *
      * @return string
      *
@@ -64,8 +57,6 @@ final readonly class TotpSettings
     }
 
     /**
-     * The number of digits in a code for new enrolments, 6 to 8.
-     *
      * @return int
      *
      * @throws \InvalidArgumentException
@@ -76,7 +67,7 @@ final readonly class TotpSettings
     }
 
     /**
-     * How long each code lasts for new enrolments, in seconds, 15 to 120.
+     * In seconds.
      *
      * @return int
      *
@@ -88,8 +79,8 @@ final readonly class TotpSettings
     }
 
     /**
-     * How many time steps either side of the current one are accepted, 0 to 3,
-     * by an application that sets no window of its own.
+     * Steps either side of the current one, for an application that sets no
+     * window of its own.
      *
      * @return int
      *
@@ -101,9 +92,6 @@ final readonly class TotpSettings
     }
 
     /**
-     * How many time steps either side of the current one the named application
-     * accepts: its own `totp_window`, or `window()` when it sets none.
-     *
      * @param  string  $application
      * @return int
      *
@@ -115,8 +103,7 @@ final readonly class TotpSettings
     }
 
     /**
-     * The issuer an authenticator app shows for a new enrolment that names none
-     * of its own: `mfa.totp.issuer`, or the application's name without one.
+     * `mfa.totp.issuer`, or `app.name` without one.
      *
      * @return string
      *
@@ -134,9 +121,6 @@ final readonly class TotpSettings
     }
 
     /**
-     * The algorithm, digits and period a new enrolment is made with, stored
-     * with its factor.
-     *
      * @return \SineMacula\Laravel\Mfa\Drivers\TotpParameters
      *
      * @throws \InvalidArgumentException
@@ -147,8 +131,6 @@ final readonly class TotpSettings
     }
 
     /**
-     * Read every setting, failing closed on the first that is out of bounds.
-     *
      * @return void
      *
      * @throws \InvalidArgumentException
@@ -163,9 +145,6 @@ final readonly class TotpSettings
     }
 
     /**
-     * The issuer `mfa.totp.issuer` sets, if any, which must be a non-empty
-     * string.
-     *
      * @return ?string
      *
      * @throws \InvalidArgumentException
@@ -182,8 +161,6 @@ final readonly class TotpSettings
     }
 
     /**
-     * Read a numeric setting from its least to its greatest value.
-     *
      * @param  string  $key
      * @return int
      *

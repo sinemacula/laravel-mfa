@@ -9,12 +9,7 @@ use SineMacula\Laravel\Mfa\Contracts\EmailSender;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 
 /**
- * Email factor driver.
- *
- * Delivers each code to the factor's email address through the application's
- * `EmailSender`, which is given the code's neutral details and lays out the
- * message itself (the package's `Codes\MailEmailSender` sends its own
- * `MfaCodeMessage`). The default sender throws until the application binds one.
+ * Delivers codes through the bound `EmailSender`, which lays out the message.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -22,19 +17,15 @@ use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 final class EmailDriver extends AbstractCodeDriver
 {
     /**
-     * Constructor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\EmailSender  $sender
      */
     public function __construct(
 
-        /** The sender the message is delivered through. */
+        /** Throws by default until the application binds one. */
         private readonly EmailSender $sender,
     ) {}
 
     /**
-     * A code sent by email to the factor's address.
-     *
      * @return \SineMacula\Laravel\Mfa\Enums\ChannelKind
      */
     #[\Override]
@@ -44,7 +35,7 @@ final class EmailDriver extends AbstractCodeDriver
     }
 
     /**
-     * The address trimmed and in lower case, or `null` when it is not one.
+     * Trimmed and lower-cased, or null when not an address.
      *
      * @param  string  $destination
      * @return ?string
@@ -58,8 +49,6 @@ final class EmailDriver extends AbstractCodeDriver
     }
 
     /**
-     * Hand the message to the email sender.
-     *
      * @param  \SineMacula\Laravel\Mfa\Codes\CodeMessage  $message
      * @return void
      */

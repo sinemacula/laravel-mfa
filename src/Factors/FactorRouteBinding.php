@@ -16,19 +16,9 @@ use SineMacula\Laravel\Mfa\Support\FactorOwnerColumns;
 use SineMacula\Laravel\Mfa\Support\IdentityType;
 
 /**
- * Holds what a factor model's route binding finds to the caller, for
- * `Concerns\ResolvesFactorRouteBinding`.
- *
- * Nobody served finds nothing, with no query. Otherwise the model's own lookup
- * runs on the write connection, and what it finds must be an instance of the
- * model and owned by the caller exactly, so a replica cannot lag behind a
- * removal and a case-insensitive collation cannot match another owner. A miss
- * is `null`. A database failure and a pending credential the resolver refuses
- * propagate: neither is a missing factor.
- *
- * It is an edge, run while Laravel binds the route's parameters: the caller is
- * built from the request being served (`Context\CallerContext::fromRequest()`)
- * on every call, and nothing is served outside a request.
+ * Limits a factor route binding to the caller's own factors, for
+ * `Concerns\ResolvesFactorRouteBinding`. Reads the write connection so a
+ * replica cannot lag behind a removal, and matches the owner exactly.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -38,23 +28,19 @@ use SineMacula\Laravel\Mfa\Support\IdentityType;
 final readonly class FactorRouteBinding
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContextResolver  $callers
      */
     public function __construct(
 
-        /** The container the request being served is read from. */
+        /** The request is read from it on every call. */
         private Container $container,
 
-        /** The resolver of who the caller is served as. */
+        /** Resolves who the caller is served as. */
         private CallerContextResolver $callers,
     ) {}
 
     /**
-     * What the lookup finds, when the caller owns it.
-     *
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $model
      * @param  \Closure(): mixed  $lookup
      * @return ?\Illuminate\Database\Eloquent\Model
@@ -79,8 +65,7 @@ final readonly class FactorRouteBinding
     }
 
     /**
-     * Run the lookup on the write connection, its miss as `null`: Eloquent's
-     * own lookup throws for a key that cannot be one of the model's.
+     * Eloquent's lookup throws for a key that cannot be the model's.
      *
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $model
      * @param  \Closure(): mixed  $lookup

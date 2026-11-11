@@ -20,8 +20,6 @@ use SineMacula\Laravel\Mfa\Support\IdentityType;
 final readonly class Actor implements \JsonSerializable
 {
     /**
-     * Constructor.
-     *
      * @param  string  $type
      * @param  string  $id
      */
@@ -30,14 +28,11 @@ final readonly class Actor implements \JsonSerializable
         /** The actor's type: its morph class, or its class name. */
         public string $type,
 
-        /** The actor's identifier. */
+        /** The actor's auth identifier. */
         public string $id,
     ) {}
 
     /**
-     * The actor an identity is, recorded by its morph class (or class name) and
-     * its auth identifier.
-     *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
      * @return self
      */
@@ -47,8 +42,6 @@ final readonly class Actor implements \JsonSerializable
     }
 
     /**
-     * Render the actor as its type and id.
-     *
      * @return array{type: string, id: string}
      */
     #[\Override]

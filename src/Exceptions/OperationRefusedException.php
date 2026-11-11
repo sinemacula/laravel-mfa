@@ -7,21 +7,11 @@ namespace SineMacula\Laravel\Mfa\Exceptions;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 
 /**
- * Operation refused exception.
+ * Thrown when an operation may not go ahead. Neither the reason nor the detail
+ * names another identity's factor.
  *
- * Thrown by `Factors\OperationGuard` when an operation may not go ahead: the
- * identity is a machine or inactive, the factor is not the identity's, it is
- * not confirmed where the operation needs it to be, or its type is not enabled
- * for the application. It carries the machine-readable reason the operation
- * answers with, and an internal detail for logs only; neither names another
- * identity's factor.
- *
- * A seam may throw one too. On `generateRecoveryCodes()` and
- * `requestAssertion()` that stays an exception: only a refusal marked as the
- * package's own becomes the value there, so a seam's is never read as the
- * package deciding. The other helpers that answer with a value, such as
- * `sendCode()` and `verify()`, do not read the mark, and report it as their
- * reason. The mark says who refused, not when.
+ * On `generateRecoveryCodes()` and `requestAssertion()` only a refusal marked
+ * `byPackage` becomes a result, so a seam's refusal stays an exception.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -29,29 +19,25 @@ use SineMacula\Laravel\Mfa\Enums\FailureReason;
 final class OperationRefusedException extends \RuntimeException
 {
     /**
-     * Constructor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
      * @param  string  $detail
      * @param  bool  $byPackage
      */
     public function __construct(
 
-        /** The machine-readable reason the operation was refused. */
+        /** The machine-readable reason a caller is told. */
         public readonly FailureReason $reason,
 
-        // What happened in detail, for logs only.
+        // For logs only.
         string $detail,
 
-        /** Whether the package itself refused: see `byPackage()`. */
+        /** Who refused, not when. */
         public readonly bool $byPackage = false,
     ) {
         parent::__construct($detail);
     }
 
     /**
-     * A refusal the package itself makes.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
      * @param  string  $detail
      * @return self
@@ -64,9 +50,6 @@ final class OperationRefusedException extends \RuntimeException
     }
 
     /**
-     * Refuse the operation for the reason, with the detail, unless it is
-     * allowed, as `unless()` does, and as the package's own refusal.
-     *
      * @param  bool  $allowed
      * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
      * @param  string  $detail
@@ -86,9 +69,6 @@ final class OperationRefusedException extends \RuntimeException
     }
 
     /**
-     * Refuse the operation for the reason, with the detail, unless it is
-     * allowed.
-     *
      * @param  bool  $allowed
      * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
      * @param  string  $detail

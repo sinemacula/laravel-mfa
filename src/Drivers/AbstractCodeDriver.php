@@ -12,18 +12,8 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 
 /**
- * Base class for the drivers whose codes are delivered to a destination (email,
- * SMS).
- *
- * The bound `ChallengeGateway` draws, stores and checks their codes, bound to
- * the factor, the identity, the application, the session and the purpose (see
- * `Codes\CodeService`), so a concrete driver only describes its channel and its
- * transport: how a code reaches the factor's destination. The code service
- * refuses a factor with no destination before any message is built.
- *
- * The driver holds no code to compare, so `verify()` and `confirm()` refuse
- * with a `LogicException` rather than accept a code checked by nothing. Such a
- * type keeps no secret, so starting an enrolment returns none.
+ * Base for drivers whose codes are delivered to a destination. The challenge
+ * gateway checks their codes, so `verify()` and `confirm()` refuse here.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -31,8 +21,6 @@ use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 abstract class AbstractCodeDriver implements CodeDeliveryDriver
 {
     /**
-     * The `amr` value of a code sent to the factor: `otp`.
-     *
      * @return list<string>
      */
     #[\Override]
@@ -42,8 +30,7 @@ abstract class AbstractCodeDriver implements CodeDeliveryDriver
     }
 
     /**
-     * Delivered codes keep no persistent secret: each is drawn when it is sent,
-     * so starting an enrolment returns none.
+     * Each code is drawn when sent, so there is no secret to return.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return null
@@ -55,9 +42,6 @@ abstract class AbstractCodeDriver implements CodeDeliveryDriver
     }
 
     /**
-     * Refuse: a pending factor is confirmed with a code checked under its
-     * binding, through the challenge gateway.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -72,9 +56,6 @@ abstract class AbstractCodeDriver implements CodeDeliveryDriver
     }
 
     /**
-     * Refuse: a code is checked under its binding, through the challenge
-     * gateway.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  string  $code
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -89,9 +70,6 @@ abstract class AbstractCodeDriver implements CodeDeliveryDriver
     }
 
     /**
-     * Deliver the message's code to its destination through the driver's
-     * transport.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Codes\CodeMessage  $message
      * @return void
@@ -103,17 +81,12 @@ abstract class AbstractCodeDriver implements CodeDeliveryDriver
     }
 
     /**
-     * Send the message's code to its destination through the driver's
-     * transport.
-     *
      * @param  \SineMacula\Laravel\Mfa\Codes\CodeMessage  $message
      * @return void
      */
     abstract protected function send(#[\SensitiveParameter] CodeMessage $message): void;
 
     /**
-     * The refusal of a factor-only call for a code that needs its binding.
-     *
      * @param  string  $action
      * @return \LogicException
      */

@@ -8,8 +8,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * The type an identity is recorded under on a factor's owner columns, in its
- * proofs and in its events.
+ * The type an identity is recorded under in factors, proofs and events.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -24,8 +23,7 @@ final class IdentityType
     private function __construct() {}
 
     /**
-     * The identity's type: its morph class for an Eloquent identity, so an
-     * application's morph map is honoured, and its class name otherwise.
+     * The morph class for an Eloquent identity, so a morph map is honoured.
      *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
      * @return string

@@ -7,8 +7,7 @@ namespace SineMacula\Laravel\Mfa\Factors;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 
 /**
- * How a change to a factor's label or preference ended: made, with the factor
- * as it now stands, or refused, with the reason a caller may be told.
+ * How a change to a factor's label or preference ended.
  *
  * @api
  *
@@ -18,23 +17,19 @@ use SineMacula\Laravel\Mfa\Enums\FailureReason;
 final readonly class FactorChange
 {
     /**
-     * Constructor.
-     *
      * @param  ?\SineMacula\Laravel\Mfa\Factors\FactorSummary  $factor
      * @param  ?\SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
      */
     private function __construct(
 
-        /** The factor as it now stands, when the change was made. */
+        /** The factor as it now stands; null when refused. */
         public ?FactorSummary $factor,
 
-        /** Why the change was refused, when it was. */
+        /** Null when made. */
         public ?FailureReason $reason,
     ) {}
 
     /**
-     * A change that was made.
-     *
      * @param  \SineMacula\Laravel\Mfa\Factors\FactorSummary  $factor
      * @return self
      */
@@ -44,8 +39,6 @@ final readonly class FactorChange
     }
 
     /**
-     * A change refused for the reason.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
      * @return self
      */
@@ -55,8 +48,6 @@ final readonly class FactorChange
     }
 
     /**
-     * Whether the change was made.
-     *
      * @return bool
      */
     public function wasMade(): bool

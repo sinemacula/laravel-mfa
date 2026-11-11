@@ -7,18 +7,8 @@ namespace SineMacula\Laravel\Mfa\Drivers;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 
 /**
- * The parameters a TOTP factor's codes are made with (RFC 6238): the HMAC
- * algorithm, the number of digits and the period of a time step. A factor keeps
- * the parameters it was enrolled with, so it works the same way in every
- * application and after the configuration changes.
- *
- * A code is the HOTP value (RFC 4226 §5.3) of the time step: the HMAC of the
- * step as an 8-byte big-endian counter, dynamically truncated to 31 bits and
- * reduced to the number of digits, zero-padded on the left. Values outside the
- * bounds the configuration allows are refused, here as when they are read.
- *
- * `TotpDriver::parameters()` returns the parameters new enrolments use, for a
- * factor that is not an Eloquent model to store with its secret.
+ * A TOTP factor's parameters, kept from enrolment so a configuration change
+ * does not alter existing factors.
  *
  * @api
  *
@@ -27,24 +17,22 @@ use SineMacula\Laravel\Mfa\Contracts\Factor;
  */
 final readonly class TotpParameters
 {
-    /** @var list<string> The HMAC algorithms a TOTP factor may use, as RFC 6238 names them. */
+    /** @var list<string> As RFC 6238 names them. */
     public const array ALGORITHMS = ['sha1', 'sha256', 'sha512'];
 
-    /** @var int The fewest digits a code may have. */
+    /** @var int */
     public const int MIN_DIGITS = 6;
 
-    /** @var int The most digits a code may have. */
+    /** @var int */
     public const int MAX_DIGITS = 8;
 
-    /** @var int The shortest time step, in seconds. */
+    /** @var int In seconds. */
     public const int MIN_PERIOD = 15;
 
-    /** @var int The longest time step, in seconds. */
+    /** @var int In seconds. */
     public const int MAX_PERIOD = 120;
 
     /**
-     * Constructor.
-     *
      * @param  string  $algorithm
      * @param  int  $digits
      * @param  int  $period
@@ -53,13 +41,13 @@ final readonly class TotpParameters
      */
     public function __construct(
 
-        /** The HMAC algorithm: `sha1`, `sha256` or `sha512`. */
+        /** One of `ALGORITHMS`. */
         public string $algorithm,
 
-        /** The number of digits in a code. */
+        /** Digits in a code. */
         public int $digits,
 
-        /** The length of a time step, in seconds. */
+        /** Time step, in seconds. */
         public int $period,
     ) {
         if (!self::allows($algorithm, $digits, $period)) {
@@ -71,8 +59,8 @@ final readonly class TotpParameters
     }
 
     /**
-     * The parameters the factor was enrolled with, or `null` when it holds
-     * none, or holds values outside the bounds, so it verifies nothing.
+     * Null when the factor holds none or holds out-of-bounds values, so it
+     * verifies nothing.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return ?self
@@ -91,9 +79,7 @@ final readonly class TotpParameters
     }
 
     /**
-     * How many random bytes a new secret has: the length of the algorithm's
-     * output, which RFC 6238 recommends for the key and is never under 160
-     * bits.
+     * The algorithm's output length, as RFC 6238 recommends for the key.
      *
      * @return 20|32|64
      */
@@ -107,8 +93,6 @@ final readonly class TotpParameters
     }
 
     /**
-     * The time step the moment falls in: whole periods since the Unix epoch.
-     *
      * @param  int  $timestamp
      * @return int
      */
@@ -118,7 +102,7 @@ final readonly class TotpParameters
     }
 
     /**
-     * The code for the time step, made with the key.
+     * The HOTP value (RFC 4226 section 5.3) of the step.
      *
      * @param  string  $key
      * @param  int  $step
@@ -138,8 +122,6 @@ final readonly class TotpParameters
     }
 
     /**
-     * Whether the values are within the bounds.
-     *
      * @param  string  $algorithm
      * @param  int  $digits
      * @param  int  $period
@@ -156,8 +138,6 @@ final readonly class TotpParameters
     }
 
     /**
-     * Whether the value lies between the bounds, inclusive.
-     *
      * @param  int  $value
      * @param  int  $min
      * @param  int  $max

@@ -9,8 +9,8 @@ use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 
 /**
- * Dispatched once per attempt that fails, with the machine-readable reason. A
- * check against the whole recovery code set is one attempt.
+ * Dispatched once per failed attempt. A check against the whole recovery code
+ * set is one attempt.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -18,8 +18,6 @@ use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 final readonly class VerificationFailed extends ContextEvent
 {
     /**
-     * Constructor.
-     *
      * @param  array<string, int|string|null>  $context
      * @param  ?\SineMacula\Laravel\Mfa\Factors\FactorSummary  $factor
      * @param  ?string  $type
@@ -51,8 +49,6 @@ final readonly class VerificationFailed extends ContextEvent
     }
 
     /**
-     * What the action the event reports was for.
-     *
      * @return \SineMacula\Laravel\Mfa\Enums\Purpose
      */
     #[\Override]
