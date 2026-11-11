@@ -6,6 +6,7 @@ namespace SineMacula\Laravel\Mfa\Proofs;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Support\Arrayable;
+use SineMacula\Laravel\Mfa\Assurance\Authenticator;
 use SineMacula\Laravel\Mfa\Assurance\Channel;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
@@ -110,6 +111,17 @@ final readonly class Proof implements \JsonSerializable, Arrayable
             $fields->int('generation'),
             $fields->nullableString('challenge_id'),
         );
+    }
+
+    /**
+     * The RFC 8176 `amr` values the proof adds, from its channel and observed
+     * properties.
+     *
+     * @return list<string>
+     */
+    public function amr(): array
+    {
+        return Authenticator::of($this)->amr;
     }
 
     /**
