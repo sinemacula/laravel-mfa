@@ -267,8 +267,8 @@ final class FactorRemovalTest extends TestCase
         $other  = $this->confirmedFactor($user);
 
         $this->container()->make(ProofStore::class)->record($user, SignInProofs::of($user)->password());
-        $this->stepUpWith($user, $other);
         $this->stepUpWith($user, $factor);
+        $this->stepUpWith($user, $other);
 
         $factors = FactorSets::of($factor, $other);
         $result  = DB::transaction(fn (): FactorRemovalResult => $this->removal()->remove($user, self::APPLICATION, $factor, $factors, SignInProofs::SESSION));
