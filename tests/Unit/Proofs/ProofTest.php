@@ -19,9 +19,6 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use Tests\Unit\Concerns\BuildsProofs;
 
 /**
- * Unit tests for the `Proof` value: construction, the rules between its kind,
- * channel, reference and purpose, and serialisation.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -33,8 +30,6 @@ final class ProofTest extends TestCase
     use BuildsProofs;
 
     /**
-     * A proof keeps everything it was made with.
-     *
      * @return void
      */
     public function testAProofKeepsWhatItWasMadeWith(): void
@@ -58,8 +53,7 @@ final class ProofTest extends TestCase
     }
 
     /**
-     * A proof stamped with another generation keeps everything else, and the
-     * original is left as it was.
+     * Everything else is kept and the original is unchanged.
      *
      * @return void
      */
@@ -106,8 +100,6 @@ final class ProofTest extends TestCase
     }
 
     /**
-     * Proofs whose parts contradict each other or are blank.
-     *
      * @return iterable<string, array{array<string, mixed>, string}>
      */
     public static function provideInvalidProofs(): iterable
@@ -148,9 +140,6 @@ final class ProofTest extends TestCase
     }
 
     /**
-     * A proof whose parts contradict each other, or that has a blank part, is
-     * refused.
-     *
      * @param  array<string, mixed>  $overrides
      * @param  string  $message
      * @return void
@@ -165,9 +154,9 @@ final class ProofTest extends TestCase
     }
 
     /**
-     * A reauthentication with the first factor carries the reauthenticate
-     * purpose, an additional factor may serve any purpose, and a recovery code
-     * any but an enrolment.
+     * Reauthentication with the first factor carries the reauthenticate
+     * purpose; an additional factor serves any purpose; a recovery code any but
+     * enrolment.
      *
      * @return void
      */
@@ -193,8 +182,8 @@ final class ProofTest extends TestCase
     }
 
     /**
-     * A first factor or a reauthentication with it may travel on an unknown
-     * channel, which only an additional factor is refused.
+     * So may a reauthentication with it; only an additional factor is refused
+     * one.
      *
      * @return void
      */
@@ -211,8 +200,8 @@ final class ProofTest extends TestCase
     }
 
     /**
-     * The serialised form uses snake_case keys, nests the channel, properties
-     * and binding, and keeps the time to the microsecond with its offset.
+     * Snake_case keys, nested channel, properties and binding, and the time to
+     * the microsecond with its offset.
      *
      * @return void
      */
@@ -254,8 +243,7 @@ final class ProofTest extends TestCase
     }
 
     /**
-     * A proof read back from its serialised form, or from its JSON, equals the
-     * original, to the microsecond.
+     * From its array or its JSON, to the microsecond.
      *
      * @return void
      */
@@ -274,8 +262,6 @@ final class ProofTest extends TestCase
     }
 
     /**
-     * Serialised forms that are not a proof.
-     *
      * @return iterable<string, array{array<string, mixed>, string}>
      */
     public static function provideMalformedProofs(): iterable
@@ -314,8 +300,6 @@ final class ProofTest extends TestCase
     }
 
     /**
-     * A serialised form that is not a proof is refused.
-     *
      * @param  array<string, mixed>  $data
      * @param  string  $message
      * @return void

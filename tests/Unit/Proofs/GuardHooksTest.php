@@ -21,10 +21,6 @@ use Tests\TestCase;
 use Tests\Unit\Concerns\BuildsProofs;
 
 /**
- * Tests for `GuardHooks`: signing in begins a sign-in named by the first
- * factor's session and records the first factor, signing out forgets it, and a
- * first factor that would never count is refused.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -36,8 +32,7 @@ final class GuardHooksTest extends TestCase
     use BuildsProofs, RefreshDatabase;
 
     /**
-     * Signing in begins a sign-in named by the first factor's session and
-     * records the first factor.
+     * The sign-in is named by the first factor's session.
      *
      * @return void
      *
@@ -55,8 +50,6 @@ final class GuardHooksTest extends TestCase
     }
 
     /**
-     * Signing in again forgets everything the previous sign-in proved.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -73,8 +66,8 @@ final class GuardHooksTest extends TestCase
     }
 
     /**
-     * Signing out of an application forgets the sign-in there and every proof
-     * of it, and leaves the identity's sign-in on another alone.
+     * Every proof goes with it; the sign-in on another application is left
+     * alone.
      *
      * @return void
      *
@@ -95,8 +88,7 @@ final class GuardHooksTest extends TestCase
     }
 
     /**
-     * A proof of anything but the first factor at sign-in is refused, and no
-     * sign-in begins.
+     * No sign-in begins.
      *
      * @return void
      *
@@ -117,8 +109,6 @@ final class GuardHooksTest extends TestCase
     }
 
     /**
-     * A first factor bound to another identity is refused.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -132,8 +122,7 @@ final class GuardHooksTest extends TestCase
     }
 
     /**
-     * A first factor made under another verification generation than the
-     * identity's current one is refused, as it would never count.
+     * It would never count.
      *
      * @return void
      *
@@ -153,8 +142,6 @@ final class GuardHooksTest extends TestCase
     }
 
     /**
-     * The bound proof store.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\ProofStore
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -165,8 +152,6 @@ final class GuardHooksTest extends TestCase
     }
 
     /**
-     * A test user with the given key, never saved.
-     *
      * @param  int  $id
      * @return \Tests\Fixtures\Identities\TestUser
      */
@@ -180,8 +165,7 @@ final class GuardHooksTest extends TestCase
     }
 
     /**
-     * The proof of the password the test user with the given key signed in with
-     * on the application, at generation 0, bound to the guard's session.
+     * Made at generation 0 and bound to the guard's session.
      *
      * @param  int  $id
      * @param  string  $session

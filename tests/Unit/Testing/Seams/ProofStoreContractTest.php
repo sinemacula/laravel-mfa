@@ -24,9 +24,6 @@ use Tests\Fixtures\Seams\SignInRowsProofStore;
 use Tests\TestCase;
 
 /**
- * The `ProofStore` contract kit proves the session store, and rejects a store
- * that keeps every proof it is given.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -39,8 +36,6 @@ final class ProofStoreContractTest extends TestCase
     use ProofStoreTests;
 
     /**
-     * The kit rejects a store that keeps a proof of another sign-in.
-     *
      * @return void
      */
     public function testRejectsAStoreThatKeepsAProofOfAnotherSignIn(): void
@@ -51,8 +46,6 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a store that keeps counting an earlier generation.
-     *
      * @return void
      */
     public function testRejectsAStoreThatIgnoresTheGeneration(): void
@@ -65,8 +58,6 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a store that forgets nothing.
-     *
      * @return void
      */
     public function testRejectsAStoreThatForgetsNothing(): void
@@ -77,8 +68,7 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a store that refuses a proof of another sign-in only
-     * while no sign-in is begun.
+     * One that refuses such a proof only while no sign-in is begun.
      *
      * @return void
      */
@@ -92,8 +82,6 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a store that keeps a proof it refuses.
-     *
      * @return void
      */
     public function testRejectsAStoreThatKeepsAProofItRefuses(): void
@@ -107,8 +95,7 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a store that keeps a proof of another identity on the
-     * identity's current sign-in.
+     * On the identity's current sign-in.
      *
      * @return void
      */
@@ -123,9 +110,8 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a store that judges a proof by the identity its binding
-     * names rather than the one it is recorded for, which a proof naming an
-     * identity with no sign-in would not show.
+     * Rather than the one it is recorded for; a proof naming an identity with
+     * no sign-in would not show this.
      *
      * @return void
      */
@@ -138,8 +124,7 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a store that forgets the current sign-in and its proofs
-     * before it throws a refusal, on each kind of refusal.
+     * Forgetting the current sign-in before throwing, on each kind of refusal.
      *
      * @return void
      */
@@ -167,9 +152,6 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a store that keeps a refused proof for the identity its
-     * binding names.
-     *
      * @return void
      */
     public function testRejectsAStoreThatKeepsARefusedProofForTheIdentityItNames(): void
@@ -181,9 +163,6 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a store that ends the sign-in of the identity a refused
-     * proof's binding names.
-     *
      * @return void
      */
     public function testRejectsAStoreThatEndsTheNamedIdentitysSignInOnARefusal(): void
@@ -195,8 +174,7 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a refusal checked on a sign-in that holds no proof, which
-     * could not show a refusal that changed it.
+     * Such a sign-in could not show a refusal that changed it.
      *
      * @return void
      */
@@ -211,8 +189,6 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a replacement that begins no other sign-in.
-     *
      * @return void
      */
     public function testRejectsAReplacementThatBeginsNoOtherSignIn(): void
@@ -227,8 +203,6 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a replacement the store does not name as current.
-     *
      * @return void
      */
     public function testRejectsAReplacementThatIsNotCurrent(): void
@@ -242,9 +216,6 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a store that reads no proof for the sign-in that replaced
-     * another.
-     *
      * @return void
      */
     public function testRejectsAStoreThatReadsNothingForTheReplacement(): void
@@ -279,9 +250,6 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a store that still reads the proofs of a sign-in it has
-     * since replaced.
-     *
      * @return void
      */
     public function testRejectsAStoreThatReadsAReplacedSignIn(): void
@@ -295,8 +263,7 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a store that keeps a proof of another application under
-     * the current sign-in's id.
+     * Under the current sign-in's id.
      *
      * @return void
      */
@@ -311,8 +278,7 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a store that reads the current sign-in's proofs for
-     * whichever sign-in is named.
+     * Reading the current sign-in's proofs for whichever sign-in is named.
      *
      * @return void
      */
@@ -327,8 +293,6 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a store that reads no proof for the sign-in named.
-     *
      * @return void
      */
     public function testRejectsAStoreThatReadsNothingForTheNamedSignIn(): void
@@ -342,12 +306,12 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
-     * Each refusal and the named read pass on a store that keeps them, and fail
-     * on none of its other flaws.
+     * Each refusal check and the named read pass a store that keeps them, and
+     * fail on none of its other flaws.
      *
      * @return void
      */
-    public function testTheNewChecksPassAStoreThatKeepsThem(): void
+    public function testTheRefusalChecksPassAStoreThatKeepsThem(): void
     {
         $identity = $this->proofStoreIdentity();
 
@@ -365,8 +329,6 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
-     * Rows of a store that breaks one part of forgetting a sign-in.
-     *
      * @return iterable<string, array{\Tests\Fixtures\Seams\Enums\ProofStoreFlaw}>
      */
     public static function signInFlaws(): iterable
@@ -378,9 +340,6 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a store that breaks any one part of keeping and
-     * forgetting a sign-in.
-     *
      * @param  \Tests\Fixtures\Seams\Enums\ProofStoreFlaw  $flaw
      * @return void
      */
@@ -393,8 +352,6 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a store that keeps the proofs of a forgotten factor.
-     *
      * @return void
      */
     public function testRejectsAStoreThatForgetsNoFactor(): void
@@ -405,8 +362,7 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
-     * Each check runs on what the closures it is given write and end, not on
-     * the store's own `record()` and `forget()`.
+     * Not the store's own `record()` and `forget()`.
      *
      * @return void
      */
@@ -432,8 +388,7 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
-     * A void is not checked on an arranged proof that never counted, even when
-     * the sign-in already held a proof of its own.
+     * Even when the sign-in already held a proof of its own.
      *
      * @return void
      */
@@ -449,8 +404,6 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
-     * A factor is not forgotten on arranged proofs that never counted.
-     *
      * @return void
      */
     public function testRejectsAFactorCheckWhoseArrangedProofsNeverCounted(): void
@@ -465,8 +418,6 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
-     * The factor check counts against the proofs the sign-in held when begun.
-     *
      * @return void
      */
     public function testTheFactorCheckCountsAgainstWhatTheSignInHeld(): void
@@ -480,8 +431,6 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
-     * The session store, over a session of its own.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\ProofStore
      */
     #[\Override]
@@ -491,8 +440,6 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
-     * A person.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
     #[\Override]
@@ -503,8 +450,6 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
-     * Another person.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
     #[\Override]
@@ -515,8 +460,6 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
-     * The application.
-     *
      * @return string
      */
     #[\Override]
@@ -526,8 +469,7 @@ final class ProofStoreContractTest extends TestCase
     }
 
     /**
-     * Assert the store refuses the identity a proof of the other identity's
-     * sign-in, begun under the id given.
+     * A proof of the other identity's sign-in, begun under the id given.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      * @param  string  $otherSession

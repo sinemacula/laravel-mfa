@@ -22,11 +22,6 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * Tests for `ProofBindings`: the proof service is built afresh, the default
- * proof store keeps proofs in the session and is built afresh on every
- * resolution, and Laravel's sign-in and sign-out events begin and forget a
- * sign-in.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -36,8 +31,6 @@ use Tests\TestCase;
 final class ProofBindingsTest extends TestCase
 {
     /**
-     * The proof service is built on every resolution.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -50,8 +43,8 @@ final class ProofBindingsTest extends TestCase
     }
 
     /**
-     * The default proof store keeps proofs in the session, and is not shared,
-     * so nothing the container keeps holds one request's session into the next.
+     * Not shared, so nothing the container keeps holds one request's session
+     * into the next.
      *
      * @return void
      *
@@ -65,7 +58,7 @@ final class ProofBindingsTest extends TestCase
     }
 
     /**
-     * The default pending completion and step-up record in the proof store.
+     * Both record in the proof store.
      *
      * @return void
      *
@@ -78,8 +71,7 @@ final class ProofBindingsTest extends TestCase
     }
 
     /**
-     * Laravel's `Login` event begins a sign-in, and `Logout` and
-     * `CurrentDeviceLogout` forget it.
+     * `Login` begins a sign-in; `Logout` and `CurrentDeviceLogout` forget it.
      *
      * @return void
      *
@@ -107,8 +99,7 @@ final class ProofBindingsTest extends TestCase
     }
 
     /**
-     * The session revoker defaults to advancing the verification generation,
-     * built afresh.
+     * Built afresh.
      *
      * @return void
      *

@@ -15,10 +15,6 @@ use SineMacula\Laravel\Mfa\Testing\FakeSmsSender;
 use Tests\TestCase;
 
 /**
- * Tests for `FakeSenderBinding`: a fake bound after the manager has built its
- * drivers is still the one they send through, and binding one builds no manager
- * that was not built already.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -28,8 +24,6 @@ use Tests\TestCase;
 final class FakeSenderBindingTest extends TestCase
 {
     /**
-     * A code driver built before the fake is built again with it.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -54,8 +48,7 @@ final class FakeSenderBindingTest extends TestCase
     }
 
     /**
-     * Binding a fake builds no manager, and leaves alone anything else bound
-     * under the manager's name.
+     * It also leaves anything else bound under the manager's name alone.
      *
      * @return void
      *

@@ -10,9 +10,6 @@ use SineMacula\Laravel\Mfa\Proofs\RemovalRevocation;
 use Tests\Fixtures\Verification\Dumps;
 
 /**
- * Unit tests for `RemovalRevocation`: whether the revoker judged the current
- * session itself, and what it returns, hidden from every dump.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -40,8 +37,6 @@ final class RemovalRevocationTest extends TestCase
     }
 
     /**
-     * No way of dumping it shows the completion.
-     *
      * @return void
      */
     public function testNoDumpShowsTheCompletion(): void
@@ -52,8 +47,6 @@ final class RemovalRevocationTest extends TestCase
     }
 
     /**
-     * A completion holding a credential.
-     *
      * @return object
      */
     private static function completion(): object

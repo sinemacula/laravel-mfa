@@ -35,9 +35,8 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * The challenge counters wiring kit proves the package's own challenge gateway,
- * which counts every outcome inside its transaction, and rejects a challenge
- * path that counts nothing.
+ * The package's own challenge gateway passes, counting every outcome inside its
+ * transaction.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -73,8 +72,6 @@ final class ChallengeCountersContractTest extends TestCase
     private bool $admitsAnything = false;
 
     /**
-     * Sign a person in with an email factor.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -88,8 +85,7 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a pending factor that holds a live enrolment as one with
-     * none, as it would a gateway's admission of it.
+     * A pending factor holding a live enrolment, given as one with none.
      *
      * @return void
      *
@@ -109,8 +105,7 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a factor given as confirmed that an enrolment challenge
-     * would admit, even when the pending factor given is refused.
+     * Even when the pending factor given is refused.
      *
      * @return void
      *
@@ -130,8 +125,7 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit rejects an enrolment challenge whose report changes the factor's
-     * count, though not the identity's.
+     * Its report changes the factor's count, though not the identity's.
      *
      * @return void
      *
@@ -148,9 +142,6 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit rejects an enrolment challenge whose report changes the
-     * identity's count.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -166,8 +157,7 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit rejects an enrolment challenge whose passed outcome resets the
-     * counts, which it raises first so the reset shows.
+     * The kit raises the counts first so the reset shows.
      *
      * @return void
      *
@@ -191,8 +181,7 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit rejects an enrolment challenge whose failed outcome alone is
-     * counted against the factor.
+     * Its failed outcome alone is counted against the factor.
      *
      * @return void
      *
@@ -209,8 +198,7 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit rejects an enrolment challenge whose passed outcome resets the
-     * identity's count, which it raises first so the reset shows.
+     * The kit raises the identity's count first so the reset shows.
      *
      * @return void
      *
@@ -236,8 +224,7 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit rejects an enrolment challenge whose failed outcome is counted
-     * and whose passed outcome takes the count back, though the two cancel out.
+     * Its failed outcome is counted and its passed outcome takes it back.
      *
      * @return void
      *
@@ -257,9 +244,6 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit rejects an enrolment challenge whose report counts only once the
-     * transaction commits.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -282,9 +266,6 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit rejects an enrolment challenge whose report counts against the
-     * identity only once the transaction commits.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -304,8 +285,6 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a challenge path that counts nothing.
-     *
      * @return void
      */
     public function testRejectsAPathThatCountsNothing(): void
@@ -318,8 +297,8 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a challenge path that counts in a transaction of its own,
-     * committed whatever becomes of the change the challenge is part of.
+     * Counting in a transaction of its own, committed whatever becomes of the
+     * change.
      *
      * @return void
      *
@@ -336,8 +315,7 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * A challenge path that fails leaves the kit's change rolled back, and its
-     * failure propagates.
+     * Its failure propagates.
      *
      * @return void
      *
@@ -362,8 +340,6 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a challenge path that challenges a disabled factor.
-     *
      * @return void
      */
     public function testRejectsAPathThatChallengesADisabledFactor(): void
@@ -374,8 +350,7 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit rejects an admission made in a transaction of the path's own,
-     * though its report is sound.
+     * Even though its report is sound.
      *
      * @return void
      */
@@ -390,8 +365,7 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a report made in a transaction of the path's own, though
-     * its admission is sound.
+     * Even though its admission is sound.
      *
      * @return void
      */
@@ -406,8 +380,6 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a report that swallows the counters' refusal.
-     *
      * @return void
      */
     public function testRejectsAReportThatSwallowsTheRefusal(): void
@@ -421,8 +393,7 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit refuses to make the check inside a transaction, where sound calls
-     * would not be refused.
+     * Inside one, sound calls would not be refused.
      *
      * @return void
      *
@@ -445,8 +416,7 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a path that admits nothing, even the identity's own
-     * binding.
+     * Not even the identity's own binding.
      *
      * @return void
      *
@@ -467,8 +437,6 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a path that admits a binding of another identity.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -488,9 +456,6 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a path that takes a report under a binding of another
-     * identity without refusing it.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -510,9 +475,8 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit accepts a path that refuses a report under a binding of another
-     * identity by answering `false`, counting nothing, as an adapter whose
-     * contract refuses by value does.
+     * Answering `false` and counting nothing, as an adapter whose contract
+     * refuses by value does.
      *
      * @return void
      *
@@ -538,9 +502,6 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * Each count a refused report under a binding of another identity must
-     * leave alone.
-     *
      * @return iterable<string, array{string, string}>
      */
     public static function chargedCounts(): iterable
@@ -551,8 +512,7 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a path that refuses a report under a binding of another
-     * identity only once it has counted it.
+     * A path that refuses such a report only once it has counted it.
      *
      * @param  string  $charged
      * @param  string  $message
@@ -584,8 +544,7 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit's tests hand the contract the test case's own admission hook, so
-     * one that swallows the counters' refusal fails them.
+     * So a hook that swallows the counters' refusal fails them.
      *
      * @return void
      */
@@ -600,8 +559,7 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit's tests hand the contract the test case's own report hook, so one
-     * that swallows the counters' refusal fails them.
+     * So a hook that swallows the counters' refusal fails them.
      *
      * @return void
      */
@@ -616,8 +574,7 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit's binding and enrolment tests hand the contract the test case's
-     * own hooks too, so a path that admits anything fails them.
+     * So a path that admits anything fails the binding and enrolment checks.
      *
      * @return void
      */
@@ -630,8 +587,7 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a challenge path that counts only once the caller's
-     * transaction commits, and leaves that transaction rolled back.
+     * The caller's transaction is left rolled back.
      *
      * @return void
      *
@@ -648,9 +604,6 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a challenge path that commits the caller's transaction to
-     * count in it.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -666,8 +619,8 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a challenge path that ends the caller's nested
-     * transaction early to count in the outer one, and rolls both back.
+     * Ending the caller's nested transaction early to count in the outer one;
+     * both roll back.
      *
      * @return void
      *
@@ -685,8 +638,7 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a challenge path that swaps the caller's nested
-     * transaction for one of its own, so its count lands in the outer one.
+     * Its count would land in the outer transaction.
      *
      * @return void
      *
@@ -706,8 +658,7 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a challenge path that counts nothing, so the identity is
-     * never locked, and puts the limits back.
+     * The kit puts the limits back afterwards.
      *
      * @return void
      *
@@ -727,8 +678,6 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a challenge path that locks the identity at once.
-     *
      * @return void
      */
     public function testRejectsAPathThatLocksTheIdentityEarly(): void
@@ -740,8 +689,7 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a challenge path that goes on counting against the factor
-     * once the identity is locked.
+     * Counting against the factor once the identity is locked.
      *
      * @return void
      */
@@ -754,8 +702,6 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit puts the attempt limits back after the lockout check.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -770,9 +716,8 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit sets the factor's limit above the identity's for the lockout
-     * check, so a host's limit on factors at or below it does not lock the
-     * factor first, and puts the host's limit back after.
+     * So a host's factor limit at or below it does not lock the factor first;
+     * the host's limit is put back after.
      *
      * @return void
      *
@@ -788,8 +733,7 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit refuses an other identity that is the counted one, whose binding
-     * the counters would rightly admit.
+     * The counters would rightly admit its binding.
      *
      * @return void
      *
@@ -810,8 +754,7 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * An error a report throws under a binding of another identity escapes the
-     * kit rather than passing as a refusal.
+     * Rather than passing as a refusal.
      *
      * @return void
      *
@@ -832,8 +775,7 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a replay check of a factor it can read no count for, as
-     * one that counts no failure.
+     * As one that counts no failure.
      *
      * @return void
      */
@@ -849,8 +791,7 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a challenge path that counts a consumed challenge
-     * answered again as a success.
+     * A consumed challenge answered again is counted as a success.
      *
      * @return void
      */
@@ -868,8 +809,7 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a replay check whose failing path counts nothing, since a
-     * reset could not then be seen.
+     * A reset could not then be seen.
      *
      * @return void
      */
@@ -881,8 +821,6 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The person.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
     #[\Override]
@@ -892,8 +830,6 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The person's email factor.
-     *
      * @return \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor
      */
     #[\Override]
@@ -903,8 +839,6 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * A pending factor of the person's, holding no enrolment.
-     *
      * @return \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor
      */
     #[\Override]
@@ -919,8 +853,6 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The person's sign-in binding.
-     *
      * @return \SineMacula\Laravel\Mfa\Proofs\ProofBinding
      */
     #[\Override]
@@ -930,8 +862,7 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * Send a code through the default gateway, once, and submit a wrong one to
-     * its challenge.
+     * Sends a code once and submits a wrong one.
      *
      * @return void
      *
@@ -951,8 +882,7 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * Send a code through the default gateway and answer it rightly; answering
-     * it again submits the same code to the same challenge.
+     * Answering again submits the same code to the same challenge.
      *
      * @return \Closure(): void
      *
@@ -976,8 +906,6 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * Another person.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
     #[\Override]
@@ -988,8 +916,6 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * Ask the counters whether they admit the challenge, as an owner would.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -1008,8 +934,6 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * Report the challenge's outcome to the counters, as an owner would.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -1025,8 +949,6 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The counters.
-     *
      * @return \SineMacula\Laravel\Mfa\Attempts\ChallengeCounters
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -1037,8 +959,7 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * The factor's failures in a row, as committed or as the open transaction
-     * sees them.
+     * As committed, or as the open transaction sees them.
      *
      * @return int
      */
@@ -1050,8 +971,8 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * Give the factor a live enrolment bound to the binding's sign-in, as an
-     * enrolment challenge would admit.
+     * A live enrolment bound to the binding's sign-in, as an enrolment
+     * challenge would admit.
      *
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -1072,8 +993,6 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * Run a check that must reject what it is given.
-     *
      * @param  \Closure(): void  $check
      * @return void
      */
@@ -1089,8 +1008,7 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * Count a failure against the factor directly, as a path that checks no
-     * admission would.
+     * As a path that checks no admission would.
      *
      * @return void
      */
@@ -1100,8 +1018,7 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * A report that counts a failure against the factor, whatever it is told,
-     * and answers whether it counted one.
+     * Counts a failure whatever it is told, and answers whether it counted one.
      *
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @return bool
@@ -1112,8 +1029,6 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * A report that counts a failure against the identity, whatever it is told.
-     *
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @return bool
@@ -1126,8 +1041,8 @@ final class ChallengeCountersContractTest extends TestCase
     }
 
     /**
-     * Make the hook's call as the test says: in a transaction of its own, with
-     * a `LogicException` swallowed, or as it is.
+     * In a transaction of its own, with a `LogicException` swallowed, or as it
+     * is.
      *
      * @param  string  $hook
      * @param  \Closure(): mixed  $call

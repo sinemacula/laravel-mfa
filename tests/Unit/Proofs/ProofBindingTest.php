@@ -11,9 +11,6 @@ use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
 /**
- * Unit tests for the `ProofBinding` value: construction, validation and
- * serialisation.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -23,8 +20,6 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 final class ProofBindingTest extends TestCase
 {
     /**
-     * A binding keeps the identity, application, session and purpose.
-     *
      * @return void
      */
     public function testABindingKeepsWhatItBindsTo(): void
@@ -39,8 +34,6 @@ final class ProofBindingTest extends TestCase
     }
 
     /**
-     * Bindings with a blank part.
-     *
      * @return iterable<string, array{string, string, string, string, string}>
      */
     public static function provideBlankParts(): iterable
@@ -52,8 +45,6 @@ final class ProofBindingTest extends TestCase
     }
 
     /**
-     * Every part of a binding is required.
-     *
      * @param  string  $identityType
      * @param  string  $identityKey
      * @param  string  $application
@@ -71,7 +62,7 @@ final class ProofBindingTest extends TestCase
     }
 
     /**
-     * The serialised form uses snake_case keys and the purpose's value.
+     * Snake_case keys and the purpose's value.
      *
      * @return void
      */
@@ -92,8 +83,6 @@ final class ProofBindingTest extends TestCase
     }
 
     /**
-     * A binding read back from its serialised form equals the original.
-     *
      * @return void
      */
     public function testABindingRoundTrips(): void
@@ -104,8 +93,6 @@ final class ProofBindingTest extends TestCase
     }
 
     /**
-     * Serialised forms that are not a binding.
-     *
      * @return iterable<string, array{array<string, mixed>, string}>
      */
     public static function provideMalformedBindings(): iterable
@@ -122,8 +109,6 @@ final class ProofBindingTest extends TestCase
     }
 
     /**
-     * A serialised form that is not a binding is refused.
-     *
      * @param  array<string, mixed>  $data
      * @param  string  $message
      * @return void

@@ -12,9 +12,6 @@ use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use Tests\Fixtures\Codes\CodeMessages;
 
 /**
- * Unit tests for `FakeEmailSender`: it binds itself, keeps every message
- * instead of sending it, and reads them and their codes back by address.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -24,8 +21,7 @@ use Tests\Fixtures\Codes\CodeMessages;
 final class FakeEmailSenderTest extends TestCase
 {
     /**
-     * `fake()` binds a fresh sender in the container given, or in the global
-     * container, and returns it.
+     * Binds in the container given, or in the global container.
      *
      * @return void
      *
@@ -52,8 +48,7 @@ final class FakeEmailSenderTest extends TestCase
     }
 
     /**
-     * Messages are kept in order, read back by address with the last code each
-     * carried, and forgotten on reset.
+     * Kept in order, read back by address, and forgotten on reset.
      *
      * @return void
      */

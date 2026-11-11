@@ -20,11 +20,6 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * Tests for `VerificationGeneration`: an identity starts at generation 0, each
- * advance moves only its own generation on by one, creating its row when it has
- * none, and an advance made inside the identity's factor state transaction
- * rolls back with it.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -36,8 +31,6 @@ final class VerificationGenerationTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * An identity with no identity state row is at generation 0.
-     *
      * @return void
      */
     public function testAnIdentityWithNoRowIsAtGenerationZero(): void
@@ -47,8 +40,7 @@ final class VerificationGenerationTest extends TestCase
     }
 
     /**
-     * Advancing creates the identity's row, and every advance moves the
-     * generation on by one and returns it.
+     * Advancing creates the identity's row and returns the new generation.
      *
      * @return void
      *
@@ -71,8 +63,7 @@ final class VerificationGenerationTest extends TestCase
     }
 
     /**
-     * An identity whose row the factor state lock already created keeps its row
-     * and moves on from its generation.
+     * A row the factor state lock already created.
      *
      * @return void
      *
@@ -89,9 +80,8 @@ final class VerificationGenerationTest extends TestCase
     }
 
     /**
-     * An advance that changes no row is refused rather than answered: the row
-     * goes between the lock and the increment here, standing in for a key the
-     * database coerced so the increment matches nothing. It rolls back whole.
+     * Deleting the row between the lock and the increment stands in for a key
+     * the database coerced. It rolls back whole.
      *
      * @return void
      *
@@ -122,8 +112,7 @@ final class VerificationGenerationTest extends TestCase
     }
 
     /**
-     * Advancing one identity moves no other's generation, including one of
-     * another type that shares its key.
+     * Including one of another type that shares its key.
      *
      * @return void
      *
@@ -142,8 +131,7 @@ final class VerificationGenerationTest extends TestCase
     }
 
     /**
-     * An identity that is not an Eloquent model has a generation of its own,
-     * keyed by its class name.
+     * Keyed by its class name.
      *
      * @return void
      *
@@ -160,8 +148,7 @@ final class VerificationGenerationTest extends TestCase
     }
 
     /**
-     * An advance made inside the identity's factor state transaction joins it,
-     * and rolls back with it.
+     * An advance inside the identity's factor state transaction joins it.
      *
      * @return void
      *
@@ -186,8 +173,7 @@ final class VerificationGenerationTest extends TestCase
     }
 
     /**
-     * An identity whose key cannot name a row is refused rather than sharing
-     * one.
+     * Refused rather than sharing one.
      *
      * @return void
      */
@@ -199,8 +185,6 @@ final class VerificationGenerationTest extends TestCase
     }
 
     /**
-     * A test user with the given key, never saved.
-     *
      * @param  int  $id
      * @return \Tests\Fixtures\Identities\TestUser
      */

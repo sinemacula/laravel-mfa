@@ -67,11 +67,9 @@ use Tests\Fixtures\Seams\ScriptedFreshnessGate;
 use Tests\TestCase;
 
 /**
- * The contract kits of the seams whose answers depend on no stored state: the
- * freshness gate, the identity and tenant requirements, the application, the
- * subject type, the active state, the event context and the session transition.
- * Each proves the package's default (or, for the application resolver, which
- * has none, an application's own), and rejects a faulty one.
+ * Kits of the seams whose answers depend on no stored state. Each proves the
+ * package's default or, for the application resolver, which has none, an
+ * application's own.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -105,8 +103,6 @@ final class SeamsWithoutStateContractTest extends TestCase
         TenantRequirementTests;
 
     /**
-     * The kit rejects a gate that finds everything fresh.
-     *
      * @return void
      */
     public function testRejectsAGateThatFindsEverythingFresh(): void
@@ -117,9 +113,9 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The gates the kit rejects: one that always asks for nothing; one with a
-     * requirement where neither side has any, however strict; one with none for
-     * a caller who asks; and one that asks less than the caller.
+     * One that always asks nothing, one with a requirement where neither side
+     * has any, one with none for a caller who asks, and one that asks less than
+     * the caller.
      *
      * @return iterable<string, array{\SineMacula\Laravel\Mfa\Contracts\FreshnessGate}>
      */
@@ -131,8 +127,6 @@ final class SeamsWithoutStateContractTest extends TestCase
         yield 'asks less than the caller' => [
             new class implements FreshnessGate {
                 /**
-                 * Fresh.
-                 *
                  * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
                  * @param  string  $operation
                  * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
@@ -145,8 +139,6 @@ final class SeamsWithoutStateContractTest extends TestCase
                 }
 
                 /**
-                 * No deadline.
-                 *
                  * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
                  * @param  string  $operation
                  * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
@@ -176,9 +168,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a gate that says it holds a session to anything but what
-     * the operation and the caller ask.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\FreshnessGate  $gate
      * @return void
      */
@@ -191,8 +180,8 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a gate whose deadline has already passed, and one that
-     * names a deadline for an operation it does not find fresh.
+     * One whose deadline has passed, and one with a deadline for an operation
+     * it does not find fresh.
      *
      * @return void
      */
@@ -212,8 +201,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a gate that does not refuse an unbounded requirement.
-     *
      * @return void
      */
     public function testRejectsAGateThatTakesAnUnboundedRequirement(): void
@@ -224,8 +211,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a requirement that changes with every call.
-     *
      * @return void
      */
     public function testRejectsARequirementThatKeepsState(): void
@@ -242,8 +227,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a blank application.
-     *
      * @return void
      */
     public function testRejectsABlankApplication(): void
@@ -254,8 +237,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a resolver that finds a machine a person.
-     *
      * @return void
      */
     public function testRejectsAResolverThatFindsAMachineAPerson(): void
@@ -266,8 +247,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a resolver that finds an inactive identity active.
-     *
      * @return void
      */
     public function testRejectsAResolverThatFindsAnInactiveIdentityActive(): void
@@ -279,8 +258,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a resolver that finds an active identity inactive.
-     *
      * @return void
      */
     public function testRejectsAResolverThatFindsAnActiveIdentityInactive(): void
@@ -292,8 +269,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a context that holds an object.
-     *
      * @return void
      */
     public function testRejectsAContextHoldingAnObject(): void
@@ -304,9 +279,8 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a resolver that names the session being served for a
-     * subject naming no sign-in, or one it does not know; and one that names no
-     * session for a sign-in it was said to know.
+     * The session being served for a subject naming no sign-in or one it does
+     * not know, or no session for a sign-in it was said to know.
      *
      * @return void
      */
@@ -324,8 +298,8 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The kit asks a resolver for the context of an identity and a request, and
-     * for the context of neither, and rejects an object in either.
+     * The kit asks for the context of an identity and a request, and of
+     * neither.
      *
      * @return void
      */
@@ -340,8 +314,7 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a resolver that names a new application each time it is
-     * asked about the same request, though never a blank one.
+     * Though never a blank one.
      *
      * @return void
      */
@@ -354,8 +327,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a resolver that finds a person a machine.
-     *
      * @return void
      */
     public function testRejectsAResolverThatFindsAPersonAMachine(): void
@@ -367,9 +338,8 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a requirement that answers the same question the same way
-     * each time it is asked in a row, but differently once another has been
-     * asked in between.
+     * The same answer to a question asked twice in a row, but a different one
+     * once another was asked in between.
      *
      * @return void
      */
@@ -388,8 +358,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a gate that finds an operation with no requirement fresh.
-     *
      * @return void
      */
     public function testRejectsAGateThatFindsAnUnconfiguredOperationFresh(): void
@@ -401,9 +369,7 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a gate that finds an operation with no requirement fresh
-     * though it names no deadline, and one that names a deadline for an
-     * operation it does not find fresh.
+     * Fresh with no deadline, or a deadline without being fresh.
      *
      * @return void
      */
@@ -423,8 +389,7 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a gate that names no deadline for an operation it is
-     * asked about as fresh, failing its assertion rather than erring.
+     * Failing its assertion rather than erring.
      *
      * @return void
      */
@@ -437,8 +402,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The kit rejects a transition that fails without refusing.
-     *
      * @return void
      */
     public function testRejectsATransitionThatFailsWithoutRefusing(): void
@@ -449,8 +412,7 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The kit judges every change, with a shortfall and without, each arranged
-     * afresh.
+     * Each arranged afresh.
      *
      * @return void
      */
@@ -476,8 +438,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The default transition returns and changes no proof.
-     *
      * @return void
      */
     public function testTheDefaultTransitionChangesNothing(): void
@@ -501,8 +461,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * An application's own resolver.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\ApplicationResolver
      */
     #[\Override]
@@ -512,8 +470,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * A request for the `api` application.
-     *
      * @return \Illuminate\Http\Request
      */
     #[\Override]
@@ -523,8 +479,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The bound default.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\EventContextResolver
      */
     #[\Override]
@@ -534,8 +488,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * A person.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
     #[\Override]
@@ -545,7 +497,7 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The bound default, asked for a signed-in person.
+     * Asked for a signed-in person.
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\FreshnessGate
      */
@@ -558,7 +510,7 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The bound default, asked for a person with a step-up just recorded.
+     * Asked for a person with a step-up just recorded.
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\FreshnessGate
      */
@@ -579,7 +531,7 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The package's operation every application has a freshness for.
+     * The package's operation, which every application has a freshness for.
      *
      * @return string
      */
@@ -590,8 +542,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The bound default.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\IdentityRequirement
      */
     #[\Override]
@@ -623,8 +573,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The application.
-     *
      * @return string
      */
     #[\Override]
@@ -634,8 +582,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The bound default.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\SessionTransition
      */
     #[\Override]
@@ -645,7 +591,7 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The change, made to a TOTP factor on a person's sign-in on `web`.
+     * Made to a TOTP factor on a person's sign-in on `web`.
      *
      * @param  \SineMacula\Laravel\Mfa\Enums\FactorChangeMade  $change
      * @return \SineMacula\Laravel\Mfa\Requirements\SessionChange
@@ -659,8 +605,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The bound default.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver
      */
     #[\Override]
@@ -670,8 +614,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * A person.
-     *
      * @return \Illuminate\Contracts\Auth\Authenticatable
      */
     #[\Override]
@@ -681,8 +623,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * A machine.
-     *
      * @return \Illuminate\Contracts\Auth\Authenticatable
      */
     #[\Override]
@@ -692,8 +632,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The bound default.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver
      */
     #[\Override]
@@ -703,8 +641,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * An active person.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
     #[\Override]
@@ -714,8 +650,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * An inactive person.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
     #[\Override]
@@ -725,8 +659,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The bound default.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\TenantRequirement
      */
     #[\Override]
@@ -736,8 +668,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * A person.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
     #[\Override]
@@ -747,8 +677,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The application.
-     *
      * @return string
      */
     #[\Override]
@@ -758,7 +686,7 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The caller of the request, as the gate last signed it in.
+     * As the gate last signed it in.
      *
      * @return \SineMacula\Laravel\Mfa\Context\CallerContext
      *
@@ -771,8 +699,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * A person.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
     private function transitionIdentity(): MultiFactorAuthenticatable
@@ -782,8 +708,7 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The failure a check that must reject what it is given fails with, or
-     * `null` when it accepts it.
+     * `null` when the check accepts what it is given.
      *
      * @param  \Closure(): void  $check
      * @return ?\PHPUnit\Framework\AssertionFailedError
