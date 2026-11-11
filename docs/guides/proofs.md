@@ -111,7 +111,7 @@ application and an id that names one sign-in, not merely a device:
 | `currentSession($identity, $application)`     | The current sign-in's session id on the application, or `null` without one           |
 | `record($identity, $proof)`                   | Keeps the identity's proof bound to its current sign-in, refusing any other          |
 | `proofs($identity, $application, $sessionId)` | The named sign-in's proofs that still count, oldest first; none unless it is current |
-| `forgetFactor($identity, $factorId)`          | Stops counting the proofs made with the factor, on every application                 |
+| `forgetFactor($identity, $factorId)`          | Once the factor is deleted, stops counting its proofs, on every application          |
 | `forget($identity, $application)`             | Forgets the current sign-in on the application and its proofs                        |
 
 A store refuses a proof it cannot keep by throwing `Exceptions\ProofRefusedException`, and fails closed when it reads:

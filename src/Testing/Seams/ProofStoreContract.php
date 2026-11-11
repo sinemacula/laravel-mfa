@@ -5,11 +5,15 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Testing\Seams;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Container\Container;
+use Illuminate\Contracts\Config\Repository;
 use PHPUnit\Framework\Assert;
 use SineMacula\Laravel\Mfa\Assurance\Channel;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
+use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
+use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
@@ -297,6 +301,8 @@ final class ProofStoreContract
 
         Assert::assertSame([...$held, ProofKind::FIRST_FACTOR, ProofKind::ADDITIONAL_FACTOR], $arranged, 'Both proofs must count before the factor is forgotten.');
 
+        self::deleteFactor($factor);
+
         $store->forgetFactor($identity, $factor);
 
         $kinds = self::kinds($store->proofs($identity, $application, $session));
@@ -347,6 +353,21 @@ final class ProofStoreContract
         }
 
         Assert::fail($what . ' must be refused by throwing a ProofRefusedException.');
+    }
+
+    /**
+     * The package deletes a factor before it asks the store to forget it.
+     *
+     * @param  string  $factor
+     * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
+     */
+    private static function deleteFactor(string $factor): void
+    {
+        $model = ConfiguredModels::factor(Container::getInstance()->make(Repository::class));
+
+        WriteConnection::query((new $model)->newQuery())->whereKey($factor)->delete();
     }
 
     /**

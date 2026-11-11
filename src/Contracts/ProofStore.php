@@ -71,7 +71,7 @@ interface ProofStore
 
     /**
      * Stop counting every proof made with the factor, on any session the store
-     * can reach.
+     * can reach. Called once the factor is deleted.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $factorId

@@ -6,6 +6,7 @@ namespace Tests\Unit\Lifecycle;
 
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Contracts\IdentityRequirement;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
 use SineMacula\Laravel\Mfa\Contracts\SessionTransition;
@@ -19,11 +20,14 @@ use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
+use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Factors\FactorSets;
 use Tests\Fixtures\Lifecycle\Concerns\ArrangesLifecycle;
 use Tests\Fixtures\Lifecycle\RecordingSessionRevoker;
+use Tests\Fixtures\Requirements\FixedIdentityRequirement;
 use Tests\Fixtures\Requirements\SignInProofs;
+use Tests\Fixtures\Seams\InterceptedProofStore;
 use Tests\Fixtures\Seams\RecordingSessionTransition;
 use Tests\TestCase;
 
@@ -207,6 +211,37 @@ final class FactorRemovalTest extends TestCase
 
         self::assertSame($answer, $result->completion());
         self::assertCount(1, $transition->changes);
+    }
+
+    /**
+     * The session is judged without the removed factor's proofs, even from a
+     * store that still lists them.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testTheRemovedFactorsProofsDoNotMeetTheRequirement(): void
+    {
+        $requirement = Requirement::none()->withAdditionalVerification();
+
+        $lagging = new InterceptedProofStore($this->container()->make(ProofStore::class), static function (): void {});
+
+        $this->container()->instance(ProofStore::class, $lagging);
+        $this->container()->instance(SessionRevoker::class, new RecordingSessionRevoker(judges: true));
+        $this->container()->instance(IdentityRequirement::class, new FixedIdentityRequirement($requirement));
+
+        $user   = $this->signedInPerson();
+        $factor = $this->confirmedFactor($user);
+        $other  = $this->confirmedFactor($user);
+
+        $this->container()->make(ProofStore::class)->record($user, SignInProofs::of($user)->password());
+        $this->stepUpWith($user, $factor);
+
+        $factors = FactorSets::of($factor, $other);
+        $result  = DB::transaction(fn (): FactorRemovalResult => $this->removal()->remove($user, self::APPLICATION, $factor, $factors, SignInProofs::SESSION));
+
+        self::assertSame($requirement->toArray(), $result->outstanding?->toArray());
     }
 
     /**
