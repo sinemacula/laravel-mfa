@@ -23,11 +23,8 @@ use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 use Tests\TestCase;
 
 /**
- * What a removal promises holds at the gate: a person proves AAL2 with a TOTP
- * code, then removes that factor with an email code recent enough for the
- * removal. The email code alone does not reach AAL2, so the session falls short
- * and the next request through `mfa` is refused, though a recent additional
- * proof remains and the default session transition changed nothing.
+ * Removing the factor that proved AAL2 leaves a recent email proof that does
+ * not reach AAL2, so the gate refuses the next request.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -41,15 +38,13 @@ final class RemovedFactorGateTest extends TestCase
 {
     use ArrangesVerification;
 
-    /** @var string A route carrying the gate. */
+    /** @var string Route behind `mfa`. */
     private const string GATED = 'gate/account';
 
-    /** @var array<string, array<string, ?string>> The serialised form of asking for AAL2 at any age. */
+    /** @var array<string, array<string, ?string>> AAL2 at any age, serialised. */
     private const array AAL2 = ['minimum_level' => ['level' => 'aal2', 'max_age' => null]];
 
     /**
-     * Arrange the application, with an identity requirement of AAL2 at any age.
-     *
      * @return void
      */
     #[\Override]
@@ -63,9 +58,6 @@ final class RemovedFactorGateTest extends TestCase
     }
 
     /**
-     * Removing the stronger factor leaves a recent weaker proof, which the gate
-     * does not take for the requirement.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -100,9 +92,6 @@ final class RemovedFactorGateTest extends TestCase
     }
 
     /**
-     * Removing the weaker factor leaves the level met, so the gate still
-     * passes.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -127,8 +116,6 @@ final class RemovedFactorGateTest extends TestCase
     }
 
     /**
-     * Define the routes the tests call.
-     *
      * @param  \Illuminate\Routing\Router  $router
      * @return void
      */
@@ -139,8 +126,7 @@ final class RemovedFactorGateTest extends TestCase
     }
 
     /**
-     * A signed-in person with a password first factor, who has proved a TOTP
-     * factor and then an email factor, which is the newest proof.
+     * Proves TOTP then email, so the email proof is the newest.
      *
      * @return array{\Tests\Fixtures\Identities\TestUser, \SineMacula\Laravel\Mfa\Models\Factor}
      *

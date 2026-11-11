@@ -29,23 +29,18 @@ use Symfony\Component\HttpFoundation\Response;
 use Tests\Fixtures\Assurance\SessionProofs;
 
 /**
- * The requirement check two ways: `ProofRequirementCheck::check()` with no
- * database, and a request the `mfa` middleware lets on, on the application the
- * query budgets use in `always` mode, so with the statements they count.
- *
- * The middleware only reads, so unlike a verification it can be measured over
- * ordinary revolutions. It is called directly, so the route and the kernel are
- * not measured.
+ * The check alone, and through the `mfa` middleware in `always` mode, which
+ * only reads, so it runs over ordinary revolutions.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  */
 final class RequirementCheckBench
 {
-    /** @var string The name of a session with as many proofs as it can keep. */
+    /** @var string */
     private const string LONG_SESSION = 'long session';
 
-    /** @var string The name of a session with one proof after its first factor. */
+    /** @var string */
     private const string ONE_PROOF = 'first factor and one proof';
 
     /** @var \SineMacula\Laravel\Mfa\Requirements\ProofRequirementCheck */
@@ -57,16 +52,13 @@ final class RequirementCheckBench
     /** @var list<\SineMacula\Laravel\Mfa\Proofs\Proof> */
     private array $proofs = [];
 
-    /** @var ?\SineMacula\Laravel\Mfa\Http\Middleware\EnsureMfaRequirementIsMet The middleware, once its application is arranged. */
+    /** @var ?\SineMacula\Laravel\Mfa\Http\Middleware\EnsureMfaRequirementIsMet */
     private ?EnsureMfaRequirementIsMet $gate = null;
 
     /** @var \Illuminate\Http\Request */
     private Request $request;
 
     /**
-     * Build the check over the default policy, and the request the middleware
-     * is given.
-     *
      * @return void
      */
     public function __construct()
@@ -81,8 +73,6 @@ final class RequirementCheckBench
     }
 
     /**
-     * The sessions the check judges, by name.
-     *
      * @return iterable<string, array{session: string}>
      */
     public function provideSessions(): iterable
@@ -93,8 +83,6 @@ final class RequirementCheckBench
     }
 
     /**
-     * Freeze the clock and prove the session meets AAL2.
-     *
      * @param  array{session: string}  $params
      * @return void
      *
@@ -110,8 +98,7 @@ final class RequirementCheckBench
     }
 
     /**
-     * Build the application, verify a person and prove the middleware lets the
-     * request on, which also warms the path.
+     * Verify a person and prove the middleware passes, which warms the path.
      *
      * @return void
      *
@@ -137,8 +124,6 @@ final class RequirementCheckBench
     }
 
     /**
-     * Release the clock.
-     *
      * @return void
      */
     public function releaseClock(): void
@@ -147,8 +132,6 @@ final class RequirementCheckBench
     }
 
     /**
-     * Measure judging the session's proofs.
-     *
      * @return void
      */
     #[AfterMethods('releaseClock')]
@@ -162,8 +145,6 @@ final class RequirementCheckBench
     }
 
     /**
-     * Measure a request the middleware lets on.
-     *
      * @return void
      */
     #[AfterMethods('releaseClock')]
@@ -176,8 +157,6 @@ final class RequirementCheckBench
     }
 
     /**
-     * The request, through the middleware alone.
-     *
      * @return \Symfony\Component\HttpFoundation\Response
      *
      * @throws \LogicException

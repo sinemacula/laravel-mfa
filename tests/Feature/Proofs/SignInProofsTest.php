@@ -34,13 +34,8 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * End-to-end tests of the proofs a sign-in keeps: a verification on a signed-in
- * session records its proof, Laravel's sign-in and sign-out events clear what
- * the session held so a new identity on a reused session inherits nothing, each
- * guard's application keeps its own sign-in, a guard that fires neither event
- * nor calls the hooks has no usable proof, a custom guard's hooks record its
- * first factor, and advancing the identity's verification generation
- * invalidates its other sessions.
+ * The proofs a sign-in keeps, end to end through Laravel's auth events and the
+ * guard hooks.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -54,8 +49,6 @@ final class SignInProofsTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * Enable TOTP on the default guard's application.
-     *
      * @return void
      */
     #[\Override]
@@ -67,9 +60,6 @@ final class SignInProofsTest extends TestCase
     }
 
     /**
-     * A TOTP verification on a signed-in session records an additional factor
-     * proof of the factor on the default guard's application.
-     *
      * @return void
      */
     public function testAVerificationOnASignedInSessionRecordsItsProof(): void
@@ -94,8 +84,6 @@ final class SignInProofsTest extends TestCase
     }
 
     /**
-     * A proof is bound to the purpose its verification was made for.
-     *
      * @return void
      */
     public function testAVerificationsProofCarriesItsPurpose(): void
@@ -115,8 +103,6 @@ final class SignInProofsTest extends TestCase
     }
 
     /**
-     * Signing out forgets every proof of the sign-in.
-     *
      * @return void
      */
     public function testSigningOutForgetsTheProofs(): void
@@ -136,9 +122,6 @@ final class SignInProofsTest extends TestCase
     }
 
     /**
-     * Signing out of the current device forgets every proof of the sign-in, as
-     * signing out does.
-     *
      * @return void
      */
     public function testSigningOutOfTheCurrentDeviceForgetsTheProofs(): void
@@ -160,9 +143,7 @@ final class SignInProofsTest extends TestCase
     }
 
     /**
-     * Two session guards over the same identity keep their own sign-ins:
-     * signing in to or out of one leaves the other's sign-in and proofs alone,
-     * and the other still records what it proves.
+     * Two session guards over one identity keep their own sign-ins.
      *
      * @return void
      */
@@ -186,17 +167,12 @@ final class SignInProofsTest extends TestCase
 
         self::assertCount(1, Mfa::proofs(Callers::current()));
 
-        // The step just accepted is never accepted again, so the next one is
-        // proved.
+        // An accepted TOTP step is never accepted again, so prove the next.
         self::assertTrue(Mfa::verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor, 1)))->isVerified());
         self::assertCount(2, Mfa::proofs(Callers::current()));
     }
 
     /**
-     * A guard that fires neither event nor calls the hooks gains nothing from
-     * the identity's sign-in through another guard: its verification is
-     * refused, it has no proofs, and the other guard's are untouched.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -238,8 +214,7 @@ final class SignInProofsTest extends TestCase
     }
 
     /**
-     * Another identity signing in on a reused session inherits nothing, and the
-     * first identity signing in again starts with nothing either.
+     * The first identity signing in again starts with nothing either.
      *
      * @return void
      */
@@ -266,10 +241,6 @@ final class SignInProofsTest extends TestCase
     }
 
     /**
-     * A guard that fires neither of Laravel's events nor calls the hooks leaves
-     * no sign-in: a verification is refused and records nothing, and the
-     * middleware still requires one.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -294,9 +265,6 @@ final class SignInProofsTest extends TestCase
     }
 
     /**
-     * A custom guard's hooks begin a sign-in that records the first factor and
-     * keeps the proofs that follow, and signing out forgets them.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -333,10 +301,6 @@ final class SignInProofsTest extends TestCase
     }
 
     /**
-     * Advancing the identity's verification generation invalidates the proofs
-     * of every session, not only the current one, and a proof made afterwards
-     * counts again.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -376,8 +340,6 @@ final class SignInProofsTest extends TestCase
     }
 
     /**
-     * Persist a test user who opts into MFA.
-     *
      * @param  string  $email
      * @return \Tests\Fixtures\Identities\TestUser
      */
@@ -390,7 +352,7 @@ final class SignInProofsTest extends TestCase
     }
 
     /**
-     * Enrol a TOTP factor for the user, returning it and its current code.
+     * A confirmed TOTP factor and its current code.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return array{0: \SineMacula\Laravel\Mfa\Models\Factor, 1: string}

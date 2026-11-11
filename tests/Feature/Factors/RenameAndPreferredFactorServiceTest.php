@@ -22,9 +22,8 @@ use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\TestCase;
 
 /**
- * A person renames a factor and chooses a preferred one, with no step-up: a
- * label is what the application it was enrolled through shows, and the
- * preferred factor is the identity's choice across applications.
+ * Renaming and preferring a factor need no step-up; a label is per enrolling
+ * application and the preference spans applications.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -39,8 +38,6 @@ final class RenameAndPreferredFactorServiceTest extends TestCase
     use ArrangesEnrollment;
 
     /**
-     * Arrange the application.
-     *
      * @return void
      */
     #[\Override]
@@ -91,9 +88,6 @@ final class RenameAndPreferredFactorServiceTest extends TestCase
     }
 
     /**
-     * Only a factor of the person's, enrolled through this application, is
-     * renamed; another is `not_found`, reporting nothing.
-     *
      * @return void
      */
     public function testARenameIsScopedToTheEnrollingApplication(): void
@@ -111,8 +105,7 @@ final class RenameAndPreferredFactorServiceTest extends TestCase
     }
 
     /**
-     * An application's own model may key its factors by integer: such an id is
-     * matched as a string, and finds only the factor it names.
+     * An application's own model may key its factors by integer.
      *
      * @return void
      */
@@ -210,8 +203,7 @@ final class RenameAndPreferredFactorServiceTest extends TestCase
     }
 
     /**
-     * A pending session is served nothing, whatever it allows, and an inactive
-     * identity is refused.
+     * A pending session is served nothing, whatever it allows.
      *
      * @return void
      */
@@ -234,10 +226,6 @@ final class RenameAndPreferredFactorServiceTest extends TestCase
     }
 
     /**
-     * The bound active state resolver, not the identity, decides who is served:
-     * a person it finds inactive is refused and their factor left as it was,
-     * and an identity it finds active is served.
-     *
      * @return void
      */
     public function testTheBoundActiveStateResolverDecidesWhoIsServed(): void

@@ -79,10 +79,8 @@ use Tests\Fixtures\Seams\RefusingCompletion;
 use Tests\TestCase;
 
 /**
- * Feature tests for `PasskeyChangeGate`, run in the stand-in authentication
- * layer's own transactions on SQLite: a registration or removal the gate
- * refuses rolls back the caller's own write with it, and one the gate allows
- * commits, or rolls back with the caller, as one change.
+ * Runs in the stand-in authentication layer's own transactions, so a refusal
+ * rolls back the caller's write and an allowed change commits with it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -105,7 +103,7 @@ final class PasskeyChangeGateTest extends TestCase
     use ArrangesPasskeys;
 
     /**
-     * Fake the gate's events and make recovery codes quick to hash.
+     * Fakes the gate's events and makes recovery codes quick to hash.
      *
      * @return void
      */
@@ -120,8 +118,6 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * Each of the gate's calls is refused outside a transaction.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -152,9 +148,8 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * On an application that does not enable passkeys, and for an identity that
-     * is not a person, the registration goes on as a sign-in passkey only:
-     * nothing is associated.
+     * On an application without passkeys, or for a non-person identity, the
+     * registration goes on as a sign-in passkey only.
      *
      * @return void
      *
@@ -183,9 +178,7 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * A first passkey on an active session needs the first factor proved again:
-     * the default reauthenticator refuses, and the refusal rolls back the
-     * caller's own credential with everything else.
+     * The default reauthenticator refuses a first passkey on an active session.
      *
      * @return void
      *
@@ -206,9 +199,8 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * With the first factor proved again, a first passkey is associated as a
-     * confirmed factor enrolled through the application, with its recovery
-     * codes, and reported once the caller commits.
+     * With the first factor proved again it is confirmed and reported once the
+     * caller commits.
      *
      * @return void
      *
@@ -246,8 +238,7 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * Recovery codes come with the first passkey only when the application
-     * accepts them and the session then meets the level it issues them at.
+     * Only when accepted and the session then meets their level.
      *
      * @return void
      *
@@ -271,8 +262,6 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * A stale reauthentication does not authorise the first passkey.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -288,7 +277,7 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * A further passkey needs a fresh step-up, not a reauthentication.
+     * A reauthentication is not enough.
      *
      * @return void
      *
@@ -311,9 +300,7 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * A pending session may associate a passkey without a step-up only as its
-     * bootstrap enrolment, when the application allows it and the identity has
-     * no factor.
+     * Only when the application allows it and the identity has no factor.
      *
      * @return void
      *
@@ -343,7 +330,7 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * The application's limit on confirmed factors of a type is applied.
+     * The application's limit on confirmed factors of a type.
      *
      * @return void
      *
@@ -362,8 +349,7 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * A credential associated already, with this identity or another, is
-     * refused: a registration is never idempotent.
+     * Whichever identity holds it: a registration is never idempotent.
      *
      * @return void
      *
@@ -387,9 +373,7 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * A credential another identity's registration associates after this one
-     * found it unassociated is refused by the unique credential index, as one
-     * found associated is, and the registration rolls back.
+     * The unique credential index refuses it and the registration rolls back.
      *
      * @return void
      *
@@ -403,9 +387,7 @@ final class PasskeyChangeGateTest extends TestCase
         $user = $this->signedInPerson();
 
         Factor::created(static function (): void {
-            // Stands in for another identity's registration committing the same
-            // credential between this one's check and its insert, outside the
-            // savepoint the insert runs in, as a commit elsewhere is.
+            // Another identity commits it between this check and the insert.
             DB::table(TableNames::of(TableNames::PASSKEY_ASSOCIATIONS))->insert([
                 'id'                   => (string) Str::ulid(),
                 'factor_id'            => 'concurrent-factor',
@@ -422,9 +404,7 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * A registration bound to another session, or one that observed no user
-     * presence, is refused; so is one made for another identity than the
-     * request's caller.
+     * Bound to another session, without user presence, or for another identity.
      *
      * @return void
      *
@@ -451,8 +431,7 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * An inactive identity is refused a registration, the same as any other
-     * enrolment, and the caller's credential rolls back with it.
+     * The caller's credential rolls back with the refusal.
      *
      * @return void
      *
@@ -484,8 +463,7 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * A caller that fails after the gate allowed the registration leaves no
-     * factor, association, recovery code or event behind.
+     * No factor, association, recovery code or event is left behind.
      *
      * @return void
      *
@@ -515,8 +493,7 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * Removing a credential associated with nobody is a no-op, whatever the
-     * session's freshness.
+     * Whatever the session's freshness.
      *
      * @return void
      *
@@ -536,8 +513,6 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * Removing an associated passkey needs a fresh step-up.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -556,8 +531,7 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * A removal that leaves the session short of its requirement hands the
-     * shortfall to the session transition.
+     * The shortfall goes to the session transition.
      *
      * @return void
      *
@@ -587,8 +561,7 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * A revoker that judges the session itself is the only judge of a passkey
-     * removal too, and what it returns is what `removing()` returns.
+     * Such a revoker is the only judge of a passkey removal too.
      *
      * @return void
      *
@@ -617,10 +590,8 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * While another factor remains, a step-up made only with the passkey being
-     * removed does not authorise its removal; one made with the other factor
-     * does, and the recovery codes and the session, still meeting its
-     * requirement, stay as they are.
+     * While another factor remains, a step-up with the passkey being removed is
+     * refused and one with the other factor is accepted.
      *
      * @return void
      *
@@ -660,8 +631,7 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * A step-up made with the identity's only factor authorises removing it
-     * when no factor is required, and the recovery codes go with it.
+     * The recovery codes go with it.
      *
      * @return void
      *
@@ -684,8 +654,7 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * The last acceptable factor is not removed while an application always
-     * requires one, and the caller's own removal rolls back with it.
+     * The caller's own removal rolls back with the refusal.
      *
      * @return void
      *
@@ -710,9 +679,7 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * A passkey factor enrolled through another application is not removed: it
-     * is not found, and the caller's own removal of the credential rolls back
-     * with it, since an application never deletes another's factor.
+     * It is not found, since an application never deletes another's factor.
      *
      * @return void
      *
@@ -739,9 +706,7 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * An inactive identity is refused a removal, the same as through
-     * `Mfa::removeFactor(Callers::current())`, and the caller's removal of the
-     * credential rolls back with it.
+     * As through `Mfa::removeFactor()`; the caller's removal rolls back.
      *
      * @return void
      *
@@ -787,8 +752,7 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * A sign-in that changed before the lock was held is not acted on, whatever
-     * proofs the new one holds: the factor and the credential stay.
+     * Whatever proofs the new one holds, the factor and the credential stay.
      *
      * @return void
      *
@@ -815,8 +779,8 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * Without a sign-in the proof store knows of there is nothing to compare
-     * under the lock, so a bound gate answering fresh removes nothing.
+     * With nothing to compare under the lock, a bound gate answering fresh
+     * removes nothing.
      *
      * @return void
      *
@@ -844,8 +808,7 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * Removing a passkey stops the identity's other sessions counting, and the
-     * current session keeps its proofs but the removed factor's.
+     * The current session keeps its proofs but the removed factor's.
      *
      * @return void
      *
@@ -875,10 +838,8 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * A removal on behalf of another identity, or of the right one on another
-     * application, removes nothing: another identity's own sign-in finds the
-     * credential is not its own, and an application the identity holds no
-     * sign-in on has nothing a step-up could have been made on.
+     * Another identity's sign-in does not own the credential, and an
+     * application with no sign-in has nothing to step up on.
      *
      * @return void
      *
@@ -902,9 +863,7 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * The caller removing a credential associated with another identity is
-     * refused as not found, and the other identity's factor and association
-     * stay.
+     * Refused as not found; the other identity's factor and association stay.
      *
      * @return void
      *
@@ -928,8 +887,6 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * The passkey factor carries the label it was registered with.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -949,8 +906,7 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * A persistence seam that neither writes the factor nor throws leaves the
-     * passkey unassociated.
+     * A persistence seam that neither writes the factor nor throws.
      *
      * @return void
      *
@@ -974,8 +930,7 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * A caller with no sign-in on the application has nothing to bind a
-     * registration to, so it is refused as not found.
+     * Nothing binds the registration, so it is refused as not found.
      *
      * @return void
      *
@@ -996,8 +951,7 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * Registering and removing in one outer transaction commit as one change;
-     * a refusal anywhere in it rolls all of it back.
+     * A refusal anywhere rolls all of it back.
      *
      * @return void
      *
@@ -1035,9 +989,8 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * A registration on the bootstrap path reports its own event, ends the
-     * obligation, and hands its proof to the completion, whose result comes
-     * back.
+     * It reports its own event, ends the obligation and returns the
+     * completion's result.
      *
      * @return void
      *
@@ -1070,9 +1023,8 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * A registration on an active session reports no bootstrap, reaches no
-     * pending completion, and ends the obligation too; it goes to the bound
-     * transition with nothing outstanding, whose answer the result carries.
+     * It ends the obligation too and goes to the bound transition with nothing
+     * outstanding.
      *
      * @return void
      *
@@ -1108,9 +1060,7 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * A first passkey on an active session is evaluated as any other first
-     * factor: on an application requiring a verification of an identity with a
-     * factor, the shortfall goes to the bound transition.
+     * Evaluated as any other first factor.
      *
      * @return void
      *
@@ -1145,8 +1095,6 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * The transition's refusal rolls the registration back with its factor.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -1157,8 +1105,6 @@ final class PasskeyChangeGateTest extends TestCase
 
         $this->container()->instance(SessionTransition::class, new class implements SessionTransition {
             /**
-             * Refuse the change.
-             *
              * @param  \SineMacula\Laravel\Mfa\Requirements\SessionChange  $change
              * @return ?object
              *
@@ -1188,8 +1134,6 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * A completion's refusal rolls the registration back with its factor.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -1215,8 +1159,7 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * A sign-in that changes between the first look and the lock registers
-     * nothing.
+     * Between the first look and the lock.
      *
      * @return void
      *
@@ -1239,8 +1182,7 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * Bind a reauthenticator that proves the password again, the given number
-     * of seconds ago.
+     * Binds a reauthenticator that proved the password `$secondsAgo` ago.
      *
      * @param  int  $secondsAgo
      * @return \Tests\Fixtures\Seams\FreshReauthenticator
@@ -1257,8 +1199,6 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * Set the identity's obligation to enrol again.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return void
      */
@@ -1273,8 +1213,7 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * Make every request carry a pending session of the user's, in its own
-     * session, allowing the given actions.
+     * Every request carries a pending session of the user's for `$actions`.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  list<\SineMacula\Laravel\Mfa\Enums\PendingAction>  $actions
@@ -1300,8 +1239,6 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * The reason the call was refused with.
-     *
      * @param  \Closure(): mixed  $call
      * @return \SineMacula\Laravel\Mfa\Enums\FailureReason
      */
@@ -1317,8 +1254,6 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * The stand-in authentication layer's registrar.
-     *
      * @return \Tests\Fixtures\Passkeys\StandInRegistrar
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -1329,8 +1264,6 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
-     * The gate under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Passkeys\PasskeyChangeGate
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

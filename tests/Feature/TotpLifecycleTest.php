@@ -30,13 +30,8 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * End-to-end TOTP lifecycle feature tests.
- *
- * Exercises the full enrolment and verification flow against a real Factor row,
- * the shipped TOTP driver, and the default session-backed proof store.
- * Assertions cover the events fired, the factor state transitions, the proofs
- * recorded, and the single use of each time step. Time is frozen in the middle
- * of a step, so no assertion straddles a step boundary.
+ * TOTP end to end through the shipped driver and the session proof store. Time
+ * is frozen mid-step so no assertion straddles a step boundary.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -49,15 +44,13 @@ final class TotpLifecycleTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** @var string A code matching no step of the window at the frozen time. */
+    /** @var string Matches no step of the window at the frozen time. */
     private const string WRONG_CODE = '000000';
 
-    /** @var int The frozen time: 15 seconds into time step 60000000. */
+    /** @var int 15 seconds into time step 60000000. */
     private const int NOW = 1800000015;
 
     /**
-     * Freeze time in the middle of a step.
-     *
      * @return void
      */
     #[\Override]
@@ -71,9 +64,6 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * A successful verification records the step of its code on the factor's
-     * row.
-     *
      * @return void
      */
     public function testSuccessfulVerificationRecordsTheAcceptedStep(): void
@@ -86,8 +76,7 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * The same code is refused at a second verification, as a replay, and
-     * counted as a failed attempt.
+     * A replay counts as a failed attempt.
      *
      * @return void
      */
@@ -109,9 +98,6 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * Once a code is accepted, a code for an earlier step of the window is
-     * refused, and a later one still passes.
-     *
      * @return void
      */
     public function testACodeForAnEarlierStepIsRefusedAfterALaterOne(): void
@@ -124,9 +110,6 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * The code that confirmed a pending factor is refused at the factor's next
-     * verification.
-     *
      * @return void
      */
     public function testTheConfirmingCodeIsRefusedAtTheNextVerification(): void
@@ -143,8 +126,6 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * Test successful TOTP verification reports it.
-     *
      * @return void
      */
     public function testSuccessfulVerificationIsVerified(): void
@@ -155,9 +136,6 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * Test successful TOTP verification on a signed-in session records an
-     * additional factor proof of the factor.
-     *
      * @return void
      */
     public function testSuccessfulVerificationRecordsAProof(): void
@@ -174,8 +152,6 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * Test successful TOTP verification stamps the factor's last use.
-     *
      * @return void
      */
     public function testSuccessfulVerificationStampsFactorLastUse(): void
@@ -191,8 +167,6 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * Test successful TOTP verification dispatches `VerificationPassed`.
-     *
      * @return void
      */
     public function testSuccessfulVerificationDispatchesVerifiedEvent(): void
@@ -215,9 +189,6 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * A failed TOTP verification must count a failure in a row and dispatch an
-     * `invalid_code` failure event.
-     *
      * @return void
      */
     public function testFailedVerificationIncrementsAttemptsAndFiresFailureEvent(): void
@@ -241,9 +212,6 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * Test crossing `mfa.attempts.factor_limit` records the configured failures
-     * in a row.
-     *
      * @return void
      */
     public function testThresholdCrossingRecordsConfiguredAttemptsCount(): void
@@ -254,9 +222,6 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * Test crossing `mfa.attempts.factor_limit` locks the factor until a future
-     * time.
-     *
      * @return void
      */
     public function testThresholdCrossingLocksTheFactorUntilAFutureTime(): void
@@ -271,8 +236,6 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * Test verifying after lockout fails.
-     *
      * @return void
      */
     public function testVerifyingAfterLockoutFails(): void
@@ -283,8 +246,6 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * Test verifying after lockout dispatches a locked failure.
-     *
      * @return void
      */
     public function testVerifyingAfterLockoutDispatchesLockedFailure(): void
@@ -302,11 +263,7 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * Test asking for a code preserves the failures in a row after lockout.
-     *
-     * `sendCode()` must NOT clear an active lockout: wiping the count on every
-     * "start MFA" call would let any consumer-side resend endpoint act as a
-     * free unlock against the configured `mfa.attempts.factor_limit` defence.
+     * A resend endpoint must never act as a free unlock.
      *
      * @return void
      */
@@ -322,8 +279,6 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * Test asking for a code preserves the time the lockout ends.
-     *
      * @return void
      */
     public function testAskingForACodePreservesTheLockoutEndAfterLockout(): void
@@ -344,8 +299,6 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * Test asking for a code keeps the factor locked after lockout.
-     *
      * @return void
      */
     public function testAskingForACodeKeepsFactorLockedAfterLockout(): void
@@ -358,8 +311,7 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * Enrol a TOTP factor for a freshly created test user and return the [user,
-     * factor, current-code] triple.
+     * A signed-in user, their confirmed TOTP factor and its current code.
      *
      * @return array{0: \Tests\Fixtures\Identities\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor, 2: string}
      */
@@ -384,8 +336,6 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * The lockout the factor's owner's attempts against it are refused by now.
-     *
      * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
      * @return ?\SineMacula\Laravel\Mfa\Attempts\Lockout
      *
@@ -399,8 +349,7 @@ final class TotpLifecycleTest extends TestCase
     }
 
     /**
-     * Enrol a TOTP factor and burn through the configured max-attempts so the
-     * factor is in a locked-out state when returned.
+     * A TOTP factor locked out by failed attempts.
      *
      * @return \SineMacula\Laravel\Mfa\Models\Factor
      */

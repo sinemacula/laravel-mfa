@@ -5,9 +5,8 @@ declare(strict_types = 1);
 namespace Benchmarks\Support;
 
 /**
- * Proof, at set-up, that a benchmarked path reaches the outcome it is named
- * for, so a fixture that drifts fails the run instead of timing a refusal in
- * the path's place.
+ * Fails the run when a drifted fixture would time a refusal instead of the
+ * path.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -20,8 +19,6 @@ final class BenchOutcome
     private function __construct() {}
 
     /**
-     * Throw unless the path reached its outcome.
-     *
      * @param  string  $path
      * @param  bool  $reached
      * @return void

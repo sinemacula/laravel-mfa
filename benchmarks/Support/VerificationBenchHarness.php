@@ -18,77 +18,60 @@ use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 use Tests\Fixtures\Identities\TestUser;
 
 /**
- * One branch of a whole verification through the manager, measured once in a
- * process.
- *
- * Two people are seeded, each with their own sign-in, factors and address, so
- * every limiter key is separate. Building the harness runs the branch on the
- * first, which warms the path, as the CLI has no opcache and a first call would
- * time the autoloader, and proves it reaches its outcome. `run()` makes the
- * same call for the second, so it makes exactly the statements the query
- * budget's ledger counts for the branch: those of an address's first window for
- * a TOTP or a recovery code, and those of the window its send began for a
- * delivered code, which takes its slot by the update alone.
- *
- * A step or a code is used up by its verification and a miss counts, so a call
- * is never repeated: there is no pool of fixtures and the clock never moves,
- * and a second `run()` in a process throws, which is why the subject stays at
- * one revolution with no warm-up.
+ * Runs a branch on a first person to warm the path, as the CLI has no opcache,
+ * then times it once for a second; a used-up step or code allows no repeat.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  */
 final class VerificationBenchHarness
 {
-    /** @var string A TOTP code accepted. */
+    /** @var string */
     public const string TOTP_HIT = 'TOTP hit';
 
-    /** @var string A wrong TOTP code. */
+    /** @var string */
     public const string TOTP_MISS = 'TOTP miss';
 
-    /** @var string A delivered code accepted. */
+    /** @var string */
     public const string CODE_HIT = 'delivered code hit';
 
-    /** @var string A wrong delivered code. */
+    /** @var string */
     public const string CODE_MISS = 'delivered code miss';
 
-    /** @var string A recovery code accepted. */
+    /** @var string */
     public const string RECOVERY_CODE_HIT = 'recovery code hit';
 
-    /** @var string A wrong recovery code. */
+    /** @var string */
     public const string RECOVERY_CODE_MISS = 'recovery code miss';
 
-    /** @var int How many steps away a wrong TOTP code is taken from. */
+    /** @var int Steps away a wrong TOTP code is taken from. */
     private const int WRONG_STEPS = 5;
 
-    /** @var string A code submitted that matches none of the set. */
+    /** @var string Matches none of the set. */
     private const string NO_RECOVERY_CODE = 'ZZZZ-ZZZZ-ZZZZ';
 
-    /** @var array<string, true> @managed-static The branches already run in this process, outside anything set-up resets. */
+    /** @var array<string, true> @managed-static Branches run in this process; set-up never resets it. */
     private static array $spent = [];
 
     /** @var \Illuminate\Contracts\Foundation\Application */
     private readonly Application $app;
 
-    /** @var \SineMacula\Laravel\Mfa\Testing\FakeEmailSender The delivered codes. */
+    /** @var \SineMacula\Laravel\Mfa\Testing\FakeEmailSender */
     private readonly FakeEmailSender $mailbox;
 
     /** @var \SineMacula\Laravel\Mfa\MfaManager */
     private readonly MfaManager $manager;
 
-    /** @var \SineMacula\Laravel\Mfa\Verification\Submission What the timed call submits. */
+    /** @var \SineMacula\Laravel\Mfa\Verification\Submission */
     private readonly Submission $submission;
 
-    /** @var \SineMacula\Laravel\Mfa\Context\CallerContext Who the timed call is made for. */
+    /** @var \SineMacula\Laravel\Mfa\Context\CallerContext */
     private readonly CallerContext $caller;
 
-    /** @var ?\SineMacula\Laravel\Mfa\Verification\VerificationResult What the timed call answered. */
+    /** @var ?\SineMacula\Laravel\Mfa\Verification\VerificationResult */
     private ?VerificationResult $result = null;
 
     /**
-     * Build the application, prove the branch on the first person and arrange
-     * it for the second.
-     *
      * @param  string  $branch
      * @return void
      *
@@ -96,7 +79,7 @@ final class VerificationBenchHarness
      */
     public function __construct(
 
-        /** The branch measured. */
+        /** Branch measured. */
         private readonly string $branch,
     ) {
         BenchApplication::freezeClock();
@@ -132,7 +115,7 @@ final class VerificationBenchHarness
     }
 
     /**
-     * Prove the timed call reached its outcome too, and release the clock.
+     * Prove the timed call's outcome and release the clock.
      *
      * @return void
      *
@@ -165,8 +148,6 @@ final class VerificationBenchHarness
     }
 
     /**
-     * Seed a person for the branch and return what they submit.
-     *
      * @param  string  $email
      * @param  string  $ip
      * @param  string  $session
@@ -187,8 +168,6 @@ final class VerificationBenchHarness
     }
 
     /**
-     * A TOTP code of a new factor, from the number of steps away given.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  int  $steps
      * @return \SineMacula\Laravel\Mfa\Verification\Submission
@@ -201,8 +180,6 @@ final class VerificationBenchHarness
     }
 
     /**
-     * The code sent to a new email factor, or a wrong one.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  string  $email
      * @param  bool  $right
@@ -226,8 +203,6 @@ final class VerificationBenchHarness
     }
 
     /**
-     * A wrong code against the person's new set.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return \SineMacula\Laravel\Mfa\Verification\Submission
      */
@@ -239,8 +214,7 @@ final class VerificationBenchHarness
     }
 
     /**
-     * Give the person a TOTP factor and a set of recovery codes, and return one
-     * of the set.
+     * Give the person a TOTP factor and recovery codes, and return one.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return string
@@ -261,8 +235,7 @@ final class VerificationBenchHarness
     }
 
     /**
-     * The caller of the request the last person seeded signed in on, as an
-     * application's controller builds it.
+     * As an application's controller builds it.
      *
      * @return \SineMacula\Laravel\Mfa\Context\CallerContext
      */

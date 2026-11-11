@@ -8,19 +8,17 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 use Tests\Fixtures\Assurance\SessionProofs;
 
 /**
- * The sets of proofs the combination and requirement benches evaluate, built on
- * the combination policy's test fixtures, each one session's, against the time
- * those fixtures measure every proof's age from.
+ * Session proof sets for the combination and requirement benches.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  */
 final class BenchProofs
 {
-    /** @var int The most proofs one sign-in keeps, the first factor among them. */
+    /** @var int The most proofs one sign-in keeps, first factor included. */
     private const int LONG_SESSION = 50;
 
-    /** @var int How far apart a long session's proofs are, in seconds. */
+    /** @var int Seconds between a long session's proofs. */
     private const int LONG_SESSION_GAP = 60;
 
     /**
@@ -29,8 +27,6 @@ final class BenchProofs
     private function __construct() {}
 
     /**
-     * Only a password first factor.
-     *
      * @return list<\SineMacula\Laravel\Mfa\Proofs\Proof>
      */
     public static function firstFactor(): array
@@ -39,8 +35,6 @@ final class BenchProofs
     }
 
     /**
-     * A password first factor and a TOTP code the given seconds ago.
-     *
      * @param  int  $secondsAgo
      * @return list<\SineMacula\Laravel\Mfa\Proofs\Proof>
      */
@@ -50,8 +44,7 @@ final class BenchProofs
     }
 
     /**
-     * A password first factor and a verifying passkey, which provide everything
-     * a requirement can ask of the default policy short of AAL3.
+     * Everything the default policy can require short of AAL3.
      *
      * @return list<\SineMacula\Laravel\Mfa\Proofs\Proof>
      */
@@ -61,8 +54,7 @@ final class BenchProofs
     }
 
     /**
-     * An email first factor and a code to the same address, a channel it cannot
-     * be independent of.
+     * An email first factor and a code to the same, dependent, address.
      *
      * @return list<\SineMacula\Laravel\Mfa\Proofs\Proof>
      */
@@ -72,7 +64,7 @@ final class BenchProofs
     }
 
     /**
-     * As many proofs as one sign-in keeps, oldest first.
+     * Oldest first.
      *
      * @return list<\SineMacula\Laravel\Mfa\Proofs\Proof>
      */

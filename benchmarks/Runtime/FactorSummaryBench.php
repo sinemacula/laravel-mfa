@@ -11,11 +11,7 @@ use PhpBench\Attributes\Revs;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 
 /**
- * Benchmarks for `FactorSummary::fromFactor()` and its JSON serialisation.
- *
- * Exercised on every `InsufficientAuthenticationException`, which runs once per
- * refused request against each of the factors the session is offered — so this
- * is a soft hot path.
+ * A soft hot path: every refused request summarises each factor it offers.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -32,8 +28,7 @@ final class FactorSummaryBench
     private InMemoryFactor $smsFactor;
 
     /**
-     * Build one factor double per shipped driver type so each benchmark targets
-     * a representative summary shape, and prove a destination comes out masked.
+     * One factor per shipped driver type, each proved to mask its destination.
      *
      * @return void
      *
@@ -68,8 +63,6 @@ final class FactorSummaryBench
     }
 
     /**
-     * Measure the cost of summarising a TOTP factor.
-     *
      * @return void
      */
     #[Iterations(3)]
@@ -80,8 +73,6 @@ final class FactorSummaryBench
     }
 
     /**
-     * Measure the cost of summarising an email factor.
-     *
      * @return void
      */
     #[Iterations(3)]
@@ -92,8 +83,6 @@ final class FactorSummaryBench
     }
 
     /**
-     * Measure the cost of summarising an SMS factor.
-     *
      * @return void
      */
     #[Iterations(3)]
@@ -104,8 +93,6 @@ final class FactorSummaryBench
     }
 
     /**
-     * Measure the cost of JSON-serialising a summarised factor.
-     *
      * @return void
      */
     #[Iterations(3)]

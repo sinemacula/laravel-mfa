@@ -8,10 +8,7 @@ use Benchmarks\Support\Concerns\ReportsUsableFactorDefaults;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 
 /**
- * Non-persisting `Factor` implementation used for benchmarks.
- *
- * Skips Eloquent / database overhead so the benchmarks measure the driver
- * verification logic in isolation.
+ * Non-persisting factor, so driver benchmarks skip Eloquent and the database.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -21,8 +18,6 @@ final readonly class InMemoryFactor implements Factor
     use ReportsUsableFactorDefaults;
 
     /**
-     * Build a benchmark factor double with the supplied state.
-     *
      * @param  string  $type
      * @param  ?string  $id
      * @param  ?string  $label
@@ -32,25 +27,23 @@ final readonly class InMemoryFactor implements Factor
      */
     public function __construct(
 
-        /** The factor type (e.g. `'totp'`, `'sms'`). */
+        /** Factor type. */
         private string $type,
 
-        /** Factor identifier returned by `getFactorIdentifier()`. */
+        /** Factor identifier. */
         private ?string $id = 'bench-factor',
 
-        /** Optional human-readable label. */
+        /** Label. */
         private ?string $label = null,
 
-        /** Delivery destination for OTP drivers; null otherwise. */
+        /** Delivery destination for OTP drivers. */
         private ?string $destination = null,
 
-        /** Stored secret / hash material the driver verifies against. */
+        /** Secret or hash the driver verifies against. */
         #[\SensitiveParameter] private ?string $secret = null,
     ) {}
 
     /**
-     * Return the configured factor identifier.
-     *
      * @return mixed
      */
     #[\Override]
@@ -60,8 +53,6 @@ final readonly class InMemoryFactor implements Factor
     }
 
     /**
-     * Return the configured type.
-     *
      * @return string
      */
     #[\Override]
@@ -71,8 +62,6 @@ final readonly class InMemoryFactor implements Factor
     }
 
     /**
-     * Return the configured label.
-     *
      * @return ?string
      */
     #[\Override]
@@ -82,8 +71,6 @@ final readonly class InMemoryFactor implements Factor
     }
 
     /**
-     * Return the configured delivery destination.
-     *
      * @return ?string
      */
     #[\Override]
@@ -93,8 +80,6 @@ final readonly class InMemoryFactor implements Factor
     }
 
     /**
-     * Return the configured secret value.
-     *
      * @return ?string
      */
     #[\Override]

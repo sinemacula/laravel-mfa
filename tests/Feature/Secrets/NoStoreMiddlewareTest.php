@@ -14,10 +14,6 @@ use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
 /**
- * Tests for the `mfa.no-store` middleware through the HTTP kernel: every
- * response of the routes it is placed on is sent with `no-store`, and other
- * routes are left as they are.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -26,12 +22,10 @@ use Tests\TestCase;
 #[CoversClass(NoStore::class)]
 final class NoStoreMiddlewareTest extends TestCase
 {
-    /** @var string A TOTP secret. */
+    /** @var string */
     private const string SECRET = 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP';
 
     /**
-     * The package aliases the middleware as `mfa.no-store` when it boots.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -45,9 +39,6 @@ final class NoStoreMiddlewareTest extends TestCase
     }
 
     /**
-     * A response of a route the middleware is placed on is sent with
-     * `no-store`.
-     *
      * @return void
      */
     public function testSendsTheRoutesResponsesWithoutStoring(): void
@@ -61,8 +52,6 @@ final class NoStoreMiddlewareTest extends TestCase
     }
 
     /**
-     * Caching the route allowed is replaced.
-     *
      * @return void
      */
     public function testReplacesTheCachingTheRouteAllowed(): void
@@ -74,8 +63,6 @@ final class NoStoreMiddlewareTest extends TestCase
     }
 
     /**
-     * A route without the middleware is left as it is.
-     *
      * @return void
      */
     public function testLeavesOtherRoutesAlone(): void
@@ -88,9 +75,6 @@ final class NoStoreMiddlewareTest extends TestCase
     }
 
     /**
-     * A secret revealed through the response helper reaches the client, and
-     * only in a response that is never stored.
-     *
      * @return void
      */
     public function testTheResponseHelperRevealsTheSecretWithoutStoring(): void
@@ -103,8 +87,6 @@ final class NoStoreMiddlewareTest extends TestCase
     }
 
     /**
-     * Define the routes the tests call.
-     *
      * @param  \Illuminate\Routing\Router  $router
      * @return void
      */

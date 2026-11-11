@@ -12,14 +12,8 @@ use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
- * Shared base for the query budgets: exact read and write counts for a path,
- * rather than wall-clock assertions, which would be flaky, or upper bounds,
- * which would hide a statement that went away and let a ledger comment drift.
- *
- * Statements are recorded from every connection, and only while the path under
- * test runs. A select is a read and an insert, an update or a delete is a
- * write; anything else fails the test, so a statement nobody has classified is
- * never counted silently as one or the other.
+ * Exact read and write counts, since an upper bound would hide a statement that
+ * went away; an unclassified statement fails rather than counting as either.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -30,18 +24,16 @@ abstract class PerformanceContractTestCase extends TestCase
 {
     use RefreshDatabase;
 
-    /** @var string The time every budget runs at. */
+    /** @var string */
     private const string NOW = '2026-11-01 12:00:00';
 
-    /** @var list<array{connection: string, sql: string}> The statements the path under test made. */
+    /** @var list<array{connection: string, sql: string}> */
     private array $statements = [];
 
-    /** @var bool Whether the path under test is running. */
+    /** @var bool */
     private bool $capturing = false;
 
     /**
-     * Freeze both clocks and listen for statements.
-     *
      * @return void
      */
     #[\Override]
@@ -63,8 +55,6 @@ abstract class PerformanceContractTestCase extends TestCase
     }
 
     /**
-     * Release both clocks.
-     *
      * @return void
      */
     #[\Override]
@@ -77,8 +67,6 @@ abstract class PerformanceContractTestCase extends TestCase
     }
 
     /**
-     * Run the path and assert exactly how many reads and writes it made.
-     *
      * @template TResult
      *
      * @param  int  $reads
@@ -103,8 +91,6 @@ abstract class PerformanceContractTestCase extends TestCase
     }
 
     /**
-     * Whether the statement reads or writes, or null when it does neither.
-     *
      * @param  string  $sql
      * @return ?string
      */
@@ -118,9 +104,6 @@ abstract class PerformanceContractTestCase extends TestCase
     }
 
     /**
-     * How many reads and writes the path made, failing the test on a statement
-     * that is neither.
-     *
      * @return array{read: int, write: int}
      */
     private function counts(): array
@@ -147,8 +130,6 @@ abstract class PerformanceContractTestCase extends TestCase
     }
 
     /**
-     * Every statement the path made, in order, with its connection.
-     *
      * @return string
      */
     private function listing(): string

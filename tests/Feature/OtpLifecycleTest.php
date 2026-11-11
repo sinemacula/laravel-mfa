@@ -28,11 +28,7 @@ use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 use Tests\TestCase;
 
 /**
- * End-to-end lifecycle of the delivered codes (email and SMS) through the
- * manager: a code is delivered through the bound sender and accepted once, for
- * its own sign-in, purpose and factor only; a resend replaces it after the
- * cooldown, and resets no failure count or lockout; the sends are capped across
- * sign-ins; and nothing is sent without a sender bound.
+ * Email and SMS codes end to end through the manager.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -48,12 +44,10 @@ final class OtpLifecycleTest extends TestCase
 {
     use ArrangesVerification;
 
-    /** @var string The phone number the SMS factor delivers to. */
+    /** @var string SMS factor destination. */
     private const string PHONE = '+447700900123';
 
     /**
-     * Arrange the application.
-     *
      * @return void
      */
     #[\Override]
@@ -65,8 +59,6 @@ final class OtpLifecycleTest extends TestCase
     }
 
     /**
-     * Release the frozen clock.
-     *
      * @return void
      */
     #[\Override]
@@ -78,9 +70,6 @@ final class OtpLifecycleTest extends TestCase
     }
 
     /**
-     * An email code is delivered to the factor's address in the code message,
-     * and verified once.
-     *
      * @return void
      */
     public function testAnEmailCodeIsDeliveredAndVerifiedOnce(): void
@@ -100,9 +89,7 @@ final class OtpLifecycleTest extends TestCase
     }
 
     /**
-     * Verifying an email code records a proof on the email channel, named by
-     * the factor's destination, for the purpose the code was sent and checked
-     * for.
+     * The proof's email channel is named by the factor's destination.
      *
      * @return void
      */
@@ -125,9 +112,6 @@ final class OtpLifecycleTest extends TestCase
     }
 
     /**
-     * An SMS code is delivered to the factor's phone number in the configured
-     * message and verified.
-     *
      * @return void
      */
     public function testAnSmsCodeIsDeliveredAndVerified(): void
@@ -147,8 +131,7 @@ final class OtpLifecycleTest extends TestCase
     }
 
     /**
-     * The code is stored only as a keyed hash: neither the factor nor the codes
-     * table holds it.
+     * Only a keyed hash is stored, in neither the factor nor the codes table.
      *
      * @return void
      */
@@ -165,9 +148,6 @@ final class OtpLifecycleTest extends TestCase
     }
 
     /**
-     * A code matches only the sign-in it was sent in: under another it is not
-     * found, and a code sent for the new one is.
-     *
      * @return void
      */
     public function testACodeMatchesOnlyItsOwnSignIn(): void
@@ -187,8 +167,7 @@ final class OtpLifecycleTest extends TestCase
     }
 
     /**
-     * A code matches only the factor it was sent for, even another of the
-     * identity's factors with the same address.
+     * Even another of the identity's factors with the same address is refused.
      *
      * @return void
      */
@@ -205,9 +184,6 @@ final class OtpLifecycleTest extends TestCase
     }
 
     /**
-     * A resend waits out the cooldown, then sends a new code that replaces the
-     * previous one.
-     *
      * @return void
      */
     public function testAResendReplacesTheCodeAfterTheCooldown(): void
@@ -233,9 +209,7 @@ final class OtpLifecycleTest extends TestCase
     }
 
     /**
-     * Asking for a code resets nothing: the factor's failures in a row and its
-     * lockout survive the request, so a resend is never a free unlock, and no
-     * code is sent until the lockout ends.
+     * Failures and lockout survive a send, so a resend is never a free unlock.
      *
      * @return void
      */
@@ -267,9 +241,6 @@ final class OtpLifecycleTest extends TestCase
     }
 
     /**
-     * The sends of a factor are capped across sign-ins, so a new sign-in does
-     * not bring new sends.
-     *
      * @return void
      */
     public function testSendsAreCappedAcrossSignIns(): void
@@ -292,8 +263,7 @@ final class OtpLifecycleTest extends TestCase
     }
 
     /**
-     * Without a sender bound, a code is never dropped silently: the send
-     * throws, over the default sender's refusal, and no code is kept.
+     * A code is never dropped silently; the send throws and no code is kept.
      *
      * @return void
      */
