@@ -6,6 +6,7 @@ namespace Tests\Unit;
 
 use Illuminate\Config\Repository;
 use Illuminate\Console\Application as ConsoleApplication;
+use Illuminate\Container\Container;
 use Illuminate\Events\Dispatcher;
 use Illuminate\Foundation\Application;
 use Illuminate\Routing\Router;
@@ -503,5 +504,51 @@ final class MfaServiceProviderTest extends TestCase
         $this->expectExceptionMessage('[attempts] mfa.attempts.lockout_seconds must be an integer from 60 to 86400.');
 
         $this->container()->make('mfa');
+    }
+
+    /**
+     * The defaults this package binds, by class or by its own closure.
+     *
+     * @return void
+     */
+    public function testTheShippedDefaultsAreThePackages(): void
+    {
+        foreach ([SmsSender::class, ProofStore::class, PasskeyGateway::class, SessionRevoker::class] as $contract) {
+            self::assertTrue(MfaServiceProvider::isPackageDefault($this->container(), $contract), $contract);
+        }
+    }
+
+    /**
+     * Anything an application binds, or holds, is not the package's default.
+     *
+     * @return void
+     */
+    public function testAnApplicationsBindingIsNotThePackages(): void
+    {
+        $container = new Container;
+
+        $container->bind('by-class', \stdClass::class);
+        $container->bind('by-closure', static fn (): \stdClass => new \stdClass);
+        $container->singleton('shared', NullSmsSender::class);
+        $container->bind('held', NullSmsSender::class);
+        $container->instance('held', new NullSmsSender);
+
+        foreach (['unbound', 'by-class', 'by-closure', 'shared', 'held'] as $contract) {
+            self::assertFalse(MfaServiceProvider::isPackageDefault($container, $contract), $contract);
+        }
+    }
+
+    /**
+     * A package class bound by name counts as the default, whoever bound it.
+     *
+     * @return void
+     */
+    public function testAPackageClassBoundByNameIsThePackages(): void
+    {
+        $container = new Container;
+
+        $container->bind(SmsSender::class, NullSmsSender::class);
+
+        self::assertTrue(MfaServiceProvider::isPackageDefault($container, SmsSender::class));
     }
 }

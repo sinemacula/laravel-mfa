@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa;
 
+use Illuminate\Container\Container;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
 use SineMacula\Laravel\Mfa\Assurance\AssuranceBindings;
@@ -78,6 +79,32 @@ final class MfaServiceProvider extends ServiceProvider
         HttpBindings::boot($this->app);
         SecretBindings::boot($this->app);
         ConfigurationBindings::boot($this->app);
+    }
+
+    /**
+     * Whether the contract is bound to one of this package's classes, so a
+     * sibling package can replace the default and keep an application's own
+     * binding. An instance or a shared binding is never the default.
+     *
+     * @param  \Illuminate\Container\Container  $container
+     * @param  string  $contract
+     * @return bool
+     */
+    public static function isPackageDefault(Container $container, string $contract): bool
+    {
+        $concrete = $container->getBindings()[$contract]['concrete'] ?? null;
+
+        if (!$concrete instanceof \Closure || $container->isShared($contract)) {
+            return false;
+        }
+
+        $closure = new \ReflectionFunction($concrete);
+        $scope   = $closure->getClosureScopeClass()?->getName();
+
+        // A class bound by name is wrapped in a closure the container defines.
+        $origin = $scope === Container::class ? $closure->getStaticVariables()['concrete'] ?? null : $scope;
+
+        return is_string($origin) && str_starts_with($origin, __NAMESPACE__ . '\\');
     }
 
     /**

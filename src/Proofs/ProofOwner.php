@@ -15,7 +15,7 @@ use SineMacula\Laravel\Mfa\Support\IdentityType;
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
- * @internal
+ * @api
  */
 final readonly class ProofOwner
 {
