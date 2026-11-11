@@ -92,6 +92,7 @@ final class PasskeyAssertionsTest extends TestCase
         self::assertTrue($request->hasStarted());
         self::assertNull($request->reason);
         self::assertSame([[self::CREDENTIAL]], $this->gateway->requested);
+        self::assertSame([self::APPLICATION], $this->gateway->listedFor);
         self::assertSame(self::SESSION, $request->options['session']);
     }
 
@@ -223,6 +224,7 @@ final class PasskeyAssertionsTest extends TestCase
         self::assertSame($properties, $assertion->properties);
         self::assertSame('challenge-1', $assertion->challengeId);
         self::assertSame([[self::CREDENTIAL]], $this->gateway->verified);
+        self::assertSame([self::APPLICATION], $this->gateway->listedFor);
     }
 
     /**

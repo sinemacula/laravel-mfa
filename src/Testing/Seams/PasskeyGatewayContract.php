@@ -30,11 +30,12 @@ final class PasskeyGatewayContract
     /**
      * @param  \SineMacula\Laravel\Mfa\Contracts\PasskeyGateway  $gateway
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
      * @return void
      */
-    public static function assertAnUnavailableGatewayListsNothing(PasskeyGateway $gateway, MultiFactorAuthenticatable $identity): void
+    public static function assertAnUnavailableGatewayListsNothing(PasskeyGateway $gateway, MultiFactorAuthenticatable $identity, string $application): void
     {
-        Assert::assertTrue($gateway->isAvailable() || $gateway->credentialIds($identity) === [], 'An unavailable gateway must list no passkeys.');
+        Assert::assertTrue($gateway->isAvailable() || $gateway->credentialIds($identity, $application) === [], 'An unavailable gateway must list no passkeys.');
     }
 
     /**
@@ -61,7 +62,9 @@ final class PasskeyGatewayContract
      */
     public static function assertAnEmptyResponseNeverVerifies(PasskeyGateway $gateway, MultiFactorAuthenticatable $identity, ProofBinding $binding): void
     {
-        self::assertDoesNotVerify(static fn () => $gateway->verifyAssertion($identity, $binding, $gateway->credentialIds($identity), []), 'An empty response must never verify.');
+        $credentialIds = $gateway->credentialIds($identity, $binding->application);
+
+        self::assertDoesNotVerify(static fn () => $gateway->verifyAssertion($identity, $binding, $credentialIds, []), 'An empty response must never verify.');
     }
 
     /**
