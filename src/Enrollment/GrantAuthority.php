@@ -8,8 +8,7 @@ use Carbon\CarbonImmutable;
 use SineMacula\Laravel\Mfa\Enums\EnrollmentAuthorization;
 
 /**
- * What authorised an enrolment to start and the instant that authority ends,
- * which an enrolment grant lives no longer than.
+ * What authorised an enrolment to start; a grant never outlives its deadline.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -19,17 +18,15 @@ use SineMacula\Laravel\Mfa\Enums\EnrollmentAuthorization;
 final readonly class GrantAuthority
 {
     /**
-     * Constructor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enums\EnrollmentAuthorization  $kind
      * @param  \Carbon\CarbonImmutable  $deadline
      */
     public function __construct(
 
-        /** What authorised the enrolment. */
+        /** Kind of authorisation. */
         public EnrollmentAuthorization $kind,
 
-        /** The instant the authority ends. */
+        /** When the authority ends. */
         public CarbonImmutable $deadline,
     ) {}
 }

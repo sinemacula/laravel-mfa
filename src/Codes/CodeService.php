@@ -26,33 +26,9 @@ use SineMacula\Laravel\Mfa\Support\FactorOwnerColumns;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 
 /**
- * Sends a delivered factor's codes and checks the codes submitted for it, each
- * bound to the factor and to a binding: the identity, the application, the
- * session and the purpose (see `DeliveredCodes`).
- *
- * Sending runs in the identity's factor state transaction (see
- * `FactorStateTransaction`), so the sends of one identity are serialised and
- * the caps on them cannot be overrun by parallel requests; the factor is read
- * again under the lock, and one a concurrent change removed is `not_found`. The
- * time of a send is read once the locks are held, never before. The code is
- * stored, then delivered by the factor's driver inside the same transaction, so
- * a delivery that throws keeps no code and spends no cooldown or cap. The
- * driver is handed a `CodeMessage`: the application and the purpose from the
- * binding, the factor's type and destination as locked, the code and its
- * expiry, and the identity the code is for. Neither sending nor checking resets
- * a failure count or lifts a lockout, and neither reports anything: `CodeSent`
- * and the verification events are dispatched by
- * `Verification\VerificationService`, whichever gateway the code went through.
- *
- * A delivery that throws is scrubbed of the code and the factor's destination,
- * which the service knows, in the message and the trace of every exception in
- * its chain, whether or not PHP recorded the arguments, and surfaces as a
- * `CodeDeliveryFailedException` naming the destination only masked, with the
- * scrubbed failure as its previous exception.
- *
- * A delivered code needs a stored factor and a binding naming the factor's
- * owner, which is the identity the code is for: anything else is refused before
- * anything is read.
+ * Sends and checks delivered codes. Sends run under the identity's factor lock
+ * so parallel requests cannot overrun the caps, and delivery happens inside the
+ * same transaction so a failed delivery keeps no code and spends no cap.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -62,19 +38,16 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 final readonly class CodeService
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      */
     public function __construct(
 
-        /** The container the engine is resolved from. */
+        /** Resolves the code engine. */
         private Container $container,
     ) {}
 
     /**
-     * Send a code for the factor under the binding to the identity through the
-     * factor's driver: a new challenge, or a resend of the binding's open one.
+     * Start a challenge or resend the binding's open one.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
@@ -92,14 +65,15 @@ final readonly class CodeService
     {
         $stored = self::stored($factor, $binding);
 
-        self::refuseAnotherRecipient($identity, $binding);
+        if (!ProofOwner::of($identity)->owns($binding)) {
+            throw new \InvalidArgumentException('A code is sent to the identity its binding names.');
+        }
 
         $codes = $this->container->make(DeliveredCodes::class);
 
         return FactorStateTransaction::forFactor($stored, static function (Collection $factors) use ($identity, $stored, $binding, $driver, $codes): SendResult {
 
-            // Read once the locks are held, so a send that waited for them is
-            // timed, and its cooldown and expiry run, from when it was made
+            // Read under the lock so a send that waited is timed when it ran
             $now    = CarbonImmutable::now()->startOfSecond();
             $locked = $factors->first(static fn (Model $candidate): bool => $candidate->is($stored));
 
@@ -120,8 +94,7 @@ final readonly class CodeService
     }
 
     /**
-     * Check the code against the factor's challenge named under the binding,
-     * using it up when it matches.
+     * Consume the challenge's code when it matches.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -141,14 +114,8 @@ final readonly class CodeService
     }
 
     /**
-     * Deliver the issued code to the identity through the factor's driver, in a
-     * message built from the binding and the factor as locked. A factor with no
-     * destination is refused there. A failure, building the message included,
-     * is scrubbed of the code and the factor's destination, which are given to
-     * the scrub rather than read from the trace, and rethrown as a
-     * `CodeDeliveryFailedException`, so the transaction still rolls back; one
-     * reading the factor before it could be summarised is rethrown scrubbed as
-     * it is, since nothing could name the factor.
+     * A failure is scrubbed of the code and destination and rethrown, so the
+     * transaction still rolls back.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\CodeDeliveryDriver  $driver
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
@@ -187,31 +154,12 @@ final readonly class CodeService
         } catch (\Throwable $exception) {
             ExceptionScrubber::scrub($exception, $issued->code, $destination);
 
-            // A factor that could not be summarised is not read again: its
-            // failure goes on scrubbed, and still rolls the code back
+            // Without a summary there is nothing to name the factor by
             throw $summary === null ? $exception : new CodeDeliveryFailedException($summary, $exception);
         }
     }
 
     /**
-     * Refuse to send a code to another identity than the one its binding names.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
-     * @return void
-     *
-     * @throws \InvalidArgumentException
-     */
-    private static function refuseAnotherRecipient(MultiFactorAuthenticatable $identity, ProofBinding $binding): void
-    {
-        if (!ProofOwner::of($identity)->owns($binding)) {
-            throw new \InvalidArgumentException('A code is sent to the identity its binding names.');
-        }
-    }
-
-    /**
-     * The factor's destination, refusing a factor that has none.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  ?string  $destination
      * @return string
@@ -228,8 +176,6 @@ final readonly class CodeService
     }
 
     /**
-     * The factor as a stored model owned by the binding's identity.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @return \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor
@@ -255,8 +201,6 @@ final readonly class CodeService
     }
 
     /**
-     * The stored factor's id, as the codes table records it.
-     *
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @return string
      *

@@ -9,10 +9,7 @@ use SineMacula\Laravel\Mfa\Attempts\ChallengeAdmission;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 
 /**
- * The outcome of asking for a code to be sent for a factor: sent, with the
- * challenge's id and when the code stops working, or refused, with the reason
- * and, when waiting will help, the seconds until another may be sent. It never
- * holds the code.
+ * Outcome of a code send request. Never holds the code.
  *
  * @api
  *
@@ -22,8 +19,6 @@ use SineMacula\Laravel\Mfa\Enums\FailureReason;
 final readonly class SendResult
 {
     /**
-     * Constructor.
-     *
      * @param  ?string  $challengeId
      * @param  ?\Carbon\CarbonImmutable  $expiresAt
      * @param  ?\SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
@@ -31,22 +26,20 @@ final readonly class SendResult
      */
     private function __construct(
 
-        /** The challenge the code was sent for, when one was sent. */
+        /** Challenge the code was sent for, when sent. */
         public ?string $challengeId,
 
-        /** When the code sent stops working, when one was sent. */
+        /** Code expiry, when sent. */
         public ?CarbonImmutable $expiresAt,
 
-        /** Why no code was sent, when none was. */
+        /** Refusal reason, when not sent. */
         public ?FailureReason $reason,
 
-        /** The seconds, at least 1, until another code may be sent, when waiting will help. */
+        /** Seconds (at least 1) until a retry can succeed, when waiting helps. */
         public ?int $retryAfter,
     ) {}
 
     /**
-     * A code was sent for the challenge.
-     *
      * @param  string  $challengeId
      * @param  \Carbon\CarbonImmutable  $expiresAt
      * @return self
@@ -57,9 +50,6 @@ final readonly class SendResult
     }
 
     /**
-     * No code was sent, for the reason, and another may be in the seconds given
-     * when waiting will help.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
      * @param  ?int  $retryAfter
      * @return self
@@ -70,8 +60,7 @@ final readonly class SendResult
     }
 
     /**
-     * No code was sent because the challenge may not go ahead, for the reason
-     * it gives; when a lockout refuses it, another may be sent once that ends.
+     * Refusal from an admission; a lockout sets the retry to its end.
      *
      * @param  \SineMacula\Laravel\Mfa\Attempts\ChallengeAdmission  $admission
      * @return self
@@ -84,8 +73,6 @@ final readonly class SendResult
     }
 
     /**
-     * Whether a code was sent.
-     *
      * @return bool
      */
     public function wasSent(): bool

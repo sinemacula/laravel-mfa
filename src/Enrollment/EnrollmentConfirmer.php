@@ -57,34 +57,11 @@ use SineMacula\Laravel\Mfa\Verification\CheckOutcome;
 use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
 
 /**
- * Confirms an enrolment: the first valid code, under a live grant, in the
- * session that started it, makes the pending factor confirmed.
- *
- * The caller and its binding are captured and an IP address slot is taken.
- * Under the identity's factor state lock the caller is resolved again, so a
- * sign-in that changed counts nothing, then the row is read and compared, in
- * this order: the grant is bound to the caller (`not_found` otherwise), it is
- * live (an expired one discards the factor and commits), the identity is active
- * and not locked out, the type is still enabled, and the limits and what
- * authorised the grant still hold (see `EnrollmentAuthority::reconfirm()`).
- * Freshness is not judged again: the grant's stored expiry already ends with
- * the proof that authorised it, and a later proof must not revive it.
- *
- * A wrong or replayed code counts against the enrolment's own cap, which at its
- * limit abandons the pending factor; both commit, as they return. The
- * identity's and the factor's failure counts are never charged. A valid code
- * followed by a refusal throws, so the code's use, the TOTP step, the
- * confirmation, the end of a re-enrolment obligation and the recovery codes all
- * roll back.
- *
- * On a pending session the proof goes through `Verification\ProofAcceptance`,
- * so the whole requirement is evaluated again; the session may stay pending. On
- * an active session no proof is recorded and `StepUp` is not called, since this
- * code was bound to the enrolment: the requirement is evaluated again on the
- * proofs the session holds, and the confirmation goes to `SessionTransition`
- * with any shortfall, whose answer the confirmation returns.
- *
- * Stateless: the seams and the configuration are read on every call.
+ * Confirms a pending factor with its first valid code, under the identity's
+ * factor lock. Wrong codes count only against the enrolment's own cap, never
+ * the identity's or factor's. A refusal after a valid code throws so every
+ * write rolls back. On an active session no proof is recorded, since the code
+ * was bound to the enrolment.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -93,12 +70,10 @@ use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
  */
 final readonly class EnrollmentConfirmer
 {
-    /** @var list<\SineMacula\Laravel\Mfa\Enums\FailureReason> The failures that count against the enrolment's own cap. */
+    /** @var list<\SineMacula\Laravel\Mfa\Enums\FailureReason> Failures that count against the enrolment's cap. */
     private const array COUNTED = [FailureReason::INVALID_CODE, FailureReason::REPLAYED];
 
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContextResolver  $callers
@@ -110,34 +85,32 @@ final readonly class EnrollmentConfirmer
      */
     public function __construct(
 
-        /** The container the seams are resolved from. */
+        /** Resolves seams. */
         private Container $container,
 
-        /** The configuration the applications and models are read from. */
+        /** Configuration. */
         private Repository $config,
 
-        /** The resolver of who the request serves. */
+        /** Caller resolver. */
         private CallerContextResolver $callers,
 
-        /** The guard every operation on a factor starts with. */
+        /** Factor operation guard. */
         private OperationGuard $guard,
 
-        /** The throttle on the address and the identity's lockout. */
+        /** IP throttle and identity lockout. */
         private AttemptService $attempts,
 
-        /** Whether what authorised the grant still holds. */
+        /** Enrolment authorisation. */
         private EnrollmentAuthority $authority,
 
-        /** The enrolments in progress. */
+        /** Enrolments in progress. */
         private PendingEnrollments $enrollments,
 
-        /** The dispatcher of the confirmation's events. */
+        /** Event dispatcher. */
         private EventDispatcher $events,
     ) {}
 
     /**
-     * Confirm the enrolment the grant holds with the code.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  \SineMacula\Laravel\Mfa\Secrets\RevealedSecret|string  $grant
      * @param  string  $code
@@ -158,10 +131,6 @@ final readonly class EnrollmentConfirmer
     }
 
     /**
-     * Make the attempt holding a slot of the IP address's window and the
-     * identity's lock, and report a refusal made there, which rolled back all
-     * it did, or by the address's throttle, which ran nothing.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  string  $grantHash
@@ -205,11 +174,8 @@ final readonly class EnrollmentConfirmer
     }
 
     /**
-     * Under the lock, for the caller as it stands now: find the enrolment the
-     * grant holds, answering one not bound to the caller as `not_found`, and
-     * settle it, leaving the factor as it was found for what a refusal reports:
-     * the instance goes on to change with a confirmation the refusal rolls
-     * back.
+     * The summary is taken before settling, since a rolled-back confirmation
+     * still changes the instance.
      *
      * @formatter:off
      *
@@ -250,9 +216,6 @@ final readonly class EnrollmentConfirmer
     }
 
     /**
-     * Under the lock, with a grant bound to the caller: discard one no longer
-     * live, refuse what no longer holds, check the code, and confirm or count.
-     *
      * @formatter:off
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
@@ -311,10 +274,6 @@ final readonly class EnrollmentConfirmer
     }
 
     /**
-     * Check the code along the factor's route: a delivered type's through the
-     * bound gateway, against the challenge the enrolment recorded, any other's
-     * through its driver.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Contracts\FactorDriver  $driver
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
@@ -349,11 +308,6 @@ final readonly class EnrollmentConfirmer
     }
 
     /**
-     * Under the lock, with a valid code: confirm the factor, end any
-     * re-enrolment obligation, issue recovery codes with the identity's first
-     * factor, and settle the session. A refusal throws, so all of it rolls
-     * back.
-     *
      * @formatter:off
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
@@ -432,8 +386,7 @@ final readonly class EnrollmentConfirmer
     }
 
     /**
-     * Refuse an active session's first additional factor that its known first
-     * factor does not accept: the session could not use it to verify.
+     * The session could not verify with a factor its first factor rejects.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -455,8 +408,6 @@ final readonly class EnrollmentConfirmer
     }
 
     /**
-     * Discard a grant no longer live, with its pending factor, and report it.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  \SineMacula\Laravel\Mfa\Models\Enrollment  $enrollment
@@ -479,9 +430,7 @@ final readonly class EnrollmentConfirmer
     }
 
     /**
-     * Report a code that failed, count it when it was wrong or replayed, and at
-     * the cap abandon the enrolment; both commit. A check with nothing to
-     * compare against counts nothing.
+     * At the cap the enrolment is abandoned; both outcomes commit.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -516,9 +465,6 @@ final readonly class EnrollmentConfirmer
     }
 
     /**
-     * Report one failed attempt, naming the factor as it was found only when
-     * the grant was bound to the caller, and answer it.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  ?\SineMacula\Laravel\Mfa\Factors\FactorSummary  $summary
@@ -551,8 +497,7 @@ final readonly class EnrollmentConfirmer
     }
 
     /**
-     * What the address's throttle makes of how the attempt settled: only a
-     * failure the enrolment counted keeps its slot.
+     * Only a counted failure keeps its IP slot.
      *
      * @param  \SineMacula\Laravel\Mfa\Enrollment\EnrollmentConfirmation  $settled
      * @return \SineMacula\Laravel\Mfa\Attempts\AttemptOutcome

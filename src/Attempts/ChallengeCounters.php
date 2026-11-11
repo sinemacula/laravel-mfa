@@ -31,41 +31,10 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 
 /**
- * The calls a challenge owner makes into this package's counts: whoever sends
- * and consumes a delivered factor's challenges (the authentication layer, or
- * the package's own `ChallengeGateway`) asks whether the factor may be
- * challenged before it sends or checks a code, and reports every outcome. The
- * per-challenge attempt and delivery counts are the owner's; the per-factor and
- * per-identity counts and lockouts are this package's.
- *
- * Both calls run inside the owner's own transaction on the storage connection,
- * and refuse with a `LogicException` without one: the identity's factor state
- * lock they take (see `Support\FactorStateTransaction`) is then held until the
- * owner commits, so parallel guesses for one identity are counted one after the
- * other and cannot overrun a cap, and an owner that rolls back counts nothing.
- * The lock order is the identity's state, then its factors, then the owner's
- * challenge: the owner opens its transaction, asks `isUsable()`, then locks and
- * consumes its challenge, then calls `report()`.
- *
- * `isUsable()` answers under the lock: the binding must name the identity,
- * which must be an active person, and the factor must be one of its stored
- * factors, confirmed, of a type the binding's application enables, accepted by
- * the combination policy after the session's first factor, and neither locked
- * nor disabled. A delivery is asked about but never reported, so sending a code
- * never resets or adds to a failure count. `report()` counts the outcome as a
- * verification of the package's own would, without an IP address (an owner's
- * per-address limits are its own), and dispatches the lockout and failure
- * ceiling events once the owner's transaction commits.
- *
- * A binding whose purpose is `enrollment` inverts the admission, so a challenge
- * for enrolling is never one for signing in or the reverse: the factor must be
- * pending, not confirmed, holding a live enrolment bound to the binding and
- * served to who is asking, of a type the application enables, with no question
- * of the combination policy, and refused only while the identity's lockout is
- * live. Its `report()` changes no factor's or identity's count, as the
- * enrolment has an attempt cap of its own.
- *
- * Stateless: the configuration and the seams are read on every call.
+ * Factor and identity counters for a challenge owner. Call both methods inside
+ * the owner's storage transaction so the factor lock is held until it commits;
+ * lock order is identity state, factors, then the owner's challenge. An
+ * `enrollment` binding admits only a pending factor and counts nothing.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -74,12 +43,10 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
  */
 final readonly class ChallengeCounters
 {
-    /** @var string Why a call made outside a transaction is refused. */
+    /** @var string */
     private const string NO_TRANSACTION = 'A challenge is admitted and its outcome reported only inside the caller\'s transaction on the storage connection.';
 
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @param  \SineMacula\Laravel\Mfa\Attempts\AttemptService  $attempts
@@ -87,23 +54,21 @@ final readonly class ChallengeCounters
      */
     public function __construct(
 
-        /** The container the seams and the drivers are resolved from. */
+        /** Resolves seams and drivers. */
         private Container $container,
 
-        /** The configuration the factor model and settings are read from. */
+        /** Configuration. */
         private Repository $config,
 
-        /** The counts and lockouts the outcome is recorded in. */
+        /** Records outcomes. */
         private AttemptService $attempts,
 
-        /** The reader of the session's first factor. */
+        /** First factor reader. */
         private SessionFirstFactor $firstFactors,
     ) {}
 
     /**
-     * Whether the factor may be challenged now under the binding, read under
-     * the identity's factor state lock, which is held until the caller's
-     * transaction ends.
+     * Ask before sending or checking a code; deliveries are never reported.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
@@ -139,8 +104,7 @@ final readonly class ChallengeCounters
     }
 
     /**
-     * Whether the factor as stored may be challenged now under the binding, for
-     * a caller already holding the identity's factor state lock.
+     * For a caller already holding the identity's factor state lock.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
@@ -161,13 +125,8 @@ final readonly class ChallengeCounters
     }
 
     /**
-     * Count the outcome of a challenge the caller has just checked and
-     * consumed, inside the same transaction: a success resets the factor's and
-     * the identity's failures in a row, a failure counts against both and may
-     * lock or disable, and a failure that does names the lockout it caused (see
-     * `AttemptOutcome::$caused`). An outcome is refused, and counted nowhere,
-     * while a lockout applies, and answered as not found for a factor no longer
-     * among the identity's.
+     * Count a checked challenge's outcome, without an IP address; events fire
+     * once the owner's transaction commits.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
@@ -198,8 +157,7 @@ final readonly class ChallengeCounters
     }
 
     /**
-     * Refuse a binding that names another identity, a machine and an inactive
-     * identity, before any lock is taken.
+     * Checked before any lock is taken.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -222,9 +180,6 @@ final readonly class ChallengeCounters
     }
 
     /**
-     * Refuse a stored factor as `factorRefusal()` does, or one a lockout or the
-     * failure ceiling holds.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  ?\SineMacula\Laravel\Mfa\Context\PendingContext  $pending
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
@@ -250,10 +205,6 @@ final readonly class ChallengeCounters
     }
 
     /**
-     * Refuse a stored factor being enrolled unless it is pending, of a type the
-     * binding's application enables, and holds a live enrolment bound to the
-     * binding and served to who is asking.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  ?\SineMacula\Laravel\Mfa\Context\PendingContext  $pending
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
@@ -281,10 +232,6 @@ final readonly class ChallengeCounters
     }
 
     /**
-     * Refuse a stored factor that is pending, of a type the binding's
-     * application does not enable, or not accepted after the session's first
-     * factor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  ?\SineMacula\Laravel\Mfa\Context\PendingContext  $pending
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
@@ -311,9 +258,7 @@ final readonly class ChallengeCounters
     }
 
     /**
-     * Whether the combination policy accepts the factor's channel after the
-     * first factor of the session the binding names; never when that first
-     * factor is not known.
+     * Never accepted when the session's first factor is unknown.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  ?\SineMacula\Laravel\Mfa\Context\PendingContext  $pending
@@ -335,9 +280,6 @@ final readonly class ChallengeCounters
     }
 
     /**
-     * The factor model the identity's factors are locked through: the factor's
-     * own when it keeps state, otherwise the configured one.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor
      *
@@ -355,9 +297,6 @@ final readonly class ChallengeCounters
     }
 
     /**
-     * The identity the caller is, refusing a caller that is nobody: counters
-     * belong to an identity.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      *

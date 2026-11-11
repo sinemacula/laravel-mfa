@@ -11,8 +11,7 @@ use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
 
 /**
- * Reads the lockouts the identity's state row and the factor as stored hold:
- * what refuses an attempt before the verification is called.
+ * Lockouts held on the identity state row and the stored factor.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -22,14 +21,12 @@ use SineMacula\Laravel\Mfa\Models\IdentityState;
 final class HeldLockouts
 {
     /**
-     * Disallow instantiation; utility container only.
+     * Disallow instantiation.
      */
     private function __construct() {}
 
     /**
-     * The strictest lockout that refuses an attempt against the factor as
-     * stored: the identity's run at the failure ceiling when the attempt names
-     * no factor of its own, the identity's lockout, and the factor's.
+     * The identity's failure ceiling applies only to an attempt with no factor.
      *
      * @param  ?\SineMacula\Laravel\Mfa\Models\IdentityState  $state
      * @param  (\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor)|null  $factor
@@ -49,8 +46,6 @@ final class HeldLockouts
     }
 
     /**
-     * The identity's lockout, while it is live.
-     *
      * @param  ?\SineMacula\Laravel\Mfa\Models\IdentityState  $state
      * @param  \Carbon\CarbonImmutable  $now
      * @return ?\SineMacula\Laravel\Mfa\Attempts\Lockout
@@ -65,9 +60,6 @@ final class HeldLockouts
     }
 
     /**
-     * The identity's run of failures at the failure ceiling, which refuses an
-     * attempt that names no factor of its own.
-     *
      * @param  ?\SineMacula\Laravel\Mfa\Models\IdentityState  $state
      * @param  \SineMacula\Laravel\Mfa\Attempts\AttemptSettings  $settings
      * @return ?\SineMacula\Laravel\Mfa\Attempts\Lockout
@@ -80,10 +72,6 @@ final class HeldLockouts
     }
 
     /**
-     * The factor's lockout: disabled at the failure ceiling, or locked by its
-     * failures in a row while that lockout is live. It is read off the instance
-     * given, so the row as locked answers for an attempt.
-     *
      * @param  (\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor)|null  $factor
      * @param  \Carbon\CarbonImmutable  $now
      * @return ?\SineMacula\Laravel\Mfa\Attempts\Lockout

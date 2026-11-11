@@ -10,14 +10,8 @@ use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 
 /**
- * How starting an enrolment ended: started, with the pending factor as a
- * summary, the grant that may confirm it and when that ends, and for a TOTP
- * factor its secret and provisioning URI; or refused, with the reason a caller
- * may be told and, when waiting will help, how long to wait.
- *
- * The grant, the secret and the URI are returned here and never again, as
- * secrets for the response: send them with `Secrets\SecretResponse::json()`. A
- * refusal holds none of them, and none can be dumped, encoded or serialised.
+ * How starting an enrolment ended. The grant, secret and URI are returned only
+ * here; send them with `Secrets\SecretResponse::json()`.
  *
  * @api
  *
@@ -27,8 +21,6 @@ use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 final readonly class EnrollmentStart
 {
     /**
-     * Constructor.
-     *
      * @param  ?\SineMacula\Laravel\Mfa\Factors\FactorSummary  $factor
      * @param  ?\SineMacula\Laravel\Mfa\Secrets\RevealedSecret  $grant
      * @param  ?\Carbon\CarbonImmutable  $expiresAt
@@ -40,34 +32,32 @@ final readonly class EnrollmentStart
      */
     private function __construct(
 
-        /** The pending factor, when the enrolment started. */
+        /** Pending factor, when started. */
         public ?FactorSummary $factor = null,
 
-        /** The grant that may confirm it, shown once. */
+        /** Confirms the factor; shown once. */
         public ?RevealedSecret $grant = null,
 
-        /** When the grant stops confirming; nothing renews it. */
+        /** Grant expiry; nothing renews it. */
         public ?CarbonImmutable $expiresAt = null,
 
-        /** The factor's secret, shown once, when its type has one. */
+        /** Factor secret, when its type has one; shown once. */
         public ?RevealedSecret $secret = null,
 
-        /** The URI an authenticator app reads the secret from, shown once, when its type provisions one. */
+        /** Authenticator app URI, when its type provisions one; shown once. */
         public ?RevealedSecret $provisioningUri = null,
 
-        /** Why the enrolment did not start, when it did not. */
+        /** Refusal reason, when not started. */
         public ?FailureReason $reason = null,
 
-        /** The seconds until a code may be sent, when no code could be and waiting will help. */
+        /** Seconds until a code may be sent, when waiting helps. */
         public ?int $retryAfter = null,
 
-        /** When the lockout refusing the enrolment ends, when it ends at a set time. */
+        /** Lockout end, when refused by one that ends at a set time. */
         public ?CarbonImmutable $lockedUntil = null,
     ) {}
 
     /**
-     * An enrolment that started.
-     *
      * @param  \SineMacula\Laravel\Mfa\Factors\FactorSummary  $factor
      * @param  \SineMacula\Laravel\Mfa\Secrets\RevealedSecret  $grant
      * @param  \Carbon\CarbonImmutable  $expiresAt
@@ -86,8 +76,6 @@ final readonly class EnrollmentStart
     }
 
     /**
-     * An enrolment refused for the reason.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
      * @param  ?int  $retryAfter
      * @param  ?\Carbon\CarbonImmutable  $lockedUntil
@@ -99,8 +87,6 @@ final readonly class EnrollmentStart
     }
 
     /**
-     * Whether the enrolment started.
-     *
      * @return bool
      */
     public function hasStarted(): bool

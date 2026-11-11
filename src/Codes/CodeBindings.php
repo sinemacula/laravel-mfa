@@ -10,11 +10,8 @@ use SineMacula\Laravel\Mfa\Contracts\EmailSender;
 use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 
 /**
- * Registers the delivered code service, the default `ChallengeGateway`, which
- * sends and checks the package's own codes (`PackageChallengeGateway`), and the
- * default SMS and email senders, which throw until the application binds its
- * own; the package refuses to boot with an application that enables a code type
- * while its sender is still the default.
+ * Container bindings for delivered codes, the default gateway and the default
+ * senders.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -24,15 +21,11 @@ use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 final class CodeBindings
 {
     /**
-     * Disallow instantiation; utility container only.
+     * Disallow instantiation.
      */
     private function __construct() {}
 
     /**
-     * Register the code service, the default challenge gateway and the default
-     * senders. The engine needs no binding: the container builds a fresh one
-     * each time it is resolved.
-     *
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @return void
      */

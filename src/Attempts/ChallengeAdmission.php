@@ -8,10 +8,7 @@ use Carbon\CarbonImmutable;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 
 /**
- * Whether a challenge for a factor may be sent or checked now: admitted;
- * locked, with when the lockout ends (none for a factor or an identity at the
- * failure ceiling); or refused with the reason a caller may be told, and why in
- * detail for logs only.
+ * Whether a factor's challenge may be sent or checked now.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -21,27 +18,23 @@ use SineMacula\Laravel\Mfa\Enums\FailureReason;
 final readonly class ChallengeAdmission
 {
     /**
-     * Constructor.
-     *
      * @param  ?\SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
      * @param  ?\Carbon\CarbonImmutable  $lockedUntil
      * @param  string  $detail
      */
     private function __construct(
 
-        /** Why the challenge may not go ahead, or `null` when it may. */
+        /** Null when admitted. */
         public ?FailureReason $reason,
 
-        /** When the lockout refusing it ends, when it ends at a set time. */
+        /** Lockout end; null when admitted or held at the failure ceiling. */
         public ?CarbonImmutable $lockedUntil,
 
-        /** What was found in detail, for logs only. */
+        /** For logs only. */
         public string $detail,
     ) {}
 
     /**
-     * The challenge may go ahead.
-     *
      * @return self
      */
     public static function admit(): self
@@ -50,8 +43,6 @@ final readonly class ChallengeAdmission
     }
 
     /**
-     * The challenge is refused by the lockout.
-     *
      * @param  \SineMacula\Laravel\Mfa\Attempts\Lockout  $lockout
      * @return self
      */
@@ -61,8 +52,6 @@ final readonly class ChallengeAdmission
     }
 
     /**
-     * The challenge is refused for the reason.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
      * @param  string  $detail
      * @return self
@@ -73,8 +62,6 @@ final readonly class ChallengeAdmission
     }
 
     /**
-     * Whether the challenge may go ahead.
-     *
      * @return bool
      */
     public function isAdmitted(): bool

@@ -8,14 +8,9 @@ use Carbon\CarbonImmutable;
 use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 
 /**
- * The throttle on the IP address an attempt came from: its failures within the
- * window, across every identity, refused until the window ends once they reach
- * the IP limit.
- *
- * A slot is taken from the address's window in one statement before the attempt
- * is made, so parallel guesses from one address cannot overrun its cap, and
- * given back unless the attempt fails, so only failures are counted. An attempt
- * made outside a request has no address and is not throttled.
+ * Per-IP failure throttle across identities. A slot is taken atomically before
+ * the attempt, so parallel guesses cannot overrun the cap, and given back
+ * unless the attempt fails.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -25,23 +20,20 @@ use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 final readonly class IpThrottle
 {
     /**
-     * Constructor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Attempts\AttemptStore  $store
      * @param  \SineMacula\Laravel\Mfa\Attempts\AttemptKeys  $keys
      */
     public function __construct(
 
-        /** The throttle rows. */
+        /** Throttle rows. */
         private AttemptStore $store,
 
-        /** The keys the throttle rows are stored under. */
+        /** Row keys. */
         private AttemptKeys $keys,
     ) {}
 
     /**
-     * Take a slot of the IP address's window: the key and the window the slot
-     * came from, to give it back with, or the lockout when the window is full.
+     * Returns the slot to give back, or the lockout when the window is full.
      * Nothing is taken without an address.
      *
      * @param  ?string  $ip
@@ -64,8 +56,6 @@ final readonly class IpThrottle
     }
 
     /**
-     * Give back the slot `take()` returned, if one was taken.
-     *
      * @param  array{0: string, 1: string}|null  $slot
      * @return void
      *
@@ -81,9 +71,6 @@ final readonly class IpThrottle
     }
 
     /**
-     * The IP address's throttle, while its window is live and full, or `null`
-     * when none applies.
-     *
      * @param  ?string  $ip
      * @param  \SineMacula\Laravel\Mfa\Attempts\AttemptSettings  $settings
      * @param  \Carbon\CarbonImmutable  $now

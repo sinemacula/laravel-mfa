@@ -11,18 +11,8 @@ use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 
 /**
- * A code to deliver: what `SmsSender::send()` and `EmailSender::send()` are
- * given, as neutral details the application words and lays out itself.
- *
- * The destination is the factor's own, in the one form it keeps (an E.164
- * number, a lower-cased address), captured under the identity's lock when the
- * code was drawn; the recipient is the identity the code is for. The code is a
- * `RevealedSecret`: reveal it only into the message to the recipient, and never
- * log it. The destination and the recipient are held as
- * `\SensitiveParameterValue`s and read through `destination()` and
- * `recipient()`, so a dump of the message shows neither them nor the code. The
- * factor's summary masks its destination, but its label is the person's own
- * text and is shown as it is.
+ * A code for a sender to deliver. Destination and recipient are wrapped so a
+ * dump shows neither; the factor summary's label is unmasked user text.
  *
  * @api
  *
@@ -31,15 +21,13 @@ use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
  */
 final readonly class CodeMessage
 {
-    /** @var \SensitiveParameterValue The destination, hidden from dumps. */
+    /** @var \SensitiveParameterValue */
     private \SensitiveParameterValue $destination;
 
-    /** @var \SensitiveParameterValue The recipient, hidden from dumps. */
+    /** @var \SensitiveParameterValue */
     private \SensitiveParameterValue $recipient;
 
     /**
-     * Constructor.
-     *
      * @param  string  $application
      * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @param  string  $type
@@ -51,30 +39,30 @@ final readonly class CodeMessage
      */
     public function __construct(
 
-        /** The application the code is for. */
+        /** Application key. */
         public string $application,
 
-        /** What the code proves: a sign-in, a reauthentication, a step-up, or an enrolment. */
+        /** Purpose. */
         public Purpose $purpose,
 
-        /** The factor's type, such as `sms` or `email`. */
+        /** Factor type, such as `sms` or `email`. */
         public string $type,
 
-        // The factor's destination, in the form it keeps.
+        // Normalised: E.164 number or lower-cased address.
         #[\SensitiveParameter]
         string $destination,
 
-        /** The code. */
+        /** Reveal only into the message; never log. */
         public RevealedSecret $code,
 
-        /** When the code stops working. */
+        /** Expiry time. */
         public CarbonImmutable $expiresAt,
 
-        // The identity the code is for.
+        // Identity the code is for.
         #[\SensitiveParameter]
         MultiFactorAuthenticatable $recipient,
 
-        /** The factor the code is sent for, its destination masked. */
+        /** Factor, destination masked. */
         public FactorSummary $factor,
     ) {
         $this->destination = new \SensitiveParameterValue($destination);
@@ -82,8 +70,6 @@ final readonly class CodeMessage
     }
 
     /**
-     * The factor's destination, in the form it keeps.
-     *
      * @return string
      */
     public function destination(): string
@@ -93,8 +79,6 @@ final readonly class CodeMessage
     }
 
     /**
-     * The identity the code is for.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
     public function recipient(): MultiFactorAuthenticatable

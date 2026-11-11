@@ -8,23 +8,9 @@ use Illuminate\Contracts\Config\Repository;
 use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 
 /**
- * The keys the attempts table stores its rows under: HMAC-SHA256 digests of the
- * scope and the subject it counts, keyed with a key derived from the
- * application key (`app.key`).
- *
- * What a row counts (an identity's key, an IP address) is usually easy to
- * enumerate, so a plain digest of it could be reversed by anyone who reads the
- * table, from a backup or a replica, by hashing every candidate. A keyed digest
- * cannot be recomputed without the application key, and stays deterministic, so
- * every server counts in the same row. Rotating the application key starts
- * every throttle afresh; the durable counts and the lockout deadlines on the
- * factor and identity state rows are kept.
- *
- * An IP address is counted by the client it stands for: an IPv4 address, or the
- * IPv4 address an IPv6 address carries (IPv4-mapped, or translated through the
- * NAT64 well-known prefix), in dotted decimal; any other IPv6 address as the
- * /64 network it belongs to, since a single client is usually given a whole /64
- * and could otherwise count each of its addresses separately.
+ * Attempt row keys: HMAC-SHA256 keyed from `app.key`, because identity keys and
+ * IP addresses are easy to enumerate and a plain hash would be reversible.
+ * Rotating `app.key` resets the throttles but not the stored lockouts.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -33,26 +19,22 @@ use SineMacula\Laravel\Mfa\Enums\AttemptScope;
  */
 final readonly class AttemptKeys
 {
-    /** @var string What the key derived from the application key is for, so it is used for nothing else. */
+    /** @var string Derivation label for throttle keys. */
     private const string PURPOSE = 'sinemacula/laravel-mfa attempt throttles';
 
-    /** @var list<string> The first twelve bytes of the IPv6 prefixes whose last four carry an IPv4 client's address: IPv4-mapped (`::ffff:0:0/96`) and the NAT64 well-known prefix (`64:ff9b::/96`). */
+    /** @var list<string> IPv4-mapped (`::ffff:0:0/96`) and NAT64 (`64:ff9b::/96`) prefixes. */
     private const array IPV4_CARRYING_PREFIXES = ["\0\0\0\0\0\0\0\0\0\0\xff\xff", "\0\x64\xff\x9b\0\0\0\0\0\0\0\0"];
 
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Config\Repository  $config
      */
     public function __construct(
 
-        /** Configuration the application key is read from on every call. */
+        /** Read on every call so a changed `app.key` applies. */
         private Repository $config,
     ) {}
 
     /**
-     * The key of an identity's row: its failures within the window.
-     *
      * @param  string  $type
      * @param  string  $key
      * @return string
@@ -65,9 +47,6 @@ final readonly class AttemptKeys
     }
 
     /**
-     * The key of an IP address's row: its failures within the window, counted
-     * by the client the address stands for.
-     *
      * @param  string  $ip
      * @return string
      *
@@ -79,9 +58,8 @@ final readonly class AttemptKeys
     }
 
     /**
-     * The canonical form of an IP address: an IPv4 address, or the IPv4 address
-     * an IPv6 address carries, in dotted decimal; any other IPv6 address as its
-     * /64 network. Anything that is not an IP address is counted as given.
+     * IPv4, or the IPv4 an IPv6 address carries; other IPv6 collapses to its
+     * /64, since one client usually holds a whole /64.
      *
      * @param  string  $ip
      * @return string
@@ -104,9 +82,6 @@ final readonly class AttemptKeys
     }
 
     /**
-     * The keyed digest of the scope and the parts, as 64 hexadecimal
-     * characters.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enums\AttemptScope  $scope
      * @param  list<string>  $parts
      * @return string
@@ -119,8 +94,6 @@ final readonly class AttemptKeys
     }
 
     /**
-     * The key the digests are made with, derived from the application key.
-     *
      * @return string
      *
      * @throws \InvalidArgumentException

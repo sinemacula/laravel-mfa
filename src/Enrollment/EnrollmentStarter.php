@@ -13,7 +13,6 @@ use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
 use SineMacula\Laravel\Mfa\Attempts\AttemptOutcome;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
-use SineMacula\Laravel\Mfa\Codes\SendResult;
 use SineMacula\Laravel\Mfa\Context\Caller;
 use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
@@ -54,28 +53,9 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 use SineMacula\Laravel\Mfa\Support\IdentityType;
 
 /**
- * Starts an enrolment: a pending factor, a grant that may confirm it, and by
- * type a secret and its provisioning URI or a first code to the destination.
- *
- * The caller and its binding are captured; the identity, the type and the
- * destination are refused or normalised; an IP address slot is taken; then
- * under the identity's factor state lock the caller is resolved again, so a
- * sign-in that changed starts nothing. Under the lock the identity's lockout
- * and what authorises the enrolment are read (see `EnrollmentAuthority`), and
- * the grant's expiry is fixed once, as the earlier of the configured lifetime
- * and the end of that authority. The enrolment restarts: any pending factor of
- * the type through this application is discarded, from any session, with its
- * secret, and expired ones through this application with it. The pending limit
- * is then counted, the factor and its row are stored, and the first code goes
- * out inside the transaction, so a delivery that throws or a sending cap leaves
- * nothing.
- *
- * A code already delivered cannot be recalled: a later failure of the
- * transaction leaves one that matches nothing that can be confirmed, and
- * nothing retries it. The events wait for the commit, and the secrets are
- * returned only from one.
- *
- * Stateless: the seams and the configuration are read on every call.
+ * Starts an enrolment under the identity's factor lock, replacing any pending
+ * factor of the same type for the application. The first code is sent inside
+ * the transaction, so a failed delivery or a send cap leaves nothing behind.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -85,8 +65,6 @@ use SineMacula\Laravel\Mfa\Support\IdentityType;
 final readonly class EnrollmentStarter
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContextResolver  $callers
@@ -98,34 +76,32 @@ final readonly class EnrollmentStarter
      */
     public function __construct(
 
-        /** The container the seams are resolved from. */
+        /** Resolves seams. */
         private Container $container,
 
-        /** The configuration the applications and models are read from. */
+        /** Configuration. */
         private Repository $config,
 
-        /** The resolver of who the request serves. */
+        /** Caller resolver. */
         private CallerContextResolver $callers,
 
-        /** The guard every operation on a factor starts with. */
+        /** Factor operation guard. */
         private OperationGuard $guard,
 
-        /** The throttle on the address and the identity's lockout. */
+        /** IP throttle and identity lockout. */
         private AttemptService $attempts,
 
-        /** Whether the caller may add the factor now. */
+        /** Enrolment authorisation. */
         private EnrollmentAuthority $authority,
 
-        /** The enrolments in progress. */
+        /** Enrolments in progress. */
         private PendingEnrollments $enrollments,
 
-        /** The dispatcher of the enrolment's events. */
+        /** Event dispatcher. */
         private EventDispatcher $events,
     ) {}
 
     /**
-     * Start an enrolment for the person the request serves.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @param  \SineMacula\Laravel\Mfa\Enrollment\EnrollmentRequest  $request
      * @return \SineMacula\Laravel\Mfa\Enrollment\EnrollmentStart
@@ -157,10 +133,6 @@ final readonly class EnrollmentStarter
     }
 
     /**
-     * Start the enrolment holding a slot of the IP address's window and the
-     * identity's lock, and answer a refusal made there, which rolled back all
-     * it did.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  \SineMacula\Laravel\Mfa\Enrollment\EnrollmentRequest  $request
@@ -207,8 +179,6 @@ final readonly class EnrollmentStarter
     }
 
     /**
-     * What a refusal carried out of the transaction answers.
-     *
      * @param  \RuntimeException  $refusal
      * @return \SineMacula\Laravel\Mfa\Enrollment\EnrollmentStart
      */
@@ -222,9 +192,6 @@ final readonly class EnrollmentStarter
     }
 
     /**
-     * Under the lock, for the caller as it stands now: refuse the enrolment or
-     * make it.
-     *
      * @formatter:off
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
@@ -258,9 +225,6 @@ final readonly class EnrollmentStarter
     }
 
     /**
-     * Authorise the enrolment, discard what it replaces, count the limit, store
-     * the factor and its row, send the first code, and queue the events.
-     *
      * @formatter:off
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
@@ -317,10 +281,6 @@ final readonly class EnrollmentStarter
     }
 
     /**
-     * The driver of the type, refusing a type the application does not enable,
-     * a passkey, which enrols only through its registration, and a type whose
-     * channel can carry no factor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enrollment\EnrollmentRequest  $request
      * @param  string  $application
      * @return \SineMacula\Laravel\Mfa\Contracts\FactorDriver
@@ -349,8 +309,7 @@ final readonly class EnrollmentStarter
     }
 
     /**
-     * Refuse a type that provisions an authenticator app without the account
-     * name it shows, a mistake of the caller's rather than a person's.
+     * A missing account name is a caller bug, so it throws rather than refuses.
      *
      * @param  \SineMacula\Laravel\Mfa\Enrollment\EnrollmentRequest  $request
      * @param  \SineMacula\Laravel\Mfa\Contracts\FactorDriver  $driver
@@ -366,9 +325,6 @@ final readonly class EnrollmentStarter
     }
 
     /**
-     * The destination a delivered type captures, normalised, refusing one the
-     * type cannot deliver to, or none; other types have none.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enrollment\EnrollmentRequest  $request
      * @param  \SineMacula\Laravel\Mfa\Contracts\FactorDriver  $driver
      * @return ?string
@@ -389,9 +345,7 @@ final readonly class EnrollmentStarter
     }
 
     /**
-     * The grant's expiry: the earlier of the configured lifetime and the end of
-     * what authorised it, floored to the second as it is stored, and refused
-     * when nothing of it is left.
+     * The earlier of the configured lifetime and the authority's deadline.
      *
      * @param  \Carbon\CarbonImmutable  $deadline
      * @return \Carbon\CarbonImmutable
@@ -411,12 +365,9 @@ final readonly class EnrollmentStarter
     }
 
     /**
-     * Refuse a factor the combination policy would not accept after the
-     * session's first factor, when it must be: always on a pending session, and
-     * on an active one only for the identity's first additional factor while
-     * that first factor is known. Someone signed in by phone code who enrols
-     * that same phone would otherwise be short, with nothing to offer. A later
-     * factor may serve another sign-in.
+     * Applies on a pending session, and on an active one only to the first
+     * additional factor, so someone signed in by phone code cannot enrol that
+     * same phone and be left with nothing else to offer.
      *
      * @formatter:off
      *
@@ -457,9 +408,8 @@ final readonly class EnrollmentStarter
     }
 
     /**
-     * Discard the pending factor of the type through the application, from any
-     * session, and any no longer live through it. Another application's are
-     * left for it, or for pruning.
+     * Discard this type's pending factor from any session, and expired ones.
+     * Other applications' are left for pruning.
      *
      * @formatter:off
      *
@@ -493,9 +443,6 @@ final readonly class EnrollmentStarter
     }
 
     /**
-     * Discard the enrolment when a new one of its type replaces it or it is no
-     * longer live, reporting which.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Models\Enrollment  $enrollment
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
@@ -523,9 +470,6 @@ final readonly class EnrollmentStarter
     }
 
     /**
-     * Refuse a further pending factor past the application's limit on its live
-     * ones, all that remain of it once the expired have been discarded.
-     *
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @return void
      *
@@ -541,9 +485,6 @@ final readonly class EnrollmentStarter
     }
 
     /**
-     * A new pending factor of the request's type, of the caller's, enrolled
-     * through the binding's application, with the destination captured.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  \SineMacula\Laravel\Mfa\Enrollment\EnrollmentRequest  $request
@@ -572,8 +513,7 @@ final readonly class EnrollmentStarter
     }
 
     /**
-     * Send the pending factor's first code, recording its challenge once it has
-     * gone; one that does not go rolls the whole start back.
+     * A code that does not go rolls the whole start back.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\Caller  $caller
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
@@ -589,7 +529,8 @@ final readonly class EnrollmentStarter
      */
     private function sendFirstCode(Caller $caller, EloquentFactor&Model $factor, ProofBinding $binding, Enrollment $row, FactorSummary $summary, array $context): void
     {
-        $challengeId = self::challengeOf($this->container->make(ChallengeGateway::class)->send($caller->context(), $factor, $binding));
+        $result      = $this->container->make(ChallengeGateway::class)->send($caller->context(), $factor, $binding);
+        $challengeId = $result->challengeId ?? throw new CodeNotSentException($result);
 
         $this->enrollments->recordChallenge($row, $challengeId);
 
@@ -597,22 +538,6 @@ final readonly class EnrollmentStarter
     }
 
     /**
-     * The challenge a code went out under, refusing a send that made none.
-     *
-     * @param  \SineMacula\Laravel\Mfa\Codes\SendResult  $result
-     * @return string
-     *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\CodeNotSentException
-     */
-    private static function challengeOf(SendResult $result): string
-    {
-        return $result->challengeId ?? throw new CodeNotSentException($result);
-    }
-
-    /**
-     * The URI an authenticator app reads the secret from, for a type that
-     * provisions one, under the request's issuer or the configured one.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\FactorDriver  $driver
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  \SineMacula\Laravel\Mfa\Enrollment\EnrollmentRequest  $request
@@ -635,8 +560,6 @@ final readonly class EnrollmentStarter
     }
 
     /**
-     * A new instance of the configured factor model.
-     *
      * @return \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
@@ -647,8 +570,6 @@ final readonly class EnrollmentStarter
     }
 
     /**
-     * The stored factor's id, throwing when a model event cancelled its save.
-     *
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @return string
      *

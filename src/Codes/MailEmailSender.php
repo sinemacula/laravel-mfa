@@ -11,17 +11,9 @@ use SineMacula\Laravel\Mfa\Contracts\EmailSender;
 use SineMacula\Laravel\Mfa\Support\ConsumerMessages;
 
 /**
- * An email sender over Laravel's mailer, for an application that binds it to
- * `EmailSender`: the code goes to the address in the configured message class
- * (`mfa.codes.mailable`: `MfaCodeMessage` or a subclass), with the whole
- * minutes, at least 1, it has left, through the default mailer, queued when the
- * message class is queueable. The package's `MfaCodeMessage` encrypts its
- * payload whenever it is queued. The message renders in the locale the code is
- * sent in unless it chose its own, also on a queue worker.
- *
- * The mailer is looked up from the mail manager only when a message is sent, so
- * building the sender, as the configuration check does on every request, builds
- * no mail transport.
+ * Opt-in `EmailSender` over Laravel's default mailer, using the
+ * `mfa.codes.mailable` class. The mailer is resolved per send so the boot-time
+ * configuration check builds no transport.
  *
  * @api
  *
@@ -31,22 +23,20 @@ use SineMacula\Laravel\Mfa\Support\ConsumerMessages;
 final readonly class MailEmailSender implements EmailSender
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Mail\Factory  $mail
      * @param  \Illuminate\Contracts\Config\Repository  $config
      */
     public function __construct(
 
-        /** The mail manager whose default mailer the message is sent through. */
+        /** Mail manager. */
         private Factory $mail,
 
-        /** Configuration the message class is read from on every send. */
+        /** Read on every send. */
         private Repository $config,
     ) {}
 
     /**
-     * Send the code to the message's address in the configured message class.
+     * Send in the code's locale unless the mailable set its own.
      *
      * @param  \SineMacula\Laravel\Mfa\Codes\CodeMessage  $message
      * @return void
