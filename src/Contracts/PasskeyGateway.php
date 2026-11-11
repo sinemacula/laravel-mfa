@@ -9,8 +9,10 @@ use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
 /**
- * The WebAuthn side of passkeys as a factor; a synced passkey's zero sign
- * counter is not refused, and an assertion returns what it observed.
+ * The WebAuthn side of passkeys as a factor. Verification checks the bound
+ * challenge, relying party, origin, signature, credential owner and sign
+ * counter (a synced passkey's zero is not refused), and returns what it
+ * observed.
  *
  * @api
  *

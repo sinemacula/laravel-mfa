@@ -13,6 +13,7 @@ use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
 use SineMacula\Laravel\Mfa\Attempts\AttemptOutcome;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
+use SineMacula\Laravel\Mfa\Codes\SendResult;
 use SineMacula\Laravel\Mfa\Context\Caller;
 use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
@@ -529,12 +530,22 @@ final readonly class EnrollmentStarter
      */
     private function sendFirstCode(Caller $caller, EloquentFactor&Model $factor, ProofBinding $binding, Enrollment $row, FactorSummary $summary, array $context): void
     {
-        $result      = $this->container->make(ChallengeGateway::class)->send($caller->context(), $factor, $binding);
-        $challengeId = $result->challengeId ?? throw new CodeNotSentException($result);
+        $challengeId = self::challengeOf($this->container->make(ChallengeGateway::class)->send($caller->context(), $factor, $binding));
 
         $this->enrollments->recordChallenge($row, $challengeId);
 
         $this->events->dispatch(new CodeSent($context, $summary, Purpose::ENROLLMENT, $challengeId));
+    }
+
+    /**
+     * @param  \SineMacula\Laravel\Mfa\Codes\SendResult  $result
+     * @return string
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\CodeNotSentException
+     */
+    private static function challengeOf(SendResult $result): string
+    {
+        return $result->challengeId ?? throw new CodeNotSentException($result);
     }
 
     /**

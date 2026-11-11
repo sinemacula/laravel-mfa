@@ -18,8 +18,9 @@ use SineMacula\Laravel\Mfa\Requirements\SessionChange;
 interface SessionTransition
 {
     /**
-     * Return what the caller receives, or `null`; throw rather than return so
-     * the change rolls back, and release nothing before it commits.
+     * Return what the caller receives, or `null`; throw when the transition
+     * cannot be made so the change rolls back, and release nothing before it
+     * commits.
      *
      * @param  \SineMacula\Laravel\Mfa\Requirements\SessionChange  $change
      * @return ?object

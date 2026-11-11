@@ -13,6 +13,7 @@ use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\CodeDeliveryDriver;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
+use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Database\StorageTransaction;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
@@ -162,9 +163,18 @@ final readonly class PackageChallengeGateway implements ChallengeGateway
      */
     private function driver(Factor $factor): CodeDeliveryDriver
     {
-        $type   = $factor->getType();
-        $driver = $this->container->make(DriverResolver::class)->fromContainer($this->container, $type);
+        return self::deliveringCodes($this->container->make(DriverResolver::class)->fromContainer($this->container, $factor->getType()), $factor->getType());
+    }
 
+    /**
+     * @param  \SineMacula\Laravel\Mfa\Contracts\FactorDriver  $driver
+     * @param  string  $type
+     * @return \SineMacula\Laravel\Mfa\Contracts\CodeDeliveryDriver
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException
+     */
+    private static function deliveringCodes(FactorDriver $driver, string $type): CodeDeliveryDriver
+    {
         if (!$driver instanceof CodeDeliveryDriver) {
             throw new UnsupportedFactorException(sprintf('The factor\'s type [%s] does not deliver codes.', $type));
         }

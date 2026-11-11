@@ -251,7 +251,18 @@ final readonly class ConfigurationValidator
             return;
         }
 
-        if ($this->container->make(PasskeyGateway::class) instanceof UnavailablePasskeyGateway) {
+        self::checkPasskeyGateway($this->container->make(PasskeyGateway::class));
+    }
+
+    /**
+     * @param  \SineMacula\Laravel\Mfa\Contracts\PasskeyGateway  $gateway
+     * @return void
+     *
+     * @throws \LogicException
+     */
+    private static function checkPasskeyGateway(PasskeyGateway $gateway): void
+    {
+        if ($gateway instanceof UnavailablePasskeyGateway) {
             throw new \LogicException(sprintf('The application enables passkey, but no passkey gateway is bound: bind yours to %s.', PasskeyGateway::class));
         }
     }

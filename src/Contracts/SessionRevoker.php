@@ -19,7 +19,7 @@ interface SessionRevoker
 {
     /**
      * End every session but the one the removal was made from, which must match
-     * the identity's own; throw so the change rolls back.
+     * the identity's own; throw when that fails so the change rolls back.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $factorId
@@ -32,8 +32,8 @@ interface SessionRevoker
     public function factorRemoved(MultiFactorAuthenticatable $identity, string $factorId, string $application, string $session): RemovalRevocation;
 
     /**
-     * End every session, the current one included; throw so the change rolls
-     * back.
+     * End every session, the current one included; throw when that fails so the
+     * change rolls back.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return void

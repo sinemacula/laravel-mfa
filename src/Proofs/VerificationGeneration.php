@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Proofs;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Facades\DB;
 use SineMacula\Laravel\Mfa\Database\IdentityStateRow;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
@@ -62,7 +63,7 @@ final class VerificationGeneration
     public static function advance(Authenticatable $identity): int
     {
         $owner      = ProofOwner::of($identity);
-        $connection = DB::connection(StorageConnection::name());
+        $connection = self::connection();
 
         return StorageTransaction::run(static function () use ($connection, $owner): int {
 
@@ -78,5 +79,15 @@ final class VerificationGeneration
 
             return is_numeric($generation) ? (int) $generation : 0;
         });
+    }
+
+    /**
+     * @return \Illuminate\Database\ConnectionInterface
+     *
+     * @throws \InvalidArgumentException
+     */
+    private static function connection(): ConnectionInterface
+    {
+        return DB::connection(StorageConnection::name());
     }
 }
