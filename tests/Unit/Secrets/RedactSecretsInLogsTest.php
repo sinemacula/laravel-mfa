@@ -21,9 +21,6 @@ use Tests\Fixtures\Secrets\RefusesToBeLogged;
 use Tests\Fixtures\Secrets\SerializingException;
 
 /**
- * Tests for the `RedactSecretsInLogs` tap: one processor runs last on a Monolog
- * logger, after every other processor, and any other logger is left as it is.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -33,8 +30,6 @@ use Tests\Fixtures\Secrets\SerializingException;
 final class RedactSecretsInLogsTest extends TestCase
 {
     /**
-     * The processor is pushed onto the channel's Monolog logger.
-     *
      * @return void
      */
     public function testPushesTheProcessor(): void
@@ -48,8 +43,7 @@ final class RedactSecretsInLogsTest extends TestCase
     }
 
     /**
-     * The processor runs after every processor the logger has, which keep their
-     * order.
+     * The logger's own processors keep their order.
      *
      * @return void
      */
@@ -69,9 +63,6 @@ final class RedactSecretsInLogsTest extends TestCase
     }
 
     /**
-     * What a processor adds to a record is redacted, since the redaction runs
-     * after it.
-     *
      * @return void
      */
     public function testRedactsWhatOtherProcessorsAdd(): void
@@ -87,8 +78,7 @@ final class RedactSecretsInLogsTest extends TestCase
     }
 
     /**
-     * A record holding a value that refuses to be logged is still written, with
-     * the value as its class alone.
+     * With the value as its class alone.
      *
      * @return void
      */
@@ -105,9 +95,8 @@ final class RedactSecretsInLogsTest extends TestCase
     }
 
     /**
-     * An exception or an enum that gives its own JSON form is logged as that
-     * form, redacted, and as its class alone when the form throws, so neither
-     * Monolog's JSON nor its line formatter throws or writes the code.
+     * As its own JSON form redacted, or its class when that throws, so neither
+     * formatter throws or writes the code.
      *
      * @return void
      */
@@ -135,8 +124,7 @@ final class RedactSecretsInLogsTest extends TestCase
     }
 
     /**
-     * A logger that has the processor already keeps one, moved to run last,
-     * however many it had and however often it is tapped.
+     * However many it had and however often it is tapped.
      *
      * @return void
      */
@@ -156,8 +144,6 @@ final class RedactSecretsInLogsTest extends TestCase
     }
 
     /**
-     * A logger other than Monolog's is left as it is.
-     *
      * @return void
      */
     public function testLeavesOtherLoggersAlone(): void

@@ -24,11 +24,8 @@ use Tests\Fixtures\Secrets\RecordedTrace;
 use Tests\TestCase;
 
 /**
- * Tests that a failure while `MfaCodeMessage` is sent, at once or by a queue
- * worker running it from the queue, leaves `send()` scrubbed of the code and
- * the recipient's address, before the worker reports it or any listener sees
- * it, whether or not PHP recorded the arguments, and that nothing collected for
- * one message is carried to the next.
+ * A failure sending `MfaCodeMessage`, at once or from the queue, is scrubbed of
+ * the code and address before anything sees it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -45,9 +42,8 @@ final class MfaCodeMessageFailureTest extends TestCase
     private const string ADDRESS = 'ada@example.test';
 
     /**
-     * Rows of whether PHP records the arguments of each call in a trace, as a
-     * development configuration does, or ignores them, as a production one
-     * does.
+     * Whether PHP records call arguments in a trace, as in development, or not,
+     * as in production.
      *
      * @return iterable<string, array{bool}>
      */
@@ -58,9 +54,8 @@ final class MfaCodeMessageFailureTest extends TestCase
     }
 
     /**
-     * A queued message the worker fails to send leaves the worker scrubbed of
-     * its code and its recipient, in every message and frame of the chain, and
-     * already scrubbed when the worker's exception event is dispatched.
+     * Every message and frame of the chain, already scrubbed when the worker's
+     * exception event is dispatched.
      *
      * @param  bool  $arguments
      * @return void
@@ -88,8 +83,6 @@ final class MfaCodeMessageFailureTest extends TestCase
     }
 
     /**
-     * A message the sender fails to send at once is scrubbed the same way.
-     *
      * @param  bool  $arguments
      * @return void
      *
@@ -109,8 +102,7 @@ final class MfaCodeMessageFailureTest extends TestCase
     }
 
     /**
-     * Each job is scrubbed of its own message's code and recipient, and what
-     * was collected for one job is not kept for the next or for any later
+     * What was collected for one job is not kept for the next or any later
      * exception.
      *
      * @return void
@@ -135,8 +127,6 @@ final class MfaCodeMessageFailureTest extends TestCase
     }
 
     /**
-     * Have the default mailer refuse every message.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -153,8 +143,8 @@ final class MfaCodeMessageFailureTest extends TestCase
     }
 
     /**
-     * Queue a message carrying the code to the address, encrypted as a queue
-     * stores it, and have a queue worker run it.
+     * Queue a code message encrypted as a queue stores it, and have a worker
+     * run it.
      *
      * @param  string  $code
      * @param  string  $address
@@ -180,8 +170,8 @@ final class MfaCodeMessageFailureTest extends TestCase
     }
 
     /**
-     * Assert that no message and no frame of any exception in the chain shows
-     * the code or the address, and that no frame keeps a code message.
+     * No message or frame in the chain shows the code or address, and no frame
+     * keeps a code message.
      *
      * @param  \Throwable  $exception
      * @param  string  $code

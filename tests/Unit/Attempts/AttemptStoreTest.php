@@ -15,10 +15,6 @@ use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 use Tests\TestCase;
 
 /**
- * Tests for `AttemptStore`: slots taken from a window up to its limit and given
- * back to it, failures recorded past it, windows that restart once ended, and
- * rows read and forgotten.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -34,8 +30,7 @@ final class AttemptStoreTest extends TestCase
     private const int NOW = 1793534400;
 
     /**
-     * The first slot creates the row with one attempt, in the window that ends
-     * at the given end, as stored.
+     * With one attempt, in a window ending at the given end.
      *
      * @return void
      */
@@ -49,10 +44,8 @@ final class AttemptStoreTest extends TestCase
     }
 
     /**
-     * A new row's window never ends later than the longest window the settings
-     * allow from now, so an insert that ignores its conflict has no value a
-     * database could coerce into another row's: the key is a fixed-width hash,
-     * and the scope an enum.
+     * So an insert that ignores its conflict has no value a database could
+     * coerce into another row's.
      *
      * @return void
      */
@@ -71,8 +64,8 @@ final class AttemptStoreTest extends TestCase
     }
 
     /**
-     * Slots are taken up to the limit; past it the window's end is answered and
-     * nothing is counted, so a refused attempt does not extend the window.
+     * Past the limit nothing is counted, so a refused attempt does not extend
+     * the window.
      *
      * @return void
      */
@@ -89,8 +82,6 @@ final class AttemptStoreTest extends TestCase
     }
 
     /**
-     * Once its window has ended, a row starts a new window with the attempt.
-     *
      * @return void
      */
     public function testAnEndedWindowRestarts(): void
@@ -104,8 +95,8 @@ final class AttemptStoreTest extends TestCase
     }
 
     /**
-     * A live window that ends elsewhere than computed, as after a change of the
-     * window's length, is counted in as stored, up to the limit.
+     * As after a change of the window's length; counted in as stored, up to the
+     * limit.
      *
      * @return void
      */
@@ -121,8 +112,7 @@ final class AttemptStoreTest extends TestCase
     }
 
     /**
-     * A slot given back frees room in the window it came from, and never takes
-     * the count below nothing or touches a later window.
+     * It never takes the count below nothing or touches a later window.
      *
      * @return void
      */
@@ -145,8 +135,7 @@ final class AttemptStoreTest extends TestCase
     }
 
     /**
-     * A recorded failure counts however many the window already holds, and
-     * starts a window when there is none.
+     * It starts a window when there is none.
      *
      * @return void
      */
@@ -167,7 +156,7 @@ final class AttemptStoreTest extends TestCase
     }
 
     /**
-     * A forgotten row is gone, and the others stay.
+     * The other rows stay.
      *
      * @return void
      */
@@ -187,8 +176,7 @@ final class AttemptStoreTest extends TestCase
     }
 
     /**
-     * Only the rows asked for are read, every one of them, and a missing one is
-     * left out.
+     * A missing one is left out.
      *
      * @return void
      */
@@ -206,9 +194,8 @@ final class AttemptStoreTest extends TestCase
     }
 
     /**
-     * A full window that a concurrent request ends while a slot is sought, by
-     * the time the slot is sought, is not taken from: the slot is refused, to
-     * be sought again the next second.
+     * When a concurrent request ends a full window first, the slot is refused,
+     * to be sought again the next second.
      *
      * @return void
      *
@@ -235,8 +222,6 @@ final class AttemptStoreTest extends TestCase
     }
 
     /**
-     * Store a row with the given count and end.
-     *
      * @param  string  $key
      * @param  int  $hits
      * @param  int  $ends
@@ -253,8 +238,6 @@ final class AttemptStoreTest extends TestCase
     }
 
     /**
-     * Resolve the store.
-     *
      * @return \SineMacula\Laravel\Mfa\Attempts\AttemptStore
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -265,9 +248,8 @@ final class AttemptStoreTest extends TestCase
     }
 
     /**
-     * A row key named for the test, as long as the digests the store is keyed
-     * by: the key column has a fixed width, which some databases pad a shorter
-     * key to.
+     * As long as the digests: the key column has a fixed width, which some
+     * databases pad a shorter key to.
      *
      * @param  string  $name
      * @return string

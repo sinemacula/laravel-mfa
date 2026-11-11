@@ -13,9 +13,6 @@ use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 
 /**
- * Unit tests for `ChallengeAdmission`: admitted, locked with when the lockout
- * ends, or refused with a reason, each distinct.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -25,8 +22,6 @@ use SineMacula\Laravel\Mfa\Enums\FailureReason;
 final class ChallengeAdmissionTest extends TestCase
 {
     /**
-     * An admitted challenge carries no reason.
-     *
      * @return void
      */
     public function testAdmits(): void
@@ -39,8 +34,7 @@ final class ChallengeAdmissionTest extends TestCase
     }
 
     /**
-     * A locked challenge carries when its lockout ends, and none at the failure
-     * ceiling.
+     * None at the failure ceiling.
      *
      * @return void
      */
@@ -57,8 +51,6 @@ final class ChallengeAdmissionTest extends TestCase
     }
 
     /**
-     * A refused challenge carries its reason and detail.
-     *
      * @return void
      */
     public function testRefuses(): void

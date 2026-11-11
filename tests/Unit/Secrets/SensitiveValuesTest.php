@@ -16,12 +16,6 @@ use Tests\Fixtures\Codes\CodeMessages;
 use Tests\Fixtures\Secrets\ForgedTrace;
 
 /**
- * Tests for `SensitiveValues`: a value known to be sensitive is redacted from
- * any string containing it, whatever its length; a value collected only from a
- * string that is it, or contains it when it is six characters or more; and the
- * values are collected from a trace's arguments, a log's values and code
- * messages, and from nothing else.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -31,8 +25,7 @@ use Tests\Fixtures\Secrets\ForgedTrace;
 final class SensitiveValuesTest extends TestCase
 {
     /**
-     * A value known to be sensitive matches any string containing it, however
-     * short it is, and every occurrence of it leaves a text.
+     * However short, and every occurrence leaves the text.
      *
      * @return void
      */
@@ -47,9 +40,7 @@ final class SensitiveValuesTest extends TestCase
     }
 
     /**
-     * A value collected matches a string that is it, or contains it when it is
-     * six characters or more; a shorter one leaves a text only when the text is
-     * it.
+     * A shorter one leaves a text only when the text is it.
      *
      * @return void
      */
@@ -67,8 +58,7 @@ final class SensitiveValuesTest extends TestCase
     }
 
     /**
-     * Each occurrence is replaced once, the longest value first, and a marker
-     * put in is never searched again.
+     * A marker put in is never searched again.
      *
      * @return void
      */
@@ -80,9 +70,6 @@ final class SensitiveValuesTest extends TestCase
     }
 
     /**
-     * Empty values, missing values and the redaction marker are never values to
-     * redact.
-     *
      * @return void
      */
     public function testIgnoresEmptyValuesAndTheMarker(): void
@@ -96,9 +83,8 @@ final class SensitiveValuesTest extends TestCase
     }
 
     /**
-     * A frame that does not touch the package gives only the values marked as
-     * sensitive and those under a key naming a secret, a code or a
-     * destination; one that does gives every string.
+     * An outside frame gives only values marked sensitive or under a sensitive
+     * key; a package frame gives every string.
      *
      * @return void
      */
@@ -127,9 +113,7 @@ final class SensitiveValuesTest extends TestCase
     }
 
     /**
-     * A code message, or a queued job sending one, nested in an array too,
-     * gives its code and its recipients' addresses as known values; a job
-     * sending another message gives nothing.
+     * Nested or queued too; a job sending another message gives nothing.
      *
      * @return void
      */
@@ -150,8 +134,7 @@ final class SensitiveValuesTest extends TestCase
     }
 
     /**
-     * A code message handed to a sender, nested in an array too, gives its code
-     * and its destination as known values.
+     * Nested in an array too.
      *
      * @return void
      */
@@ -168,9 +151,8 @@ final class SensitiveValuesTest extends TestCase
     }
 
     /**
-     * Every recipient of every kind is read, and only a queued job sending a
-     * code message counts as one: not a job sending another message, nor any
-     * other object holding a code message.
+     * Not a job sending another message, nor any other object holding a code
+     * message.
      *
      * @return void
      */
@@ -199,9 +181,8 @@ final class SensitiveValuesTest extends TestCase
     }
 
     /**
-     * A log's values give no plain string unless a key naming a secret, a code
-     * or a destination holds it, and values nested deeper than ten levels,
-     * inside a sensitive or a secret value too, are not collected.
+     * Only under a sensitive key, and nothing deeper than ten levels, even
+     * inside a sensitive or secret value.
      *
      * @return void
      */
@@ -215,8 +196,6 @@ final class SensitiveValuesTest extends TestCase
     }
 
     /**
-     * Combining values keeps both sides' values of each kind.
-     *
      * @return void
      */
     public function testCombiningKeepsBothSides(): void
@@ -233,8 +212,6 @@ final class SensitiveValuesTest extends TestCase
     }
 
     /**
-     * A recipient without a string address gives nothing.
-     *
      * @return void
      */
     public function testSkipsARecipientWithoutAnAddress(): void
@@ -246,8 +223,7 @@ final class SensitiveValuesTest extends TestCase
     }
 
     /**
-     * A log's values give what an exception among them recorded in its trace,
-     * besides what a trace's arguments give; a trace's arguments do not read an
+     * Besides what a trace's arguments give; a trace's arguments do not read an
      * exception.
      *
      * @return void
@@ -264,7 +240,7 @@ final class SensitiveValuesTest extends TestCase
     }
 
     /**
-     * Values nested deeper than ten levels are not collected.
+     * Ten levels.
      *
      * @return void
      */
@@ -275,8 +251,8 @@ final class SensitiveValuesTest extends TestCase
     }
 
     /**
-     * Values combined keep their kind: a known value still matches whatever its
-     * length, and a collected one does not.
+     * A known value still matches whatever its length, and a collected one does
+     * not.
      *
      * @return void
      */
@@ -290,8 +266,6 @@ final class SensitiveValuesTest extends TestCase
     }
 
     /**
-     * The value, nested in as many lists.
-     *
      * @param  mixed  $value
      * @param  int  $levels
      * @return array<int, mixed>

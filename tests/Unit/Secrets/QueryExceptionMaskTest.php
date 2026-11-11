@@ -18,9 +18,8 @@ use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 use Tests\TestCase;
 
 /**
- * A failed query's exception keeps its class and code and what says what went
- * wrong, and nothing the query was given: not in its message, its bindings,
- * what it wraps or the arguments its trace recorded.
+ * A failed query's exception keeps its class, code and reason, and nothing the
+ * query was given.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -56,8 +55,6 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * Put the setting back.
-     *
      * @return void
      */
     #[\Override]
@@ -71,8 +68,8 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * The message becomes the SQLSTATE, the driver error number, the connection
-     * and the SQL with placeholders.
+     * The SQLSTATE, the driver error number, the connection and the SQL with
+     * placeholders.
      *
      * @return void
      */
@@ -88,8 +85,8 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * A previous exception's message becomes the SQLSTATE and the driver error
-     * number, and nothing the driver quoted stays.
+     * Only the SQLSTATE and the driver error number; nothing the driver quoted
+     * stays.
      *
      * @return void
      */
@@ -106,8 +103,8 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * The bindings are emptied, and the driver's text in `errorInfo` is cleared
-     * with its SQLSTATE and number kept.
+     * The driver's text in `errorInfo` is cleared with its SQLSTATE and number
+     * kept.
      *
      * @return void
      */
@@ -138,8 +135,6 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * Without an `errorInfo`, the reason falls back on the code alone.
-     *
      * @return void
      */
     public function testWithoutErrorInfoTheCodeIsTheState(): void
@@ -155,8 +150,6 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * An `errorInfo` with no driver text is left as it is.
-     *
      * @return void
      */
     public function testAnErrorInfoWithoutDriverTextIsKept(): void
@@ -173,8 +166,7 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * The arguments a trace recorded lose what the query was given, whatever
-     * frame holds them, a value in another frame included.
+     * Whatever frame holds them, a value in another frame included.
      *
      * @return void
      */
@@ -190,7 +182,7 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * Every query exception a chain holds gives up its bindings, and only the
+     * Every query exception in a chain gives up its bindings, and only the
      * first is summarised.
      *
      * @return void
@@ -208,9 +200,6 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * Something other than a query exception in the chain does not stop what
-     * lies behind it being masked.
-     *
      * @return void
      */
     public function testTheChainIsFollowedPastAnythingElse(): void
@@ -230,8 +219,7 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * What every query exception in a chain was given is known in the trace,
-     * not only what the last was.
+     * Not only what the last was.
      *
      * @return void
      */
@@ -248,8 +236,7 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * The SQLSTATE comes from `errorInfo` first, where a driver gives one apart
-     * from the code.
+     * Where a driver gives one apart from the code.
      *
      * @return void
      */
@@ -269,8 +256,6 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * On the report path, a failure on a package table is masked.
-     *
      * @return void
      */
     public function testTheScrubberMasksAFailureOnAPackageTable(): void
@@ -286,8 +271,6 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * It finds a table under its configured name.
-     *
      * @return void
      */
     public function testTheScrubberFindsAConfiguredTable(): void
@@ -302,8 +285,7 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * An application's own failure on its own table is left as it is, bar the
-     * scrubbing every exception gets.
+     * Bar the scrubbing every exception gets.
      *
      * @return void
      */
@@ -318,8 +300,8 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * A failure leaving a package transaction is masked, whatever
-     * `mfa.secrets.redact` says, and what is not a query failure is left alone.
+     * Whatever `mfa.secrets.redact` says; what is not a query failure is left
+     * alone.
      *
      * @return void
      *
@@ -349,8 +331,7 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * A deadlock exception above a failed query loses the message it copied and
-     * keeps what Laravel recognises it by, and the query under it is masked.
+     * It keeps what Laravel recognises it by, and the query under it is masked.
      *
      * @return void
      */
@@ -367,8 +348,7 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * Each deadlock exception a chain holds above a failed query is rewritten,
-     * as a transaction nested twice wraps the wrapper.
+     * As a transaction nested twice wraps the wrapper.
      *
      * @return void
      */
@@ -385,8 +365,6 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * A deadlock exception with no failed query under it has nothing to lose.
-     *
      * @return void
      */
     public function testADeadlockWithoutAFailedQueryIsLeftAlone(): void
@@ -399,8 +377,7 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * The arguments a deadlock exception's trace recorded lose what the query
-     * under it was given, every binding in the chain among them.
+     * Every binding in the chain among them.
      *
      * @return void
      */
@@ -416,9 +393,6 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * What a deadlock exception wraps may hold more than one failed query, and
-     * what each was given is known in its trace.
-     *
      * @return void
      */
     public function testEveryBindingBelowADeadlockIsKnownInItsTrace(): void
@@ -434,9 +408,6 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * Something other than a query exception between two does not hide what the
-     * deeper one was given from the trace.
-     *
      * @return void
      */
     public function testABindingBehindSomethingElseIsKnownInTheTrace(): void
@@ -449,9 +420,6 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * The scrubber rewrites a deadlock exception above a failure on one of the
-     * package's tables.
-     *
      * @return void
      */
     public function testTheScrubberMasksADeadlockAboveAPackageFailure(): void
@@ -466,9 +434,6 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * The scrubber leaves a deadlock exception above an application's own
-     * failure as it does the failure.
-     *
      * @return void
      */
     public function testTheScrubberLeavesADeadlockAboveAnApplicationsOwnFailure(): void
@@ -483,8 +448,7 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * A deadlock exception leaving a package transaction is masked, whatever
-     * `mfa.secrets.redact` says.
+     * Whatever `mfa.secrets.redact` says.
      *
      * @return void
      *
@@ -508,8 +472,7 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * A failure leaving a pin on the write connection is masked, and the pin is
-     * released.
+     * And the pin is released.
      *
      * @return void
      *
@@ -529,8 +492,7 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * A failed save of a factor leaves with nothing the factor held, even with
-     * no transaction open.
+     * Even with no transaction open.
      *
      * @return void
      *
@@ -567,8 +529,6 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * What a driver raises, quoting the stored value.
-     *
      * @return \PDOException
      */
     private function driverFailure(): \PDOException
@@ -583,8 +543,7 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * A failure whose trace records the value, in a frame outside the package
-     * that received it.
+     * The value is recorded in a frame outside the package that received it.
      *
      * @param  string  $value
      * @return \Illuminate\Database\QueryException
@@ -599,8 +558,6 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * Throw a failure bound to the secret, with the value in this frame.
-     *
      * @param  string  $value
      * @return never
      *
@@ -612,8 +569,7 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * A failure wrapping another, each bound to its own value, with both values
-     * in this frame.
+     * Each bound to its own value, with both values in this frame.
      *
      * @param  string  $first
      * @param  string  $second
@@ -627,8 +583,8 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * A failure wrapping something else that wraps another failure, bound to a
-     * value this frame holds, which the outer failure was not given.
+     * The deeper failure is bound to a value this frame holds, which the outer
+     * failure was not given.
      *
      * @param  string  $value
      * @return \Illuminate\Database\QueryException
@@ -641,8 +597,7 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * A deadlock above a failure bound to the secret, whose trace records the
-     * value in a frame outside the package that received it.
+     * The value is recorded in a frame outside the package that received it.
      *
      * @param  string  $value
      * @return \Illuminate\Database\DeadlockException
@@ -655,8 +610,7 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * A deadlock above a failure wrapping another, each bound to its own value,
-     * with both values in this frame.
+     * Each failure bound to its own value, with both values in this frame.
      *
      * @param  string  $first
      * @param  string  $second
@@ -671,8 +625,6 @@ final class QueryExceptionMaskTest extends TestCase
     }
 
     /**
-     * The arguments every frame of the exception's trace recorded.
-     *
      * @param  \Throwable  $throwable
      * @return list<mixed>
      */

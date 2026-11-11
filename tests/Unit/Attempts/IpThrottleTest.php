@@ -18,9 +18,6 @@ use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 use Tests\TestCase;
 
 /**
- * Tests for `IpThrottle`: slots taken from an address's window up to the IP
- * limit, given back, and the throttle read while the window is live and full.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -33,8 +30,6 @@ final class IpThrottleTest extends TestCase
     private const string IP = '192.0.2.1';
 
     /**
-     * Freeze the clock.
-     *
      * @return void
      */
     #[\Override]
@@ -46,8 +41,6 @@ final class IpThrottleTest extends TestCase
     }
 
     /**
-     * Release the frozen clock.
-     *
      * @return void
      */
     #[\Override]
@@ -59,8 +52,6 @@ final class IpThrottleTest extends TestCase
     }
 
     /**
-     * An attempt without an address.
-     *
      * @return iterable<string, array{?string}>
      */
     public static function missingAddresses(): iterable
@@ -70,7 +61,7 @@ final class IpThrottleTest extends TestCase
     }
 
     /**
-     * An attempt without an address takes no slot and is never throttled.
+     * It takes no slot.
      *
      * @param  ?string  $ip
      * @return void
@@ -91,8 +82,8 @@ final class IpThrottleTest extends TestCase
     }
 
     /**
-     * A slot is taken from the address's window, which ends a window's length
-     * from now, and answered with its key and the window it came from.
+     * It ends a window's length from now, and is answered with its key and the
+     * window it came from.
      *
      * @return void
      *
@@ -111,8 +102,7 @@ final class IpThrottleTest extends TestCase
     }
 
     /**
-     * A full window refuses the slot with a throttle of the address that ends
-     * with the window, and counts nothing.
+     * The throttle ends with the window, and nothing is counted.
      *
      * @return void
      *
@@ -136,8 +126,7 @@ final class IpThrottleTest extends TestCase
     }
 
     /**
-     * A slot given back leaves the window as it was before it was taken, and
-     * giving back no slot changes nothing.
+     * Giving back no slot changes nothing.
      *
      * @return void
      *
@@ -162,8 +151,7 @@ final class IpThrottleTest extends TestCase
     }
 
     /**
-     * The address is throttled while its window is live and holds the IP limit,
-     * until the window ends.
+     * Until the window ends.
      *
      * @return void
      *
@@ -187,8 +175,6 @@ final class IpThrottleTest extends TestCase
     }
 
     /**
-     * A live window below the IP limit does not throttle the address.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -204,8 +190,7 @@ final class IpThrottleTest extends TestCase
     }
 
     /**
-     * Store the address's window with the given count, ending at the given
-     * time, a minute from now by default.
+     * The window ends a minute from now by default.
      *
      * @param  int  $hits
      * @param  ?\Carbon\CarbonImmutable  $ends
@@ -227,8 +212,6 @@ final class IpThrottleTest extends TestCase
     }
 
     /**
-     * The attempts counted in the address's window.
-     *
      * @return int
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -240,8 +223,6 @@ final class IpThrottleTest extends TestCase
     }
 
     /**
-     * The key of the address's window.
-     *
      * @return string
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -253,8 +234,6 @@ final class IpThrottleTest extends TestCase
     }
 
     /**
-     * The attempt settings, as configured now.
-     *
      * @return \SineMacula\Laravel\Mfa\Attempts\AttemptSettings
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -265,8 +244,6 @@ final class IpThrottleTest extends TestCase
     }
 
     /**
-     * Resolve the attempt store.
-     *
      * @return \SineMacula\Laravel\Mfa\Attempts\AttemptStore
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -277,8 +254,6 @@ final class IpThrottleTest extends TestCase
     }
 
     /**
-     * Resolve the IP throttle.
-     *
      * @return \SineMacula\Laravel\Mfa\Attempts\IpThrottle
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

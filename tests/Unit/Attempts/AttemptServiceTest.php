@@ -38,11 +38,6 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * Tests for `AttemptService`: what each attempt is counted against, when it
- * locks a factor, the identity or an address, what a success resets and what
- * nothing but a success does, the failure ceiling, and lifting a lockout apart
- * from enabling a disabled factor.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -57,8 +52,6 @@ final class AttemptServiceTest extends TestCase
     private const string IP = '192.0.2.1';
 
     /**
-     * Freeze the clock.
-     *
      * @return void
      */
     #[\Override]
@@ -70,8 +63,6 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * Release the frozen clock.
-     *
      * @return void
      */
     #[\Override]
@@ -83,8 +74,7 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * A failure is counted against the factor in a row, the identity's run and
-     * its window, and the address.
+     * The factor's run, the identity's run and window, and the address.
      *
      * @return void
      *
@@ -107,10 +97,8 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * A success resets the failures in a row of the factor it proved and the
-     * identity's run, and nothing else: another factor keeps its count and its
-     * lockout, the identity's window keeps its failures, and the success takes
-     * no slot of the address's window.
+     * Another factor keeps its count and lockout, the identity's window its
+     * failures, and the address's window gains no slot.
      *
      * @return void
      *
@@ -141,10 +129,8 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * A success with nothing to reset saves nothing: not the identity's state,
-     * not the factor proved, and not another factor that is not disabled. A
-     * model event refusing those saves, as an application's observer may, is
-     * never asked, so it cannot abort the success.
+     * No save is made, so an application's observer refusing one cannot abort
+     * the success.
      *
      * @return void
      *
@@ -177,8 +163,7 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * The failure that reaches the factor limit locks the factor for the
-     * lockout period and reports it.
+     * Locks for the lockout period and reports it.
      *
      * @return void
      *
@@ -220,8 +205,7 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * The deadline goes on the factor's own row, in the one save that counts
-     * the failure, and nothing of the factor goes in the attempts table.
+     * Nothing of the factor goes in the attempts table.
      *
      * @return void
      *
@@ -253,8 +237,8 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * A locked factor refuses the attempt without running the verification,
-     * counts it nowhere, does not extend the lockout and reports nothing more.
+     * Without running the verification, counting it nowhere or reporting
+     * anything more.
      *
      * @return void
      *
@@ -297,8 +281,7 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * A lockout applies up to the second before its deadline and not from the
-     * deadline itself, for the read and for an attempt alike.
+     * For the read and for an attempt alike.
      *
      * @return void
      *
@@ -323,9 +306,8 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * Both an attempt and the lockout read answer from the row as stored, not
-     * from the instance the caller holds: a copy read before the lockout is
-     * refused, and a copy read before a lift is not.
+     * A copy read before the lockout is refused, and a copy read before a lift
+     * is not.
      *
      * @return void
      *
@@ -351,9 +333,8 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * A model event that cancels the save of the failure that locks the factor
-     * throws and rolls everything back: nothing is counted, no deadline is
-     * stored and nothing is reported.
+     * A model event cancelling that save throws and rolls everything back:
+     * nothing is counted, stored or reported.
      *
      * @return void
      *
@@ -389,10 +370,8 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * A failure that locks the identity and the factor at once names the
-     * strictest of the two: the identity's, which ends no sooner; and a failure
-     * of a factor that keeps no state, which brings the identity's run to the
-     * failure ceiling, names the identity at the ceiling.
+     * The identity's, which ends no sooner; a stateless factor's failure
+     * reaching the identity's ceiling names the identity.
      *
      * @return void
      *
@@ -430,9 +409,7 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * A model event that cancels the save of the identity's lockout throws and
-     * rolls everything back, rather than report a lockout that was never
-     * stored.
+     * Rolled back rather than report a lockout that was never stored.
      *
      * @return void
      *
@@ -466,9 +443,8 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * A custom column with no cast declared works once the model is read back
-     * from storage: the deadline is written to it, refuses from it and is
-     * lifted from it. The shipped column is never touched.
+     * With no cast declared, the deadline is written to, refuses from and is
+     * lifted from it; the shipped column is never touched.
      *
      * @return void
      *
@@ -513,9 +489,7 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * An independent model with no cast on `disabled_at`, disabled at the
-     * failure ceiling, is read back from storage as disabled and refused as
-     * disabled without running the verification.
+     * Without running the verification.
      *
      * @return void
      *
@@ -555,8 +529,7 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * The factor's failures in a row outlive its lockout: once it ends, the
-     * next failure locks the factor again.
+     * The factor's failures in a row outlive its lockout.
      *
      * @return void
      *
@@ -584,9 +557,8 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * Failures across the identity's factors and recovery codes lock the
-     * identity at its limit, for every factor and for recovery codes, until the
-     * lockout ends, and report it with no factor.
+     * For every factor and for recovery codes, until the lockout ends, and
+     * reported with no factor.
      *
      * @return void
      *
@@ -626,8 +598,7 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * The identity's failures count within the window only: failures spread
-     * wider than it never lock the identity.
+     * Failures spread wider than the window never lock the identity.
      *
      * @return void
      *
@@ -651,9 +622,8 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * Failures from one address across identities throttle it at its limit,
-     * refusing the next identity without running its verification, while
-     * another address is not throttled.
+     * The next identity is refused without running its verification; another
+     * address is not throttled.
      *
      * @return void
      *
@@ -678,9 +648,6 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * Successes take no slot of the address's window, so an address that only
-     * succeeds is never throttled.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -716,9 +683,8 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * The failure that reaches the failure ceiling disables the factor, reports
-     * it, and from then on the factor is refused as disabled; past the factor
-     * limit, it disables the factor rather than locking it.
+     * From then on it is refused as disabled; past the factor limit, it
+     * disables rather than locks.
      *
      * @return void
      *
@@ -756,9 +722,8 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * A failure that brings the identity's run to the failure ceiling takes
-     * precedence over the factor limit too: it disables the factor, and writes
-     * no deadline, however far past the limit the factor is.
+     * It disables the factor and writes no deadline, however far past the limit
+     * the factor is.
      *
      * @return void
      *
@@ -787,9 +752,7 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * Proving another factor enables every one of the identity's factors the
-     * failure ceiling disabled, and keeps their failures in a row, since only a
-     * success of a factor resets its own count: the next failure of one
+     * Only a factor's own success resets its count, so the next failure of one
      * disables it again.
      *
      * @return void
@@ -821,8 +784,7 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * Enabling a disabled factor clears its failures in a row and leaves its
-     * lockout to end on its own; a factor that is not disabled is left alone.
+     * Its lockout ends on its own; a factor that is not disabled is left alone.
      *
      * @return void
      *
@@ -848,9 +810,8 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * Lifting a factor's lockout reports it with the actor and keeps the
-     * factor's failures in a row, so its next failure locks it again; lifting
-     * it again lifts nothing and reports nothing.
+     * Reported with the actor; the next failure locks it again, and lifting it
+     * again lifts and reports nothing.
      *
      * @return void
      *
@@ -886,9 +847,8 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * Lifting clears a deadline that has already passed, the moment it ends
-     * included, but it was not live, so nothing is reported as lifted and the
-     * failures in a row are kept.
+     * The moment it ends included; it was not live, so nothing is reported and
+     * the failures in a row are kept.
      *
      * @return void
      *
@@ -914,8 +874,7 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * A model event that cancels the save of a lift throws, and leaves the
-     * lockout in force and unreported.
+     * It throws, and leaves the lockout in force and unreported.
      *
      * @return void
      *
@@ -946,8 +905,6 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * Stored deadlines that cannot be read as a time.
-     *
      * @return iterable<string, array{string, class-string<\Throwable>}>
      */
     public static function unreadableDeadlines(): iterable
@@ -958,10 +915,8 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * A stored deadline that cannot be read as a time fails closed: an attempt
-     * and the lockout read throw, the verification does not run and nothing is
-     * counted, rather than the factor reading as unlocked. The column is text
-     * here, as MySQL and PostgreSQL would refuse such a value in a timestamp.
+     * The verification does not run and nothing is counted. The column is text,
+     * as MySQL and PostgreSQL refuse such a value in a timestamp.
      *
      * @param  string  $stored
      * @param  class-string<\Throwable>  $exception
@@ -1004,9 +959,6 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * Lifting the lockout of a factor that is not the identity's lifts nothing
-     * and reports nothing.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -1026,8 +978,6 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * Lifting a lockout leaves a factor the failure ceiling disabled disabled.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -1046,8 +996,8 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * Lifting the identity's lockout clears it and its window, and reports it
-     * with no factor; lifting it again lifts nothing.
+     * It clears the window too and reports with no factor; lifting it again
+     * lifts nothing.
      *
      * @return void
      *
@@ -1073,8 +1023,7 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * A factor that keeps no state of its own is not counted itself, but the
-     * identity is charged for it.
+     * It is not counted itself, but the identity is charged for it.
      *
      * @return void
      *
@@ -1095,10 +1044,8 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * From the failure ceiling on, the identity's run refuses every attempt
-     * that names no factor of its own (a recovery code, or a factor that keeps
-     * no state) without running the verification, while one of its factors may
-     * still be attempted; proving it resets the run.
+     * Attempts naming no factor of its own are refused without verifying; its
+     * factors may still be attempted, and proving one resets the run.
      *
      * @return void
      *
@@ -1143,9 +1090,7 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * The failure that brings the identity's run to the failure ceiling, spread
-     * across its factors, disables the factor it was made against, however few
-     * failures in a row that factor has, and reports it.
+     * However few failures in a row that factor has, and it is reported.
      *
      * @return void
      *
@@ -1180,8 +1125,8 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * Resetting the identity's failures clears its run, so attempts without a
-     * factor are made again; with no run there is nothing to reset.
+     * So attempts without a factor are made again; with no run there is nothing
+     * to reset.
      *
      * @return void
      *
@@ -1207,8 +1152,7 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * A factor removed before the lock is taken is not found: the verification
-     * does not run and nothing is counted anywhere.
+     * The verification does not run and nothing is counted anywhere.
      *
      * @return void
      *
@@ -1236,8 +1180,7 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * Another identity's factor is not among the identity's own, so it is not
-     * found either, and its own count is left alone.
+     * Its own count is left alone.
      *
      * @return void
      *
@@ -1257,9 +1200,8 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * The verification is handed the factor as stored under the lock, not the
-     * instance the caller read before; a factor that keeps no state is handed
-     * as it is, and an attempt without a factor is handed none.
+     * Not the caller's instance; a stateless factor is handed as it is, and an
+     * attempt without a factor is handed none.
      *
      * @return void
      *
@@ -1291,9 +1233,8 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * A listener that throws once the attempt has committed leaves the failure
-     * counted against the factor and the identity. The address's slot is given
-     * back, since the exception reaches the throttle.
+     * The address's slot is given back, since the exception reaches the
+     * throttle.
      *
      * @return void
      *
@@ -1324,8 +1265,7 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * A verification that throws counts nothing, rolls the attempt back and
-     * gives the address's slot back.
+     * It rolls the attempt back and gives the address's slot back.
      *
      * @return void
      *
@@ -1355,8 +1295,7 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * An identity whose key is neither a string nor an integer cannot be
-     * counted.
+     * A key that is neither a string nor an integer cannot be counted.
      *
      * @return void
      *
@@ -1370,9 +1309,9 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * The lockout read under the lock, without an address: none for a usable
-     * factor, the factor's own once disabled, and the identity's once locked;
-     * with no factor, the identity's run at the failure ceiling too.
+     * Without an address: none for a usable factor, the factor's own once
+     * disabled, the identity's once locked, and with no factor the identity's
+     * run at the ceiling.
      *
      * @return void
      *
@@ -1407,8 +1346,6 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * Make an attempt whose verification answers as given.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  ?\SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  bool  $passes
@@ -1452,8 +1389,6 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * The user's identity state row, or `null` when it has none.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return ?\SineMacula\Laravel\Mfa\Models\IdentityState
      */
@@ -1466,8 +1401,6 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * The factor as stored now.
-     *
      * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
      * @return \SineMacula\Laravel\Mfa\Models\Factor
      */
@@ -1477,8 +1410,8 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * Create a TOTP factor for the user with the given failures in a row,
-     * disabled at the failure ceiling when asked.
+     * A TOTP factor with the given failures in a row, disabled at the failure
+     * ceiling when asked.
      *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  int  $failures
@@ -1499,8 +1432,6 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * Create a test user.
-     *
      * @param  string  $email
      * @return \Tests\Fixtures\Identities\TestUser
      */
@@ -1511,8 +1442,6 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * Resolve the attempt keys.
-     *
      * @return \SineMacula\Laravel\Mfa\Attempts\AttemptKeys
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -1523,8 +1452,6 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * Resolve the attempt service.
-     *
      * @return \SineMacula\Laravel\Mfa\Attempts\AttemptService
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

@@ -11,10 +11,6 @@ use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Attempts\AttemptKeys;
 
 /**
- * Unit tests for `AttemptKeys`: keyed digests of the scope and the subject,
- * deterministic for one application key and apart for anything else, and IP
- * addresses counted by the client they stand for.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -27,9 +23,8 @@ final class AttemptKeysTest extends TestCase
     private const string APP_KEY = 'base64:2fl+Ktvkfl+Fuz4Qp/A75G2RTiWVA/ZoKZvp6fiiM10=';
 
     /**
-     * A key is a keyed HMAC-SHA256 digest of the scope and the subject: 64
-     * hexadecimal characters, the same for the same subject, and apart from a
-     * plain digest of the subject.
+     * The same for the same subject, and apart from a plain digest of the
+     * subject.
      *
      * @return void
      */
@@ -47,8 +42,8 @@ final class AttemptKeysTest extends TestCase
     }
 
     /**
-     * The same subject in different scopes, or with a different identity type,
-     * and different subjects in the same scope count in different rows.
+     * The same subject in another scope or identity type, and another subject
+     * in the same scope, count apart.
      *
      * @return void
      */
@@ -69,8 +64,7 @@ final class AttemptKeysTest extends TestCase
     }
 
     /**
-     * Another application key gives another key, so rotating it starts every
-     * throttle afresh.
+     * So rotating it starts every throttle afresh.
      *
      * @return void
      */
@@ -93,8 +87,6 @@ final class AttemptKeysTest extends TestCase
     }
 
     /**
-     * Addresses and the client each is counted as.
-     *
      * @return iterable<string, array{string, string}>
      */
     public static function addresses(): iterable
@@ -108,8 +100,6 @@ final class AttemptKeysTest extends TestCase
     }
 
     /**
-     * An address is counted by the client it stands for.
-     *
      * @param  string  $ip
      * @param  string  $canonical
      * @return void
@@ -124,8 +114,6 @@ final class AttemptKeysTest extends TestCase
     }
 
     /**
-     * Build the keys over a configuration holding the given application key.
-     *
      * @param  string  $appKey
      * @return \SineMacula\Laravel\Mfa\Attempts\AttemptKeys
      */

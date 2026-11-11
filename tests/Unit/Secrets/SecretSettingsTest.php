@@ -11,9 +11,6 @@ use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Secrets\SecretSettings;
 
 /**
- * Tests for `SecretSettings`: redaction is on unless the setting reads as
- * false.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -23,8 +20,6 @@ use SineMacula\Laravel\Mfa\Secrets\SecretSettings;
 final class SecretSettingsTest extends TestCase
 {
     /**
-     * Settings and whether each redacts.
-     *
      * @return iterable<string, array{mixed, bool}>
      */
     public static function settings(): iterable
@@ -44,8 +39,7 @@ final class SecretSettingsTest extends TestCase
     }
 
     /**
-     * Redaction follows the setting, and fails safe on anything that does not
-     * read as false.
+     * Fails safe on anything that does not read as false.
      *
      * @param  mixed  $value
      * @param  bool  $redacts
@@ -60,8 +54,6 @@ final class SecretSettingsTest extends TestCase
     }
 
     /**
-     * A missing block redacts.
-     *
      * @return void
      */
     public function testRedactsWithoutTheBlock(): void

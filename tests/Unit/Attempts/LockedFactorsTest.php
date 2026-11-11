@@ -16,9 +16,6 @@ use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\TestCase;
 
 /**
- * Unit tests for `LockedFactors`: which factors keep state of their own, how a
- * factor is found among the locked ones by its id, and which ids are usable.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -28,8 +25,8 @@ use Tests\TestCase;
 final class LockedFactorsTest extends TestCase
 {
     /**
-     * Only an Eloquent factor model keeps state of its own: not a factor that
-     * is no model, nor a model that is a factor but not an Eloquent one.
+     * Not a factor that is no model, nor a model that is a factor but not an
+     * Eloquent one.
      *
      * @return void
      */
@@ -44,8 +41,7 @@ final class LockedFactorsTest extends TestCase
     }
 
     /**
-     * A factor is found as the locked instance with the same id, not the one it
-     * was looked up with.
+     * Not the one it was looked up with.
      *
      * @return void
      */
@@ -58,8 +54,8 @@ final class LockedFactorsTest extends TestCase
     }
 
     /**
-     * Nothing is found for a factor that keeps no state, has no usable id, or
-     * is not among the locked ones.
+     * For a factor that keeps no state, has no usable id, or is not among the
+     * locked ones.
      *
      * @return void
      */
@@ -74,8 +70,6 @@ final class LockedFactorsTest extends TestCase
     }
 
     /**
-     * The ids a factor is matched by.
-     *
      * @return iterable<string, array{0: mixed, 1: ?string}>
      */
     public static function ids(): iterable
@@ -87,7 +81,7 @@ final class LockedFactorsTest extends TestCase
     }
 
     /**
-     * A factor's id is usable as a non-empty string or an integer, as a string.
+     * As a non-empty string or an integer, given back as a string.
      *
      * @param  mixed  $id
      * @param  ?string  $expected
@@ -100,8 +94,6 @@ final class LockedFactorsTest extends TestCase
     }
 
     /**
-     * The factor as the contract an attempt names it by.
-     *
      * @param  ?\SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return ?\SineMacula\Laravel\Mfa\Contracts\Factor
      */
@@ -111,8 +103,6 @@ final class LockedFactorsTest extends TestCase
     }
 
     /**
-     * An unsaved factor model with the given id.
-     *
      * @param  string  $id
      * @return \SineMacula\Laravel\Mfa\Models\Factor
      */

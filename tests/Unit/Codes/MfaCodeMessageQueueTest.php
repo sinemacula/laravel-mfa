@@ -14,8 +14,7 @@ use Tests\Fixtures\Codes\PayloadRecordingQueue;
 use Tests\TestCase;
 
 /**
- * Tests that `MfaCodeMessage` is never queued in clear: the payload a queue
- * stores for it holds the code only encrypted with the application key.
+ * `MfaCodeMessage` is never queued in clear.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -29,8 +28,6 @@ final class MfaCodeMessageQueueTest extends TestCase
     private const string CODE = '493817';
 
     /**
-     * The message, and a subclass of it, asks to be encrypted on the queue.
-     *
      * @return void
      */
     public function testTheMessageAsksToBeEncryptedOnTheQueue(): void
@@ -41,8 +38,7 @@ final class MfaCodeMessageQueueTest extends TestCase
     }
 
     /**
-     * The payload a queue stores for the queued message holds no plaintext
-     * code, and decrypts to the message with its code.
+     * And it decrypts to the message with its code.
      *
      * @return void
      *

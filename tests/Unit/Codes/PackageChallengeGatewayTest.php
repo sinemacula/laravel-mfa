@@ -28,10 +28,6 @@ use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\TestCase;
 
 /**
- * Tests for `PackageChallengeGateway`, the package's own codes as a challenge
- * gateway: it serves only the request's caller, asks the counters before it
- * sends or checks, and sends only for a type that delivers codes.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -52,8 +48,6 @@ final class PackageChallengeGatewayTest extends TestCase
     private FakeEmailSender $mailbox;
 
     /**
-     * Sign a person in with an email factor.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -67,8 +61,6 @@ final class PackageChallengeGatewayTest extends TestCase
     }
 
     /**
-     * A code is sent for the caller's factor and answers its challenge.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -84,8 +76,8 @@ final class PackageChallengeGatewayTest extends TestCase
     }
 
     /**
-     * A binding that does not name the request's caller is sent nothing and
-     * verifies nothing.
+     * A binding not naming the request's caller is sent nothing and verifies
+     * nothing.
      *
      * @return void
      *
@@ -101,8 +93,8 @@ final class PackageChallengeGatewayTest extends TestCase
     }
 
     /**
-     * A caller with no sign-in the proof store knows of is sent nothing and
-     * verifies nothing, under the binding of the sign-in it had.
+     * A caller whose sign-in the proof store does not know is served nothing,
+     * even under its old binding.
      *
      * @return void
      *
@@ -124,8 +116,7 @@ final class PackageChallengeGatewayTest extends TestCase
     }
 
     /**
-     * A pending session that does not allow sending or verifying is served
-     * nothing, though the guard's user is the factor's owner.
+     * Even though the guard's user owns the factor.
      *
      * @return void
      *
@@ -153,8 +144,8 @@ final class PackageChallengeGatewayTest extends TestCase
     }
 
     /**
-     * A binding of the caller's own sign-in on another application, or of
-     * another session on its own, is sent nothing and verifies nothing.
+     * Another application of the caller's sign-in, or another session on its
+     * own.
      *
      * @return void
      *
@@ -182,9 +173,6 @@ final class PackageChallengeGatewayTest extends TestCase
     }
 
     /**
-     * A pending session on one application is served only for its own binding,
-     * never for the same identity's active sign-in on another.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -254,8 +242,7 @@ final class PackageChallengeGatewayTest extends TestCase
     }
 
     /**
-     * A factor under a timed lockout is refused with when the lockout ends, and
-     * how long a send must wait.
+     * Refused with when the lockout ends and how long a send must wait.
      *
      * @return void
      *
@@ -278,8 +265,8 @@ final class PackageChallengeGatewayTest extends TestCase
     }
 
     /**
-     * A wrong code, an expired challenge and an absent one are each counted,
-     * and carry their own reason and internal detail.
+     * A wrong code, an expired challenge and an absent one each carry their own
+     * reason and detail.
      *
      * @return void
      *
@@ -306,8 +293,6 @@ final class PackageChallengeGatewayTest extends TestCase
     }
 
     /**
-     * A factor whose type does not deliver codes is refused.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -326,8 +311,6 @@ final class PackageChallengeGatewayTest extends TestCase
     }
 
     /**
-     * The bound gateway.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\ChallengeGateway
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

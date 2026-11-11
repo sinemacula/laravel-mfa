@@ -22,9 +22,8 @@ use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use SineMacula\Laravel\Mfa\Testing\FakeSmsSender;
 
 /**
- * Tests that every parameter carrying a code, a message holding one, a
- * destination or a recipient on the way to a sender is marked as sensitive, so
- * PHP records none of them in a trace.
+ * Parameters carrying a code, a message, a destination or a recipient to a
+ * sender are marked sensitive, so PHP records none in a trace.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -44,8 +43,6 @@ use SineMacula\Laravel\Mfa\Testing\FakeSmsSender;
 final class SensitiveDeliveryParametersTest extends TestCase
 {
     /**
-     * Rows of a method and the parameters of it that carry plaintext.
-     *
      * @return iterable<string, array{class-string, string, list<string>}>
      */
     public static function deliveryParameters(): iterable
@@ -71,8 +68,6 @@ final class SensitiveDeliveryParametersTest extends TestCase
     }
 
     /**
-     * Each parameter carrying plaintext is marked as sensitive.
-     *
      * @param  class-string  $class
      * @param  string  $method
      * @param  list<string>  $parameters

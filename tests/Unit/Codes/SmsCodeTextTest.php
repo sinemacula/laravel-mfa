@@ -10,9 +10,6 @@ use Tests\Fixtures\Codes\CodeMessages;
 use Tests\TestCase;
 
 /**
- * Unit tests for `SmsCodeText`: the package's wording of an SMS, in the current
- * locale, with the code in it.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -22,8 +19,6 @@ use Tests\TestCase;
 final class SmsCodeTextTest extends TestCase
 {
     /**
-     * The shipped English carries the code.
-     *
      * @return void
      */
     public function testTheShippedEnglishCarriesTheCode(): void
@@ -32,8 +27,6 @@ final class SmsCodeTextTest extends TestCase
     }
 
     /**
-     * The line is read in the current locale.
-     *
      * @return void
      */
     public function testTheLineIsInTheCurrentLocale(): void
@@ -45,8 +38,7 @@ final class SmsCodeTextTest extends TestCase
     }
 
     /**
-     * A line without the placeholder gives the shipped English, so the code is
-     * never left out.
+     * So the code is never left out.
      *
      * @return void
      */

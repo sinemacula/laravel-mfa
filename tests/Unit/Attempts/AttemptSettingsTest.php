@@ -11,9 +11,6 @@ use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Attempts\AttemptSettings;
 
 /**
- * Unit tests for `AttemptSettings`: each setting's default, the bounds it
- * accepts, and the message a value past them fails with.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -38,11 +35,8 @@ final class AttemptSettingsTest extends TestCase
     }
 
     /**
-     * Each setting takes its default (within its bounds) when unset, reads
-     * either bound as an integer or the digit string `env()` returns, and
-     * refuses a value past either bound, or one that is not an integer, naming
-     * the key and its bounds, both as it is read and when every setting is
-     * validated.
+     * Bounds read as an integer or an `env()` digit string; anything past them
+     * is refused on read and on validation.
      *
      * @param  string  $key
      * @param  \Closure(\SineMacula\Laravel\Mfa\Attempts\AttemptSettings): int  $read
@@ -79,8 +73,6 @@ final class AttemptSettingsTest extends TestCase
     }
 
     /**
-     * The defaults validate.
-     *
      * @return void
      */
     public function testTheDefaultsValidate(): void
@@ -91,8 +83,6 @@ final class AttemptSettingsTest extends TestCase
     }
 
     /**
-     * Build the settings over an `mfa.attempts` block.
-     *
      * @param  array<string, mixed>  $attempts
      * @return \SineMacula\Laravel\Mfa\Attempts\AttemptSettings
      */

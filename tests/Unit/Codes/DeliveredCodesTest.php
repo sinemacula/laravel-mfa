@@ -18,12 +18,6 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * Tests for `DeliveredCodes`, the engine behind delivered codes: a code matches
- * only its own factor, identity, application, session and purpose, is stored
- * only as a keyed hash and used once; a resend replaces the code, keeps
- * the attempt budget, waits out the cooldown and never outlives its challenge;
- * and the sends of a factor and of an identity are capped across sessions.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -51,9 +45,7 @@ final class DeliveredCodesTest extends TestCase
     private array $draws = [];
 
     /**
-     * A code is accepted once for its own factor and binding, with the lifetime
-     * configured; used, it is replayed for itself and missing for any other
-     * code.
+     * Used, it is replayed for itself and missing for any other code.
      *
      * @return void
      *
@@ -74,8 +66,6 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * Rows of a factor and binding that differ from the code's in one part.
-     *
      * @return iterable<string, array{string, \SineMacula\Laravel\Mfa\Proofs\ProofBinding}>
      */
     public static function otherBindings(): iterable
@@ -88,9 +78,8 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * A code is missing for any other session, purpose, factor, application or
-     * identity, even when its challenge is named, and such a check counts no
-     * attempt against it: it still works for its own.
+     * Such a check counts no attempt, so the code still works for its own
+     * binding.
      *
      * @param  string  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -111,8 +100,6 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * A challenge named that does not exist is missing.
-     *
      * @return void
      *
      * @throws \Random\RandomException
@@ -128,9 +115,8 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * The table holds the code only as a keyed hash bound to its challenge and
-     * binding, and the session only as a keyed digest; the binding's other
-     * parts are stored as they are.
+     * The code is a keyed hash bound to its challenge and binding, and the
+     * session a keyed digest.
      *
      * @return void
      *
@@ -160,8 +146,6 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * A wrong code is invalid and counts an attempt.
-     *
      * @return void
      *
      * @throws \Random\RandomException
@@ -178,8 +162,7 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * Once a challenge has used up its attempts, even its code is refused,
-     * without counting another.
+     * Even the right code is refused, without counting another attempt.
      *
      * @return void
      *
@@ -198,8 +181,7 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * A code is refused from the second it expires, without counting an
-     * attempt, and works until then.
+     * Refused from the second it expires, and works until then.
      *
      * @return void
      *
@@ -217,8 +199,7 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * A resend waits out the cooldown since the last code, then sends a new
-     * code for the same challenge.
+     * Then it sends a new code for the same challenge.
      *
      * @return void
      *
@@ -242,7 +223,7 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * A resend invalidates the previous code at once: only the new one works.
+     * Only the new code works.
      *
      * @return void
      *
@@ -261,8 +242,8 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * A resend never sends the previous code's digits again, which would still
-     * match under the new issue: it draws again until they differ.
+     * The old digits would still match under the new issue, so it draws again
+     * until they differ.
      *
      * @return void
      *
@@ -284,8 +265,7 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * A resend keeps the attempts already made: a new code brings no new
-     * attempts.
+     * A new code brings no new attempts.
      *
      * @return void
      *
@@ -309,8 +289,7 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * A resend's code never works past the end of its challenge, and once the
-     * challenge has ended the next code starts a new one.
+     * Once the challenge has ended, the next code starts a new one.
      *
      * @return void
      *
@@ -336,9 +315,6 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * A challenge that has used up its attempts sends no more codes until it
-     * ends.
-     *
      * @return void
      *
      * @throws \Random\RandomException
@@ -356,9 +332,6 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * Once a challenge's code is used, the next code starts a new challenge at
-     * once.
-     *
      * @return void
      *
      * @throws \Random\RandomException
@@ -378,8 +351,7 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * A factor is sent no more than its cap within the send window, across
-     * every session, until its oldest send leaves the window.
+     * Across every session, until the oldest send leaves the window.
      *
      * @return void
      *
@@ -399,10 +371,8 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * The cap counts what a destination was sent, whichever factor held it, so
-     * a pending factor discarded for a new one leaves its sends counted, while
-     * another destination, another identity's, and a factor with none are
-     * apart.
+     * Counted per destination, so a pending factor discarded for a new one
+     * leaves its sends counted.
      *
      * @return void
      *
@@ -427,10 +397,8 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * A new enrolment challenge waits out the cooldown since the last enrolment
-     * code to the destination, though its factor is a new one; a new challenge
-     * of any other purpose does not, and neither does one to another
-     * destination.
+     * Though its factor is new; other purposes and other destinations do not
+     * wait.
      *
      * @return void
      *
@@ -454,8 +422,7 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * An identity is sent no more than its cap within the send window, across
-     * its factors, while another identity is unaffected.
+     * Another identity is unaffected.
      *
      * @return void
      *
@@ -474,10 +441,8 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * A refusal under the identity's cap waits for its sends to leave the
-     * window oldest first, whichever of its challenges they were made for: a
-     * resend of the first challenge, made after the second challenge's send,
-     * leaves after it.
+     * Sends leave oldest first whichever challenge they were for, so a later
+     * resend leaves after an earlier send.
      *
      * @return void
      *
@@ -501,8 +466,6 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * Every resend counts towards the caps.
-     *
      * @return void
      *
      * @throws \Random\RandomException
@@ -522,9 +485,7 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * Each send leaves the send window on its own, a window after it was made:
-     * a challenge's first send stops counting while its resend still does, and
-     * a refusal waits only until enough sends have left for one more.
+     * A refusal waits only until enough sends have left for one more.
      *
      * @return void
      *
@@ -546,8 +507,8 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * Without a generator, a code is the configured number of digits, and every
-     * digit is drawn: across enough codes each of 0 to 9 turns up.
+     * Without a generator every digit is drawn: across enough codes each of 0
+     * to 9 turns up.
      *
      * @return void
      *
@@ -585,8 +546,8 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * A check whose attempt a concurrent check used up first answers from a
-     * fresh read: the challenge is exhausted.
+     * When a concurrent check used up the last attempt first, the challenge is
+     * exhausted.
      *
      * @return void
      *
@@ -604,8 +565,7 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * A check whose code a concurrent resend replaced first is invalid, and the
-     * replacement is untouched.
+     * The replacement code is untouched.
      *
      * @return void
      *
@@ -625,8 +585,8 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * A check whose code a concurrent check used first is missing, and counts
-     * no attempt.
+     * Missing when a concurrent check used the code first, and counts no
+     * attempt.
      *
      * @return void
      *
@@ -645,8 +605,6 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * A check whose challenge a concurrent change removed first is invalid.
-     *
      * @return void
      *
      * @throws \Random\RandomException
@@ -664,8 +622,8 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * A resend that a concurrent resend overtook sends nothing and asks for one
-     * second, leaving the other's code in place.
+     * It sends nothing and asks for one second, leaving the other's code in
+     * place.
      *
      * @return void
      *
@@ -686,8 +644,8 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * The engine over the test configuration with the block's settings changed,
-     * drawing the codes given in order.
+     * The engine with the block's settings changed, drawing the given codes in
+     * order.
      *
      * @param  array<string, mixed>  $settings
      * @param  list<string>  $draws
@@ -709,8 +667,8 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * Run the change once, the first time a challenge is read after this, as a
-     * concurrent request would between a check's read and its writes.
+     * Run the change once on the next challenge read, as a concurrent request
+     * would between a check's read and its writes.
      *
      * @param  \Closure(): mixed  $change
      * @return void
@@ -732,8 +690,6 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * The test's time, to the second.
-     *
      * @return \Carbon\CarbonImmutable
      */
     private static function now(): CarbonImmutable
@@ -742,8 +698,6 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
-     * A binding, with any part changed.
-     *
      * @param  string  $session
      * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @param  string  $application

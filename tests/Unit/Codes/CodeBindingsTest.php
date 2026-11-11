@@ -17,10 +17,6 @@ use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 use Tests\TestCase;
 
 /**
- * Tests for `CodeBindings`: the default senders fail loud until the application
- * binds its own, the code service is built afresh, and the engine is built
- * afresh each time it is resolved.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -30,8 +26,7 @@ use Tests\TestCase;
 final class CodeBindingsTest extends TestCase
 {
     /**
-     * The default SMS and email senders are the ones that fail loud, and are
-     * built afresh.
+     * The default SMS and email senders are the ones that fail loud.
      *
      * @return void
      *
@@ -46,8 +41,7 @@ final class CodeBindingsTest extends TestCase
     }
 
     /**
-     * The code service is built afresh, and the engine, which reads the
-     * configuration on every call, is built afresh.
+     * The engine reads the configuration on every call, so it is built afresh.
      *
      * @return void
      *
@@ -62,8 +56,6 @@ final class CodeBindingsTest extends TestCase
     }
 
     /**
-     * The challenge gateway defaults to the package's own codes, built afresh.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

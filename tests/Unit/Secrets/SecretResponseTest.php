@@ -11,9 +11,6 @@ use SineMacula\Laravel\Mfa\Secrets\SecretResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Tests for `SecretResponse`: secrets are revealed into the body, and the
- * response is never stored.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -29,8 +26,7 @@ final class SecretResponseTest extends TestCase
     private const string URI = 'otpauth://totp/Acme:ben%40example.test?issuer=Acme&secret=' . self::SECRET;
 
     /**
-     * Every secret in the body is revealed, at any depth, and everything else
-     * is kept.
+     * At any depth, and everything else is kept.
      *
      * @return void
      *
@@ -55,7 +51,7 @@ final class SecretResponseTest extends TestCase
     }
 
     /**
-     * The JSON response is sent with `no-store`, so no cache keeps it.
+     * So no cache keeps it.
      *
      * @return void
      */
@@ -68,8 +64,6 @@ final class SecretResponseTest extends TestCase
     }
 
     /**
-     * The status and headers given are kept.
-     *
      * @return void
      */
     public function testJsonKeepsTheStatusAndHeaders(): void
@@ -81,8 +75,7 @@ final class SecretResponseTest extends TestCase
     }
 
     /**
-     * Any response can be sent without being stored, and the same response is
-     * returned.
+     * The same response is returned.
      *
      * @return void
      */
@@ -96,8 +89,6 @@ final class SecretResponseTest extends TestCase
     }
 
     /**
-     * Caching the response allowed is replaced, not added to.
-     *
      * @return void
      */
     public function testWithoutStoringReplacesTheCachingAllowed(): void

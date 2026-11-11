@@ -14,9 +14,6 @@ use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 
 /**
- * Unit tests for `SendResult`: a sent code's challenge and expiry, and a
- * refusal's reason and wait.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -26,8 +23,7 @@ use SineMacula\Laravel\Mfa\Enums\FailureReason;
 final class SendResultTest extends TestCase
 {
     /**
-     * A sent result names the challenge and when its code stops working, and no
-     * reason or wait.
+     * A sent result has no reason or wait.
      *
      * @return void
      */
@@ -44,7 +40,7 @@ final class SendResultTest extends TestCase
     }
 
     /**
-     * A refusal names its reason and wait, and no challenge or expiry.
+     * A refusal has no challenge or expiry.
      *
      * @return void
      */
@@ -60,8 +56,7 @@ final class SendResultTest extends TestCase
     }
 
     /**
-     * A refusal waits at least a second, or not at all when waiting will not
-     * help.
+     * Not at all when waiting will not help.
      *
      * @return void
      */
@@ -73,8 +68,8 @@ final class SendResultTest extends TestCase
     }
 
     /**
-     * A refusal by a challenge's admission carries its reason, and how long a
-     * lockout has left when it ends at a set time.
+     * Carries the reason, and the lockout's remaining time when it ends at a
+     * set time.
      *
      * @return void
      */

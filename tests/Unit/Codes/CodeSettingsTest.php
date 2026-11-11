@@ -14,9 +14,6 @@ use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 use Tests\Fixtures\Codes\CustomMfaCodeMessage;
 
 /**
- * Unit tests for `CodeSettings`: each setting's default, the bounds it accepts,
- * and the message a value past them fails with.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -41,11 +38,8 @@ final class CodeSettingsTest extends TestCase
     }
 
     /**
-     * Each setting takes its default (within its bounds) when unset, reads
-     * either bound as an integer or the digit string `env()` returns, and
-     * refuses a value past either bound, or one that is not an integer, naming
-     * the key and its bounds, both as it is read and when every setting is
-     * validated.
+     * Bounds read as an integer or an `env()` digit string; anything past them
+     * is refused on read and on validation.
      *
      * @param  string  $key
      * @param  \Closure(\SineMacula\Laravel\Mfa\Codes\CodeSettings): int  $read
@@ -82,8 +76,6 @@ final class CodeSettingsTest extends TestCase
     }
 
     /**
-     * The defaults validate.
-     *
      * @return void
      */
     public function testTheDefaultsValidate(): void
@@ -94,8 +86,7 @@ final class CodeSettingsTest extends TestCase
     }
 
     /**
-     * The resend cooldown defaults to 60 seconds and reaches from 0 to the code
-     * lifetime, which bounds it.
+     * Defaults to 60 seconds and reaches from 0 to the code lifetime.
      *
      * @return void
      */
@@ -122,8 +113,7 @@ final class CodeSettingsTest extends TestCase
     }
 
     /**
-     * The challenge lifetime defaults to 30 minutes and reaches from the code
-     * lifetime, which bounds it, to 60 minutes.
+     * Defaults to 30 minutes and reaches from the code lifetime to 60 minutes.
      *
      * @return void
      */
@@ -150,8 +140,8 @@ final class CodeSettingsTest extends TestCase
     }
 
     /**
-     * The email message class defaults to `MfaCodeMessage`, reads a subclass,
-     * and refuses any other class or value.
+     * Defaults to `MfaCodeMessage`, reads a subclass, and refuses any other
+     * class or value.
      *
      * @return void
      */
@@ -169,8 +159,7 @@ final class CodeSettingsTest extends TestCase
     }
 
     /**
-     * Assert each value is refused with the message, as it is read and when
-     * every setting is validated.
+     * Each value is refused with the message, on read and on validation.
      *
      * @param  list<mixed>  $values
      * @param  string  $key
@@ -197,8 +186,6 @@ final class CodeSettingsTest extends TestCase
     }
 
     /**
-     * Build the settings over an `mfa.codes` block.
-     *
      * @param  array<string, mixed>  $block
      * @return \SineMacula\Laravel\Mfa\Codes\CodeSettings
      */

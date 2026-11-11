@@ -29,10 +29,6 @@ use Tests\Fixtures\Secrets\ForgedTrace;
 use Tests\Fixtures\Secrets\RecordedTrace;
 
 /**
- * Tests for `SecretBindings`: the middleware is aliased, and while redaction is
- * on every log channel, configured or resolved already, is tapped and every
- * reported exception scrubbed.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -48,8 +44,6 @@ final class SecretBindingsTest extends TestCase
     private const string APPLICATION_TAP = 'App\Logging\CustomizeFormatter';
 
     /**
-     * The middleware is aliased as `mfa.no-store`.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -64,7 +58,7 @@ final class SecretBindingsTest extends TestCase
     }
 
     /**
-     * Every configured log channel is given the tap, after its own taps.
+     * After its own taps.
      *
      * @return void
      *
@@ -86,8 +80,6 @@ final class SecretBindingsTest extends TestCase
     }
 
     /**
-     * A channel that lists the tap already is not given it again.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -106,9 +98,6 @@ final class SecretBindingsTest extends TestCase
     }
 
     /**
-     * A channel that is not an array, or whose taps are not a list, is left as
-     * it is.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -124,8 +113,6 @@ final class SecretBindingsTest extends TestCase
     }
 
     /**
-     * A channel listed after one that is skipped is still tapped.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -148,8 +135,6 @@ final class SecretBindingsTest extends TestCase
     }
 
     /**
-     * Without log channels, the logging configuration is left as it is.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -164,8 +149,7 @@ final class SecretBindingsTest extends TestCase
     }
 
     /**
-     * With redaction off, no channel is tapped, but the middleware is still
-     * aliased.
+     * The middleware is still aliased.
      *
      * @return void
      *
@@ -182,9 +166,8 @@ final class SecretBindingsTest extends TestCase
     }
 
     /**
-     * A channel the log manager resolved before the package boots, which it
-     * keeps and never taps again, is tapped as the package boots, and a logger
-     * that is not a channel is left as it is.
+     * The log manager keeps such a channel and never taps it again; a logger
+     * that is not a channel is left alone.
      *
      * @return void
      *
@@ -214,9 +197,6 @@ final class SecretBindingsTest extends TestCase
     }
 
     /**
-     * A channel resolved already is tapped though a logger that is not a
-     * channel was resolved before it.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -243,8 +223,7 @@ final class SecretBindingsTest extends TestCase
     }
 
     /**
-     * An exception handler built after the package boots scrubs every exception
-     * it reports before its later reporters see it.
+     * Scrubbed before its later reporters see it.
      *
      * @return void
      *
@@ -266,9 +245,6 @@ final class SecretBindingsTest extends TestCase
     }
 
     /**
-     * An exception handler built before the package boots scrubs every
-     * exception it reports too.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -288,8 +264,6 @@ final class SecretBindingsTest extends TestCase
     }
 
     /**
-     * With redaction off, reported exceptions are not scrubbed.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -307,8 +281,6 @@ final class SecretBindingsTest extends TestCase
     }
 
     /**
-     * An exception handler other than Laravel's is left as it is.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -321,8 +293,6 @@ final class SecretBindingsTest extends TestCase
             public int $reported = 0;
 
             /**
-             * Count the report.
-             *
              * @param  \Throwable  $e
              * @return void
              */
@@ -333,8 +303,6 @@ final class SecretBindingsTest extends TestCase
             }
 
             /**
-             * Report everything.
-             *
              * @param  \Throwable  $e
              * @return bool
              */
@@ -345,8 +313,6 @@ final class SecretBindingsTest extends TestCase
             }
 
             /**
-             * Render nothing.
-             *
              * @param  mixed  $request
              * @param  \Throwable  $e
              * @return \Symfony\Component\HttpFoundation\Response
@@ -358,8 +324,6 @@ final class SecretBindingsTest extends TestCase
             }
 
             /**
-             * Render nothing.
-             *
              * @param  mixed  $output
              * @param  \Throwable  $e
              * @return void
@@ -377,8 +341,6 @@ final class SecretBindingsTest extends TestCase
     }
 
     /**
-     * A container holding the configuration and a router.
-     *
      * @param  bool  $redact
      * @param  ?array<array-key, mixed>  $channels
      * @return \Illuminate\Container\Container
@@ -399,8 +361,6 @@ final class SecretBindingsTest extends TestCase
     }
 
     /**
-     * The container's configuration.
-     *
      * @param  \Illuminate\Container\Container  $container
      * @return \Illuminate\Contracts\Config\Repository
      *
@@ -412,8 +372,6 @@ final class SecretBindingsTest extends TestCase
     }
 
     /**
-     * The exception handler the container resolves.
-     *
      * @param  \Illuminate\Container\Container  $container
      * @return mixed
      *
@@ -425,8 +383,6 @@ final class SecretBindingsTest extends TestCase
     }
 
     /**
-     * Bind Laravel's exception handler.
-     *
      * @param  \Illuminate\Container\Container  $container
      * @return void
      */
@@ -436,9 +392,8 @@ final class SecretBindingsTest extends TestCase
     }
 
     /**
-     * Report an exception whose trace holds a code passed into the package, and
-     * return the strings its trace recorded as arguments, as a reporter
-     * registered after the package's sees them.
+     * The strings a later reporter sees as trace arguments for an exception
+     * carrying a code into the package.
      *
      * @param  \Illuminate\Container\Container  $container
      * @return list<string>

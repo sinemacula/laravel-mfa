@@ -11,9 +11,6 @@ use SineMacula\Laravel\Mfa\Attempts\ChallengeOutcome;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 
 /**
- * Unit tests for `ChallengeOutcome`: passed, failed and counted, or refused and
- * counted nowhere.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -23,8 +20,6 @@ use SineMacula\Laravel\Mfa\Enums\FailureReason;
 final class ChallengeOutcomeTest extends TestCase
 {
     /**
-     * A pass has no reason and was counted.
-     *
      * @return void
      */
     public function testAPass(): void
@@ -38,8 +33,6 @@ final class ChallengeOutcomeTest extends TestCase
     }
 
     /**
-     * A failure carries its reason and detail, and was counted.
-     *
      * @return void
      */
     public function testAFailure(): void
@@ -54,8 +47,7 @@ final class ChallengeOutcomeTest extends TestCase
     }
 
     /**
-     * A refusal was counted nowhere, and a lockout says when it ends if it
-     * does.
+     * A lockout says when it ends, if it does.
      *
      * @return void
      */
