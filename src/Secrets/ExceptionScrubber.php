@@ -5,47 +5,14 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Secrets;
 
 /**
- * Scrubs an exception of the secrets, codes and full destinations it recorded,
- * so none passed down the stack reaches a log, an error tracker or a rendered
- * error page.
+ * Redacts secrets, codes and destinations from an exception chain's messages
+ * and traces, since PHP records call arguments unless
+ * `zend.exception_ignore_args` is on.
  *
- * A trace records every argument of every call unless PHP runs with
- * `zend.exception_ignore_args` on, and its string form shows the start of each
- * string. A frame cannot say which of its arguments is a code, so every
- * argument of a frame that touches this package is replaced with `[redacted]`:
- * a call into one of its classes, and a call made from one of its files.
- *
- * What the package passes on travels further down the stack, and up it too: a
- * facade call records the code in the facade's frame, and the code the package
- * hands to a hasher or an encrypter is recorded again in every frame below. So
- * every string the package's frames received, every value any frame marks as
- * sensitive (a `\SensitiveParameterValue` or a `RevealedSecret`), and every
- * value under a key naming a secret, a code or a destination is collected
- * before anything is scrubbed, and redacted wherever it appears in another
- * frame: a string equal to one, and a string containing one of six characters
- * or more. A code message (a `CodeMessage`, an `MfaCodeMessage`, or a queued
- * job sending one) becomes `[redacted]` in every frame, and its code and its
- * destination or its recipients' addresses are redacted from any string
- * containing them, whatever their length. Other arguments are kept, with the
- * secrets in them redacted as `Redactor` redacts a log context, and other
- * objects are kept as they are.
- *
- * The values collected are redacted from the message of every exception in the
- * chain too, each occurrence replaced by `[redacted]`, and so is every
- * `otpauth://` provisioning URI. A caller that knows what it handed down, as
- * the delivery of a code does, gives those values to `scrub()`: they are
- * redacted from every message and every frame, whatever their length, and do
- * not depend on PHP recording arguments at all. The exception and every
- * previous one are scrubbed in place, and what one of them passed on is
- * redacted in all of them. A failed query on one of the package's tables is
- * masked first (see `QueryExceptionMask`), so nothing it was given stays.
- *
- * The package scrubs every exception the application's exception handler
- * reports, and every exception in a log record's context, unless
- * `mfa.secrets.redact` is off. An error reporter registered on the handler
- * before the package booted sees the exception first: call `scrub()` from the
- * application's own `report` callback ahead of it, or run PHP with
- * `zend.exception_ignore_args` on, as its production configuration does.
+ * A frame cannot say which argument is a code, so every argument of a frame
+ * touching the package is redacted, and the strings it received are redacted
+ * wherever else they appear. Reporters registered before the package booted see
+ * the exception first: call `scrub()` ahead of them.
  *
  * @api
  *
@@ -54,7 +21,7 @@ namespace SineMacula\Laravel\Mfa\Secrets;
  */
 final class ExceptionScrubber
 {
-    /** @var string The namespace of the package's classes. */
+    /** @var string */
     private const string PACKAGE_NAMESPACE = 'SineMacula\Laravel\Mfa\\';
 
     /**
@@ -63,9 +30,7 @@ final class ExceptionScrubber
     private function __construct() {}
 
     /**
-     * Scrub the message and the trace of the exception and of every previous
-     * one, redacting the values known to be sensitive too, whatever their
-     * length.
+     * Known values the caller handed down are redacted whatever their length.
      *
      * @param  \Throwable  $throwable
      * @param  ?string  ...$known
@@ -77,9 +42,7 @@ final class ExceptionScrubber
     }
 
     /**
-     * Scrub the message and the trace of the exception and of every previous
-     * one, redacting the sensitive values given too, each as its kind is
-     * redacted: those a log record holds, for an exception logged with it.
+     * For an exception logged with a record, redacting the values it holds.
      *
      * @param  \Throwable  $throwable
      * @param  \SineMacula\Laravel\Mfa\Secrets\SensitiveValues  $sensitive
@@ -101,9 +64,7 @@ final class ExceptionScrubber
     }
 
     /**
-     * Scrub only the trace of the exception and of every previous one,
-     * redacting the sensitive values given too, for a caller that rewrites the
-     * messages itself.
+     * For a caller that rewrites the messages itself.
      *
      * @param  \Throwable  $throwable
      * @param  \SineMacula\Laravel\Mfa\Secrets\SensitiveValues  $sensitive
@@ -122,10 +83,8 @@ final class ExceptionScrubber
     }
 
     /**
-     * The sensitive values the exception and every previous one recorded in
-     * their traces, as `scrub()` collects them, read without scrubbing
-     * anything, so a log record's message copied from the exception's can be
-     * redacted of them first.
+     * Read without scrubbing, so a log message copied from the exception can be
+     * redacted first.
      *
      * @param  \Throwable  $throwable
      * @return \SineMacula\Laravel\Mfa\Secrets\SensitiveValues
@@ -138,8 +97,6 @@ final class ExceptionScrubber
     }
 
     /**
-     * The sensitive values recorded in the traces of the chain.
-     *
      * @param  list<\Throwable>  $chain
      * @return \SineMacula\Laravel\Mfa\Secrets\SensitiveValues
      */
@@ -163,8 +120,7 @@ final class ExceptionScrubber
     }
 
     /**
-     * The exception and every previous one, each once, so a chain that loops
-     * back ends.
+     * Each exception once, so a chain that loops back ends.
      *
      * @param  \Throwable  $throwable
      * @return list<\Throwable>
@@ -181,8 +137,6 @@ final class ExceptionScrubber
     }
 
     /**
-     * The trace recorded in the exception.
-     *
      * @param  \Throwable  $throwable
      * @return list<array<string, mixed>>
      */
@@ -193,9 +147,6 @@ final class ExceptionScrubber
     }
 
     /**
-     * Redact every sensitive value and every provisioning URI in the
-     * exception's message.
-     *
      * @param  \Throwable  $throwable
      * @param  \SineMacula\Laravel\Mfa\Secrets\SensitiveValues  $values
      * @return void
@@ -206,8 +157,6 @@ final class ExceptionScrubber
     }
 
     /**
-     * Scrub the arguments recorded in the exception's own trace.
-     *
      * @param  \Throwable  $throwable
      * @param  \SineMacula\Laravel\Mfa\Secrets\SensitiveValues  $values
      * @return void
@@ -220,9 +169,7 @@ final class ExceptionScrubber
     }
 
     /**
-     * The frame with its arguments scrubbed: all of them for a frame that
-     * touches the package; for any other, the secrets in them and the sensitive
-     * values collected.
+     * Redacts every argument of a frame touching the package.
      *
      * @param  array<string, mixed>  $frame
      * @param  \SineMacula\Laravel\Mfa\Secrets\SensitiveValues  $values
@@ -242,8 +189,7 @@ final class ExceptionScrubber
     }
 
     /**
-     * Whether the frame is a call into one of the package's classes, or a call
-     * made from one of its files.
+     * A call into one of the package's classes, or from one of its files.
      *
      * @param  array<string, mixed>  $frame
      * @return bool
@@ -258,9 +204,7 @@ final class ExceptionScrubber
     }
 
     /**
-     * A property of `\Exception` or `\Error`. Neither has a setter for its
-     * message or its trace, so they can only be rewritten in place through
-     * reflection.
+     * Reflection, as `\Exception` and `\Error` have no message or trace setter.
      *
      * @param  \Throwable  $throwable
      * @param  string  $name

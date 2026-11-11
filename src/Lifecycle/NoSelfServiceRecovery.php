@@ -10,8 +10,8 @@ use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 
 /**
- * The default `SelfServiceRecovery`: none is offered, so a person who has lost
- * every factor and their recovery codes is reset by someone else.
+ * Offers no self-service recovery, so a person who has lost every factor and
+ * their recovery codes is reset by someone else.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -19,8 +19,6 @@ use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 final class NoSelfServiceRecovery implements SelfServiceRecovery
 {
     /**
-     * Whether the application offers the identity self-service recovery: never.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return bool
@@ -32,8 +30,6 @@ final class NoSelfServiceRecovery implements SelfServiceRecovery
     }
 
     /**
-     * Refuse to start a recovery, changing nothing.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return void

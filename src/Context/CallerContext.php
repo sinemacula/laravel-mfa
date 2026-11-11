@@ -11,21 +11,10 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 
 /**
- * Who an action is served to, as plain values: the identity the caller
- * authenticated as, or the pending session it holds, the application it acts
- * on, and its client. Every self-service action takes one first.
- *
- * It is trusted input from the application's own code, not proof of who the
- * caller is: building one authenticates nobody. The action decides whether it
- * serves the caller (a pending session only what its credential allows, and
- * only a person), and re-checks under the identity's lock that the pending
- * credential still validates, or that the store's current sign-in is still the
- * one the action began on. The sign-in is never carried here: it is read from
- * the proof store for the identity and the application.
- *
- * `fromRequest()` is the one place it is read from a request. With no request,
- * as in a queued job or a console command, build one with `forIdentity()`,
- * `forPending()` or `nobody()`.
+ * Who an action is served to. Trusted input from the application's own code:
+ * building one authenticates nobody, and each action re-checks the caller under
+ * the identity's lock. The sign-in is read from the proof store, never carried
+ * here.
  *
  * @api
  *
@@ -35,8 +24,6 @@ use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 final readonly class CallerContext
 {
     /**
-     * Constructor.
-     *
      * @param  ?\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  ?\SineMacula\Laravel\Mfa\Context\PendingContext  $pending
      * @param  string  $application
@@ -46,13 +33,13 @@ final readonly class CallerContext
      */
     private function __construct(
 
-        /** The identity the caller authenticated as, or the pending session's, or `null` when it is nobody. */
+        /** `null` for nobody. */
         public ?MultiFactorAuthenticatable $identity,
 
-        /** The pending session the caller holds, or `null` for an active one. */
+        /** `null` on an active session. */
         public ?PendingContext $pending,
 
-        /** The application the caller acts on. */
+        /** The application acted on. */
         public string $application,
 
         /** The caller's client. */
@@ -64,8 +51,6 @@ final readonly class CallerContext
     }
 
     /**
-     * An identity on an active session of the application.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
@@ -79,8 +64,6 @@ final readonly class CallerContext
     }
 
     /**
-     * A pending session, on its own identity and application.
-     *
      * @param  \SineMacula\Laravel\Mfa\Context\PendingContext  $pending
      * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
      * @return self
@@ -93,8 +76,7 @@ final readonly class CallerContext
     }
 
     /**
-     * Nobody, on the application: every action that serves a caller serves
-     * nothing.
+     * Every action that serves a caller serves nothing.
      *
      * @param  string  $application
      * @param  ?\SineMacula\Laravel\Mfa\Context\ClientContext  $client
@@ -108,16 +90,9 @@ final readonly class CallerContext
     }
 
     /**
-     * The caller of the request, through the guard named, or the default one.
-     *
-     * The bound `PendingSessionResolver` is asked first: a pending session it
-     * reads is the caller, and an invalid pending credential it throws for is
-     * not caught, so the request is refused rather than served as the guard's
-     * user. Otherwise the caller is the user the named guard authenticated for
-     * the request, when it is one this package serves, or nobody. The
-     * application is the one a bound `ApplicationResolver` names for the
-     * request, through the guard when it is a `GuardApplicationResolver`, or
-     * else the guard's name (see `RequestApplication`).
+     * A pending session wins over the guard's user, and an invalid pending
+     * credential throws so the request is refused rather than served as that
+     * user.
      *
      * @param  \Illuminate\Http\Request  $request
      * @param  ?string  $guard

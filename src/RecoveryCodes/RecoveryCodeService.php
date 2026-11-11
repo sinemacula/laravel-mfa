@@ -42,26 +42,12 @@ use SineMacula\Laravel\Mfa\Support\FactorOwnerColumns;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 
 /**
- * Generates, redeems, reports, removes and prunes an identity's recovery codes:
- * a fallback for lost factors, never a factor of their own. A redemption is
- * reached through `Verification\VerificationService`, which holds the
- * identity's lock, makes and hands over the proof, and reports the
- * verification; generating a set for the person the request serves is gated by
- * `RecoveryCodeIssuance`.
+ * An identity's one recovery code set, shared by every application: a fallback
+ * for lost factors, never a factor of its own.
  *
- * An identity has one set, shared by every application; each application
- * decides whether it accepts recovery codes. A set is generated for an identity
- * with a confirmed factor only, and replaces any earlier one in the identity's
- * factor state transaction (see `Support\FactorStateTransaction`), so a
- * redemption, which takes the same lock, finds either the old set intact or the
- * new one, never both and never neither. Codes are stored hashed with the
- * application's Laravel hasher, salted, and a redemption checks the submitted
- * code against every unused code of the set as one attempt, with the same work
- * whichever code matches, if any. Every event is dispatched through
- * `Events\EventDispatcher`, once the change it reports has committed.
- *
- * The application of every operation is the one it is given, and no request is
- * read.
+ * A set is replaced under the identity's factor state lock, so a redemption
+ * sees the old set or the new one, never both. Codes are stored with the salted
+ * Laravel hasher, and events are dispatched once the change commits.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -70,15 +56,13 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
  */
 final readonly class RecoveryCodeService
 {
-    /** @var string The type a recovery code is reported and proved as. */
+    /** @var string Type a recovery code is reported and proved as. */
     public const string TYPE = 'recovery_code';
 
-    /** @var \SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeRows The identity's stored codes and the set's state. */
+    /** @var \SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeRows */
     private RecoveryCodeRows $rows;
 
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @param  \SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeGenerator  $generator
@@ -90,55 +74,39 @@ final readonly class RecoveryCodeService
      */
     public function __construct(
 
-        /** The container the hasher is read from on every call. */
+        /** The hasher is resolved per call. */
         private Container $container,
 
-        /** The configuration the settings and models are read from on every call. */
+        /** Read on every call so changed settings apply. */
         private Repository $config,
 
-        /** The generator of new sets. */
+        /** Draws new sets. */
         private RecoveryCodeGenerator $generator,
 
-        /** The guard that refuses a machine or inactive identity. */
+        /** Refuses a machine or inactive identity. */
         private OperationGuard $guard,
 
-        /** The attempt service a redemption is counted through. */
+        /** Counts redemptions as attempts. */
         private AttemptService $attempts,
 
-        /** The dispatcher of the recovery code events. */
+        /** Dispatches the recovery code events. */
         private EventDispatcher $events,
 
-        /** The reader of the session's first factor. */
+        /** Reads the session's first factor. */
         private SessionFirstFactor $firstFactors,
 
-        /** The resolver of who the request serves. */
+        /** Resolves who the request serves. */
         private CallerContextResolver $callers,
     ) {
         $this->rows = new RecoveryCodeRows($config);
     }
 
     /**
-     * Generate a new set for the identity, replacing any earlier one, and
-     * return its codes, once, as secrets for the response.
+     * Replace any earlier set and return the new codes, revealed once.
      *
-     * Refused with an `OperationRefusedException` for a machine or inactive
-     * identity, when the application does not accept recovery codes
-     * (`type_not_enabled`), and when the identity has no confirmed factor
-     * (`no_factor`), checked again under the lock. The codes are drawn and
-     * hashed before the lock is taken; under it, every code of the identity not
-     * yet replaced is marked replaced, the new codes are stored under the next
-     * generation, and the generation and its time are recorded on the
-     * identity's state row, so all of it commits or none does: a save a model
-     * event cancels throws `WriteCanceledException` and rolls it all back.
-     * `RecoveryCodesGenerated` is dispatched once it has committed. The codes
-     * are returned unformatted, in the order they were drawn. The application
-     * is the current request's unless the caller names the one it acts on, and
-     * the event names the sign-in given, when the operation captured one.
-     *
-     * A gate, when given, refuses by throwing: it runs before the codes are
-     * drawn, given no factors, and again first under the lock, given the
-     * identity's factors as stored there, so what it checks holds when the old
-     * set is replaced, and a refusal leaves the old set intact.
+     * The gate refuses by throwing; it runs before drawing with no factors and
+     * again under the lock with the stored factors, so a refusal keeps the old
+     * set.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -162,19 +130,15 @@ final readonly class RecoveryCodeService
     ): array {
         ['codes' => $codes, 'generation' => $generation] = $this->replaceSet($identity, $application, $gate);
 
-        // Dispatched from out here, so inside a caller's transaction it keeps
-        // its place among the caller's events rather than running ahead of them
-        // with this nested transaction's.
+        // Outside the transaction so it keeps its order in a caller's events.
         $this->reportGenerated($identity, $application, count($codes), $generation, $actor, $client, $signInId);
 
         return $codes;
     }
 
     /**
-     * Everything `generate()` does up to the commit, reporting nothing: for a
-     * caller that must tell a refusal from a listener's failure once the change
-     * has committed, and reports with `reportGenerated()` itself. Returns the
-     * codes, once, as secrets for the response, and the set's generation.
+     * `generate()` without the event, for a caller that must tell a refusal
+     * from a listener's failure and reports with `reportGenerated()` itself.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -224,9 +188,6 @@ final readonly class RecoveryCodeService
     }
 
     /**
-     * Report a set of the given size and generation as generated, once the
-     * change it belongs to has committed.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @param  int  $count
@@ -252,11 +213,8 @@ final readonly class RecoveryCodeService
     }
 
     /**
-     * Whether a recovery code may be tried for the identity under the binding,
-     * read under its factor state lock, which the caller holds: it must be an
-     * active person, on an application that accepts recovery codes, with a
-     * confirmed factor as stored, and a session whose first factor is known.
-     * Nothing is hashed for a refused attempt, and nothing is counted.
+     * Whether a code may be tried, read under the caller's lock; a refusal is
+     * neither hashed nor counted.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -287,18 +245,9 @@ final readonly class RecoveryCodeService
     }
 
     /**
-     * Redeem a code under the binding: one attempt against every unused code of
-     * the identity's set, inside the identity's factor state transaction, which
-     * the caller holds. It records no proof and reports nothing, so a refusal
-     * that follows rolls the code's use back with the count.
-     *
-     * The attempt is made through the attempt service: refused without checking
-     * anything while a lockout applies, and counted against the identity
-     * otherwise. The submitted code, normalised (see `RecoveryCodeNormalizer`),
-     * is checked against every unused code of the current generation with the
-     * hasher, without stopping at a match, and a match is marked used by a
-     * statement that changes it only while it is still unused. A malformed code
-     * is checked the same way, against a placeholder, and matches nothing.
+     * One counted attempt against every unused code, inside the caller's factor
+     * state transaction; it reports nothing, so a later refusal rolls the use
+     * back.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $code
@@ -331,10 +280,6 @@ final readonly class RecoveryCodeService
     }
 
     /**
-     * Report a redemption that left the given number of codes unused, once it
-     * has committed: `RecoveryCodeUsed`, and `RecoveryCodesLow` when the set is
-     * left at or below its low count.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  int  $remaining
@@ -359,10 +304,6 @@ final readonly class RecoveryCodeService
     }
 
     /**
-     * Where the identity's set stands, read in one statement from the write
-     * connection, so the count and the generation it counts are of the same
-     * set. No lock is taken.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return \SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeStatus
      *
@@ -375,9 +316,7 @@ final readonly class RecoveryCodeService
     }
 
     /**
-     * Where the set of the identity the request serves for listing factors
-     * stands: a pending session's when its credential allows listing them,
-     * otherwise the signed-in person's; `null` when it serves nobody.
+     * Null when the request serves nobody allowed to list factors.
      *
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $context
      * @return ?\SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeStatus
@@ -394,17 +333,8 @@ final readonly class RecoveryCodeService
     }
 
     /**
-     * Remove the identity's set, as with its last confirmed factor: every code
-     * row is deleted and the set's time cleared; the generation is kept, so it
-     * only ever rises. `RecoveryCodesRemoved` is dispatched once the removal
-     * commits when there was a set, used up or not, or any code row. Returns
-     * whether there was.
-     *
-     * It must run inside the identity's factor state transaction, holding its
-     * lock, as part of the change that removes the factor; a call with no
-     * transaction open on the storage connection is refused with a
-     * `LogicException`, and a save of the state row a model event cancels
-     * throws `WriteCanceledException`, which rolls the removal back with it.
+     * Delete the set inside the factor state transaction and return whether
+     * there was one; the generation is kept so it only ever rises.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  ?\SineMacula\Laravel\Mfa\Events\Actor  $actor
@@ -429,11 +359,8 @@ final readonly class RecoveryCodeService
     }
 
     /**
-     * Delete the identity's recovery codes and clear when they were generated,
-     * under the lock of its state row, reporting nothing, and return whether it
-     * had a set: for a caller with more to do before the removal is reported,
-     * which then calls `reportSetRemoved()`. Refused and rolled back as
-     * `removeSet()` is.
+     * `removeSet()` without the event, for a caller that reports with
+     * `reportSetRemoved()` itself.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return bool
@@ -452,9 +379,6 @@ final readonly class RecoveryCodeService
     }
 
     /**
-     * Report that the identity's recovery code set was removed, once the
-     * storage connection commits.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  ?\SineMacula\Laravel\Mfa\Events\Actor  $actor
      * @param  ?string  $application
@@ -475,10 +399,7 @@ final readonly class RecoveryCodeService
     }
 
     /**
-     * Delete every code used, or replaced by a newer set, before the given
-     * time, and return how many. A code still usable is never deleted, and the
-     * identity's state row is left as it is. Deleted a limited batch at a time,
-     * as a mass delete, so no model event fires. Dispatches nothing.
+     * Delete codes used or replaced before the time, without model events.
      *
      * @param  \Carbon\CarbonInterface  $before
      * @return int
@@ -493,9 +414,6 @@ final readonly class RecoveryCodeService
     }
 
     /**
-     * Refuse generating a set for a machine or inactive identity, or on an
-     * application that does not accept recovery codes.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return void
@@ -512,8 +430,6 @@ final readonly class RecoveryCodeService
     }
 
     /**
-     * Refuse generating a set for an identity without a confirmed factor.
-     *
      * @param  bool  $confirmed
      * @param  string  $detail
      * @return void
@@ -528,9 +444,6 @@ final readonly class RecoveryCodeService
     }
 
     /**
-     * Under the identity's lock: check the normalised code against every unused
-     * code of the current generation and mark the match used.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  ?string  $normalized
      * @return \SineMacula\Laravel\Mfa\RecoveryCodes\Redemption
@@ -552,8 +465,7 @@ final readonly class RecoveryCodeService
     }
 
     /**
-     * The redemption the attempt's check made: an attempt no lockout refused
-     * always runs the check, so a missing one is a defect.
+     * An attempt no lockout refused always runs the check.
      *
      * @param  ?\SineMacula\Laravel\Mfa\RecoveryCodes\Redemption  $checked
      * @return \SineMacula\Laravel\Mfa\RecoveryCodes\Redemption
@@ -566,11 +478,8 @@ final readonly class RecoveryCodeService
     }
 
     /**
-     * Determine whether the identity still has a confirmed factor, read with a
-     * locking read under the identity's lock. The factors are matched to the
-     * owner exactly and their status compared in PHP (see
-     * `Factors\ConfirmedFactors`), as a collation that ignores case or padding
-     * would let a status such as `CONFIRMED` admit a code in SQL.
+     * Status is compared in PHP because a case- or padding-insensitive
+     * collation would let `CONFIRMED` admit a code in SQL.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofOwner  $owner
      * @return bool
@@ -595,8 +504,6 @@ final readonly class RecoveryCodeService
     }
 
     /**
-     * The application's hasher, resolved on every call.
-     *
      * @return \Illuminate\Contracts\Hashing\Hasher
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

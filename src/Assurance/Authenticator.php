@@ -9,18 +9,11 @@ use SineMacula\Laravel\Mfa\Enums\KeyProtection;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 
 /**
- * What one proof shows as an authenticator, in NIST SP 800-63B-4's terms:
- * whether it is something the person knows or has, whether it is a multi-factor
- * authenticator on its own, whether it is restricted, whether it resisted
- * phishing, and the RFC 8176 `amr` values it adds.
+ * One proof classified in NIST SP 800-63B-4 terms, with its RFC 8176 `amr`
+ * values, from its driver-fixed channel and observed properties only.
  *
- * The answers come from the channel the proof travelled on, which the driver
- * fixes, and from the properties the proof actually observed, never from a type
- * name or from configuration. A password is something known; an SMS code, a
- * TOTP code, a recovery code and a passkey are something had; a passkey whose
- * assertion was observed to verify the person is a multi-factor authenticator.
- * An email code is not an out-of-band authenticator, and an external provider's
- * result says nothing this package can classify, so neither is either.
+ * An email code is not out-of-band and an external provider's result cannot be
+ * classified, so neither is something known or had.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -29,30 +22,28 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
  */
 final readonly class Authenticator
 {
-    /** @var string The `amr` value of a password. */
+    /** @var string */
     private const string AMR_PASSWORD = 'pwd';
 
-    /** @var string The `amr` value of a code sent by SMS. */
+    /** @var string */
     private const string AMR_SMS = 'sms';
 
-    /** @var string The `amr` value of a one-time code: TOTP, email or recovery code. */
+    /** @var string TOTP, email or recovery code. */
     private const string AMR_ONE_TIME_CODE = 'otp';
 
-    /** @var string The `amr` value of a proof of possession of a key. */
+    /** @var string */
     private const string AMR_PROOF_OF_POSSESSION = 'pop';
 
-    /** @var string The `amr` value of observed user presence. */
+    /** @var string */
     private const string AMR_USER_PRESENCE = 'user';
 
-    /** @var string The `amr` value of an observed hardware-protected key. */
+    /** @var string */
     private const string AMR_HARDWARE_KEY = 'hwk';
 
-    /** @var string The `amr` value of an observed software-protected key. */
+    /** @var string */
     private const string AMR_SOFTWARE_KEY = 'swk';
 
     /**
-     * Constructor.
-     *
      * @param  bool  $knowledge
      * @param  bool  $possession
      * @param  bool  $multiFactor
@@ -62,19 +53,19 @@ final readonly class Authenticator
      */
     private function __construct(
 
-        /** Whether the proof is something the person knows. */
+        /** Something the person knows. */
         public bool $knowledge,
 
-        /** Whether the proof is something the person has. */
+        /** Something the person has. */
         public bool $possession,
 
-        /** Whether the proof is a multi-factor authenticator on its own. */
+        /** A multi-factor authenticator on its own. */
         public bool $multiFactor,
 
-        /** Whether the proof is a restricted authenticator. */
+        /** A restricted authenticator. */
         public bool $restricted,
 
-        /** Whether the proof was observed to resist phishing. */
+        /** Observed to resist phishing. */
         public bool $phishingResistant,
 
         /** The `amr` values the proof adds. */
@@ -82,8 +73,7 @@ final readonly class Authenticator
     ) {}
 
     /**
-     * What the given proof shows as an authenticator. A proof without a channel
-     * is a recovery code.
+     * A proof without a channel is a recovery code.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @return self
@@ -96,15 +86,15 @@ final readonly class Authenticator
         return new self(
             knowledge: $kind === ChannelKind::PASSWORD,
             possession: self::isPossession($kind),
-            multiFactor: self::isMultiFactor($kind, $properties),
-            restricted: $kind === ChannelKind::SMS,
+            multiFactor: $kind === ChannelKind::PASSKEY && $properties->userVerification === true,
+            restricted: $kind  === ChannelKind::SMS,
             phishingResistant: $properties->phishingResistance ?? false,
             amr: self::amrOf($kind, $properties),
         );
     }
 
     /**
-     * Whether the proof can establish a level: something known or had.
+     * Something known or had.
      *
      * @return bool
      */
@@ -114,9 +104,6 @@ final readonly class Authenticator
     }
 
     /**
-     * Whether a proof on a channel of the given kind, or a recovery code when
-     * there is none, is something the person has.
-     *
      * @param  ?\SineMacula\Laravel\Mfa\Enums\ChannelKind  $kind
      * @return bool
      */
@@ -132,22 +119,7 @@ final readonly class Authenticator
     }
 
     /**
-     * Whether a proof on a channel of the given kind, with what it observed, is
-     * a multi-factor authenticator: a passkey whose assertion verified the
-     * person.
-     *
-     * @param  ?\SineMacula\Laravel\Mfa\Enums\ChannelKind  $kind
-     * @param  \SineMacula\Laravel\Mfa\Assurance\ObservedProperties  $properties
-     * @return bool
-     */
-    private static function isMultiFactor(?ChannelKind $kind, ObservedProperties $properties): bool
-    {
-        return $kind === ChannelKind::PASSKEY && $properties->userVerification === true;
-    }
-
-    /**
-     * The `amr` values of a proof: its method's, then user presence and key
-     * protection, each only when it was observed.
+     * The method's value, then user presence and key protection when observed.
      *
      * @param  ?\SineMacula\Laravel\Mfa\Enums\ChannelKind  $kind
      * @param  \SineMacula\Laravel\Mfa\Assurance\ObservedProperties  $properties
@@ -165,9 +137,7 @@ final readonly class Authenticator
     }
 
     /**
-     * The `amr` value of the method a proof on a channel of the given kind
-     * used, or of a recovery code when there is none; `null` for a channel this
-     * package cannot classify.
+     * `null` for a channel this package cannot classify.
      *
      * @param  ?\SineMacula\Laravel\Mfa\Enums\ChannelKind  $kind
      * @return ?string
@@ -187,9 +157,6 @@ final readonly class Authenticator
     }
 
     /**
-     * The `amr` value of the observed protection of a key, or `null` when none
-     * was observed.
-     *
      * @param  ?\SineMacula\Laravel\Mfa\Enums\KeyProtection  $protection
      * @return ?string
      */

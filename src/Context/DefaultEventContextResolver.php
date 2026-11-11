@@ -10,11 +10,8 @@ use SineMacula\Laravel\Mfa\Events\EventSubject;
 use SineMacula\Laravel\Mfa\Support\IdentityType;
 
 /**
- * The event context without an authentication layer: the identity, and the IP
- * address and user agent of the client the action was served to (the event adds
- * the application it ran through). It knows no principal, tenant or session,
- * which stay `null`: the Laravel session's id is a bearer secret and never
- * leaves it.
+ * Event context without an authentication layer: identity and client only. The
+ * session stays `null` because the Laravel session id is a bearer secret.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -24,10 +21,7 @@ use SineMacula\Laravel\Mfa\Support\IdentityType;
 final readonly class DefaultEventContextResolver implements EventContextResolver
 {
     /**
-     * The context of an event about the subject: its identity's type and id,
-     * and the client's IP address and user agent when they are known. The
-     * sign-in is this package's own id, not a session of any authentication
-     * layer, so it is not given as the session.
+     * The sign-in id is this package's own, so it is not given as the session.
      *
      * @param  \SineMacula\Laravel\Mfa\Events\EventSubject  $subject
      * @return array<string, int|string|null>

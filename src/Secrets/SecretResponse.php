@@ -8,16 +8,8 @@ use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Sends the secrets the package returns once, and nothing else, in a response
- * no cache keeps.
- *
- * `json()` reveals every `RevealedSecret` in the body, at any depth, and sends
- * it with `Cache-Control: no-store` and `Pragma: no-cache`, so neither a
- * browser nor a proxy stores the one response that shows them.
- * `withoutStoring()` sets the same headers on any response, replacing whatever
- * caching it allowed; the `mfa.no-store` middleware applies it to every
- * response of the routes it is placed on, which also covers a secret a route
- * reveals itself.
+ * Sends one-time secrets with `Cache-Control: no-store` so no browser or proxy
+ * keeps the only response that shows them.
  *
  * @api
  *
@@ -32,8 +24,7 @@ final class SecretResponse
     private function __construct() {}
 
     /**
-     * A JSON response of the data with every secret in it revealed, never
-     * stored.
+     * Reveals every `RevealedSecret` in the data, at any depth.
      *
      * @param  array<array-key, mixed>  $data
      * @param  int  $status
@@ -46,8 +37,7 @@ final class SecretResponse
     }
 
     /**
-     * The response, sent with `Cache-Control: no-store` and `Pragma: no-cache`
-     * in place of any caching it allowed.
+     * Replaces any caching headers the response had.
      *
      * @template TResponse of \Symfony\Component\HttpFoundation\Response
      *
@@ -63,9 +53,6 @@ final class SecretResponse
     }
 
     /**
-     * The data with every secret in it, at any depth, replaced by its
-     * plaintext.
-     *
      * @param  array<array-key, mixed>  $data
      * @return array<array-key, mixed>
      */

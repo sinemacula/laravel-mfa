@@ -16,20 +16,9 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 
 /**
- * The first factor a session started with, read only from a trusted source, so
- * the combination policy can decide which factor may follow it.
- *
- * For a pending session it is the pending context's own first factor, when it
- * is of the identity's current verification generation and not dated after now.
- * For an active one it is the latest first factor the proof store holds for the
- * identity's current sign-in, or, when it holds none, the bound
- * `FirstFactorResolver`'s answer, which counts only when it is a first factor
- * of the identity on the application, bound to the current sign-in, made under
- * the identity's current verification generation and not after now. A session
- * whose first factor is not known has none, so no factor is accepted after it.
- *
- * Stateless: the request, the store and the resolver are resolved on every
- * call.
+ * The first factor a session started with, read only from a trusted source so
+ * the combination policy can decide which factor may follow it. An unknown
+ * first factor accepts no factor after it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -39,22 +28,17 @@ use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 final readonly class SessionFirstFactor
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      */
     public function __construct(
 
-        /** The container the store is resolved from. */
+        /** The store and resolver are resolved on every call. */
         private Container $container,
     ) {}
 
     /**
-     * The first factor of the session the binding names: the pending session's
-     * when the caller holds one and the binding names it, otherwise the
-     * identity's current sign-in's when the binding names it; `null` for any
-     * other session. A caller holding a pending session is never answered from
-     * an active sign-in, so its credential reaches no other session.
+     * A caller holding a pending session is never answered from an active
+     * sign-in, so its credential reaches no other session.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -84,10 +68,6 @@ final readonly class SessionFirstFactor
     }
 
     /**
-     * The pending session's first factor, when it may still count: a first
-     * factor of the identity on the pending session, made under the identity's
-     * current verification generation and not after now.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Context\PendingContext  $pending
      * @return ?\SineMacula\Laravel\Mfa\Proofs\Proof
@@ -100,9 +80,6 @@ final readonly class SessionFirstFactor
     }
 
     /**
-     * The first factor of the identity's current sign-in on the application, or
-     * `null` when it has no sign-in or its first factor is not known.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
      * @return ?\SineMacula\Laravel\Mfa\Proofs\Proof
@@ -118,10 +95,8 @@ final readonly class SessionFirstFactor
     }
 
     /**
-     * The proofs of the identity's current sign-in on the application that
-     * still count, oldest first, with its first factor ahead of them when the
-     * store holds none and the bound resolver reports a trusted one; none
-     * without a sign-in.
+     * Oldest first, led by a trusted resolver's first factor when the store
+     * holds none.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -138,10 +113,8 @@ final readonly class SessionFirstFactor
     }
 
     /**
-     * The proofs of the identity's sign-in on the application the session
-     * names, as `proofs()` reads them, read only for that sign-in: none when it
-     * is no longer the identity's current sign-in there, so a sign-in replaced
-     * between two reads lends its successor's proofs to neither.
+     * Pinned to the named sign-in, so one replaced between two reads lends its
+     * successor's proofs to neither.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -167,9 +140,7 @@ final readonly class SessionFirstFactor
     }
 
     /**
-     * The first factor of the identity's sign-in on the application the session
-     * names: the one the store records for it, or else the bound resolver's,
-     * when it may count for that sign-in.
+     * The latest recorded first factor, else the bound resolver's.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -191,9 +162,8 @@ final readonly class SessionFirstFactor
     }
 
     /**
-     * The bound resolver's first factor of the identity's current sign-in, when
-     * it may count: only while the session named is still that sign-in, so a
-     * resolver answering for a sign-in since replaced lends it nothing.
+     * Only while the named session is still current, so a resolver answering
+     * for a replaced sign-in lends it nothing.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -215,9 +185,8 @@ final readonly class SessionFirstFactor
     }
 
     /**
-     * Whether a first factor may count for the session: a first factor of the
-     * identity on the application, bound to the sign-in, made under the
-     * identity's current verification generation and not after now.
+     * Bound to the sign-in, of the current verification generation and not
+     * dated after now.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $firstFactor
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity

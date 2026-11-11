@@ -10,31 +10,13 @@ use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 use SineMacula\Laravel\Mfa\Enums\RequirementPart;
 
 /**
- * What a session's proofs add up to: whether the combination is accepted as an
- * additional verification, whether it is multifactor authentication, the
- * assurance level it supports, whether it is phishing-resistant, whether it
- * relies on a restricted authenticator, the `amr` values it reports, and which
- * parts of the outstanding requirement it meets and which it does not.
+ * What a session's proofs add up to. Accepted, multifactor and level are
+ * separate answers: an email code after a password is accepted without being
+ * multifactor, and `amr` alone never carries a result.
  *
- * Accepted, multifactor and the level are separate answers: an email code after
- * a password is accepted without being multifactor, and a code after a
- * phone-code sign-in is accepted at AAL1 only. `amr` states only what happened,
- * and is never enough on its own to carry a result.
- *
- * An evaluation that contradicts itself is refused when it is built: a part
- * reported met that its own answers rule out, `mfa` without a multifactor
- * combination, or `mca` without an accepted one that is not multifactor. A
- * replaced combination policy therefore cannot report more than it found.
- *
- * When every part is met, `metUntil` says when the evidence stops meeting them:
- * the instant the first part bounded by a maximum age falls out of it. It is
- * what an enrolment grant's lifetime is taken from, and an answer about now, so
- * neither `toArray()` nor JSON shows it. When the combination is multifactor,
- * `multifactorAt` says when the freshest evidence of that was made: a further
- * proof's own time only when it supplies or completes the multifactor evidence,
- * never when the first factor alone gives it. A policy that does not say leaves
- * it `null`, and nothing then takes a proof to have refreshed it. Neither
- * `toArray()` nor JSON shows it either.
+ * A self-contradicting evaluation is refused on construction, so a replaced
+ * combination policy cannot report more than it found. `metUntil` and
+ * `multifactorAt` are answers about now, so serialisation omits them.
  *
  * @implements \Illuminate\Contracts\Support\Arrayable<string, mixed>
  *
@@ -43,15 +25,13 @@ use SineMacula\Laravel\Mfa\Enums\RequirementPart;
  */
 final readonly class Evaluation implements \JsonSerializable, Arrayable
 {
-    /** @var string The `amr` value of multifactor authentication. */
+    /** @var string */
     private const string AMR_MULTIFACTOR = 'mfa';
 
-    /** @var string The `amr` value of an accepted additional verification that is not multifactor. */
+    /** @var string An accepted additional verification that is not multifactor. */
     private const string AMR_MULTIPLE_CHANNEL = 'mca';
 
     /**
-     * Constructor.
-     *
      * @param  bool  $accepted
      * @param  bool  $multifactor
      * @param  \SineMacula\Laravel\Mfa\Enums\AssuranceLevel  $level
@@ -67,34 +47,34 @@ final readonly class Evaluation implements \JsonSerializable, Arrayable
      */
     public function __construct(
 
-        /** Whether the combination is accepted as an additional verification. */
+        /** Accepted as an additional verification. */
         public bool $accepted,
 
-        /** Whether the combination is multifactor authentication. */
+        /** Multifactor authentication. */
         public bool $multifactor,
 
-        /** The assurance level the combination supports. */
+        /** The assurance level supported. */
         public AssuranceLevel $level,
 
-        /** Whether the combination is phishing-resistant. */
+        /** Phishing-resistant. */
         public bool $phishingResistant,
 
-        /** Whether the combination relies on a restricted authenticator, such as an SMS code. */
+        /** Relies on a restricted authenticator, such as an SMS code. */
         public bool $restricted,
 
-        /** The RFC 8176 `amr` values the combination reports, derived from what was observed. */
+        /** RFC 8176 values derived from what was observed. */
         public array $amr,
 
-        /** The parts of the requirement the combination meets. */
+        /** Requirement parts met. */
         public array $met,
 
-        /** The parts of the requirement the combination does not meet. */
+        /** Requirement parts not met. */
         public array $unmet,
 
-        /** When the evidence stops meeting the whole requirement, if a maximum age bounds it. */
+        /** When the first age-bounded part lapses; sets an enrolment grant's lifetime. */
         public ?CarbonImmutable $metUntil = null,
 
-        /** When the freshest evidence that the proofs are multifactor was made, when they are and it is known. */
+        /** When the freshest multifactor evidence was made; `null` when unknown. */
         public ?CarbonImmutable $multifactorAt = null,
     ) {
         self::assertAmr($amr);
@@ -113,7 +93,7 @@ final readonly class Evaluation implements \JsonSerializable, Arrayable
     }
 
     /**
-     * Whether the combination meets the whole requirement: no part is unmet.
+     * No part is unmet.
      *
      * @return bool
      */
@@ -123,9 +103,6 @@ final readonly class Evaluation implements \JsonSerializable, Arrayable
     }
 
     /**
-     * The evaluation with snake_case keys and the values of the level and the
-     * parts.
-     *
      * @return array{accepted: bool, multifactor: bool, level: string, phishing_resistant: bool, restricted: bool, amr: list<string>, met: list<string>, unmet: list<string>}
      */
     #[\Override]
@@ -144,8 +121,6 @@ final readonly class Evaluation implements \JsonSerializable, Arrayable
     }
 
     /**
-     * The evaluation as JSON serialises it: the same as `toArray()`.
-     *
      * @return array{accepted: bool, multifactor: bool, level: string, phishing_resistant: bool, restricted: bool, amr: list<string>, met: list<string>, unmet: list<string>}
      */
     #[\Override]
@@ -176,11 +151,7 @@ final readonly class Evaluation implements \JsonSerializable, Arrayable
     }
 
     /**
-     * Refuse a part reported met that the evaluation's own answers rule out: an
-     * additional verification without an accepted or multifactor combination,
-     * multifactor authentication or phishing resistance the combination does
-     * not have, or a minimum level when the level is unclassified, which meets
-     * none.
+     * Refuse a part reported met that the evaluation's own answers rule out.
      *
      * @return void
      *

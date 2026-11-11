@@ -25,23 +25,9 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 
 /**
- * Deletes what is no longer of use, older than
- * `mfa.lifecycle.prune_after_days`: enrolments past their expiry, with a factor
- * still pending, delivered codes past theirs, and recovery codes used or
- * replaced; and, with no retention, throttle rows whose window has ended, which
- * count nothing.
- *
- * `Mfa::prune()` runs it; the package schedules nothing itself. `mfa:prune` is
- * the same from the console.
- *
- * Delivered codes outlive the send window they count towards, whose longest is
- * a day, the shortest retention. Those, recovery codes and throttle rows go in
- * bounded statements (see `Database\BoundedDelete`), with no model event. An
- * enrolment goes on its own, under its owner's factor state lock, read again
- * there, so one confirmed or restarted meanwhile is left alone, and a model
- * event that cancels its deletion rolls back and propagates.
- * `EnrollmentExpired` reports each pending factor discarded, once its change
- * commits, with only what the stored row says in its context.
+ * Deletes expired records older than `mfa.lifecycle.prune_after_days`;
+ * throttle rows go once their window ends. The one-day minimum retention
+ * outlives the longest send window a delivered code counts towards.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -51,8 +37,6 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 final readonly class RecordPruner
 {
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @param  \SineMacula\Laravel\Mfa\Enrollment\PendingEnrollments  $enrollments
      * @param  \SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService  $recoveryCodes
@@ -61,25 +45,23 @@ final readonly class RecordPruner
      */
     public function __construct(
 
-        /** The configuration the retention and the factor model are read from. */
+        /** Read on every run so a changed retention applies. */
         private Repository $config,
 
-        /** The enrolments in progress. */
+        /** Enrolments in progress. */
         private PendingEnrollments $enrollments,
 
-        /** The recovery codes. */
+        /** Recovery codes. */
         private RecoveryCodeService $recoveryCodes,
 
-        /** The throttle rows. */
+        /** Throttle rows. */
         private AttemptStore $attempts,
 
-        /** The dispatcher of the expiry events. */
+        /** Dispatches the expiry events. */
         private EventDispatcher $events,
     ) {}
 
     /**
-     * Prune, and say how many records of each kind went.
-     *
      * @return \SineMacula\Laravel\Mfa\Lifecycle\PruneResult
      *
      * @throws \InvalidArgumentException
@@ -99,7 +81,7 @@ final readonly class RecordPruner
     }
 
     /**
-     * Prune every enrolment past its expiry before the time, each on its own.
+     * Each enrolment goes on its own, under its owner's lock.
      *
      * @param  \Carbon\CarbonInterface  $before
      * @return int
@@ -118,9 +100,7 @@ final readonly class RecordPruner
     }
 
     /**
-     * Under its owner's lock, read the enrolment again and delete it if it is
-     * still past its expiry, with its factor if that is still pending. Returns
-     * whether it went.
+     * Read again under the lock, so one confirmed or restarted meanwhile stays.
      *
      * @param  \SineMacula\Laravel\Mfa\Models\Enrollment  $read
      * @param  \Carbon\CarbonInterface  $before
@@ -163,8 +143,6 @@ final readonly class RecordPruner
     }
 
     /**
-     * Delete the enrolment and its pending factor, and report it.
-     *
      * @param  \SineMacula\Laravel\Mfa\Models\Enrollment  $enrollment
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @return void

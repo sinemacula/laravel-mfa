@@ -19,36 +19,14 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
 /**
- * Fills the `mfa` namespace of the authentication context from the session's
- * recorded proofs, with the same eight keys every time, so a policy can read
- * them whoever is served: `contributeFor()` for a named sign-in whose proofs
- * the caller supplies, the one way it is built. `Mfa::authenticationContext()`
- * reads a caller's own sign-in and its proofs from the proof store and hands
- * them to it, and an authentication layer building the context for another
- * session, or in a queued job, supplies its own.
+ * Fills the `mfa` namespace of the authentication context with the same eight
+ * keys every time, so a policy can read them whoever is served.
  *
- * `accepted`, `multifactor`, `level` and `phishing_resistant` come from one
- * evaluation of an additional verification against the session's proofs.
- * `accepted` means that requirement is met, including by a first factor that is
- * a multi-factor authenticator, so what the gate lets on and what this reports
- * agree for the same requirement and proofs. A gate holding a session to a
- * freshness or a stronger requirement can still refuse.
- *
- * `factor_types`, `last_verification_age_seconds` and part of
- * `user_verification` come from the session's accepted recorded evidence: each
- * additional factor or recovery code the bound check accepts after the
- * session's one first factor. It is a probe of each proof beside the first
- * factor, exact under the default policy; a bound check may accept a pair yet
- * refuse the set, so it says what was accepted and recorded and not what a
- * policy selected. Recovery codes count, as they meet an additional
- * verification. The age is not an operation's freshness, and a multi-factor
- * first factor can read `accepted` with no age.
- *
- * A pending session, a guest, a machine, an identity that is not MFA-capable
- * and an inactive identity all have the neutral context; what a pending session
- * needs to enrol comes through the pending flow.
- *
- * Stateless: consecutive requests through one instance share no answer.
+ * `accepted` agrees with what the gate lets through for an additional
+ * verification; a gate with a freshness or stronger requirement can still
+ * refuse. `factor_types` and the age come from each further proof the bound
+ * check accepts beside the first factor, which is exact only under the default
+ * policy.
  *
  * @api
  *
@@ -57,35 +35,23 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
  */
 final readonly class AuthenticationContextContributor
 {
-    /** @var string The namespace of the authentication context the keys go under. */
+    /** @var string */
     public const string NAMESPACE = 'mfa';
 
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Container\Container  $container
      */
     public function __construct(
 
-        /** The container the seams and the check are resolved from. */
+        /** Seams and the check are resolved on every call. */
         private Container $container,
     ) {}
 
     /**
-     * The keys of the `mfa` namespace for a named sign-in of the identity on
-     * the application, from its proofs as the caller read them.
-     * `has_confirmed_factor` is a fact: whether the identity has a factor whose
-     * stored status is exactly `confirmed` (see `Factors\ConfirmedFactors`). A
-     * status the package does not know is no confirmed factor, though
-     * `isMfaEnabled()` still holds the identity to MFA for it. Only the proofs
-     * that count are read, by the rules the proof store applies (bound to the
-     * identity, the application and the sign-in, made in the identity's current
-     * verification generation, and not dated in the future), oldest first;
-     * proofs made at the same instant are taken in the order given. The caller
-     * reads them from a trusted record of that sign-in, never from input,
-     * leaves out any made with a factor since removed, and gives a pending,
-     * revoked or ended session, or none, the neutral context without asking. A
-     * machine and an inactive identity have the neutral context.
+     * The caller supplies the proofs from a trusted record of the sign-in,
+     * never from input, and gives a pending, revoked or ended session the
+     * neutral context without asking. Proofs that would not count in the proof
+     * store are ignored.
      *
      * @formatter:off
      *
@@ -120,8 +86,6 @@ final readonly class AuthenticationContextContributor
     }
 
     /**
-     * The context of a caller the package does not serve.
-     *
      * @formatter:off
      *
      * @return array{
@@ -152,9 +116,6 @@ final readonly class AuthenticationContextContributor
     }
 
     /**
-     * The keys of the `mfa` namespace for the identity on the proofs of one of
-     * its sign-ins.
-     *
      * @formatter:off
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
@@ -195,8 +156,6 @@ final readonly class AuthenticationContextContributor
     }
 
     /**
-     * The session's one first factor, or `null` with none or more than one.
-     *
      * @param  list<\SineMacula\Laravel\Mfa\Proofs\Proof>  $proofs
      * @return ?\SineMacula\Laravel\Mfa\Proofs\Proof
      */
@@ -208,8 +167,7 @@ final readonly class AuthenticationContextContributor
     }
 
     /**
-     * The additional factors and recovery codes the bound check accepts after
-     * the first factor, oldest first.
+     * Recovery codes count, as they meet an additional verification.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\RequirementCheck  $check
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $firstFactor
@@ -226,8 +184,7 @@ final readonly class AuthenticationContextContributor
     }
 
     /**
-     * Whether the evidence, or a first factor that supports a level, observed
-     * the person verified.
+     * The first factor counts only when it supports a level.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\RequirementCheck  $check
      * @param  ?\SineMacula\Laravel\Mfa\Proofs\Proof  $firstFactor
@@ -247,9 +204,7 @@ final readonly class AuthenticationContextContributor
     }
 
     /**
-     * How many whole seconds ago the newest of the evidence was made, or `null`
-     * without any. The evidence is oldest first, as every read of a sign-in's
-     * proofs returns them.
+     * Whole seconds since the newest evidence; the evidence is oldest first.
      *
      * @param  list<\SineMacula\Laravel\Mfa\Proofs\Proof>  $evidence
      * @return ?int

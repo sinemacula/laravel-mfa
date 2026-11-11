@@ -8,20 +8,8 @@ use Illuminate\Contracts\Config\Repository;
 use SineMacula\Laravel\Mfa\Config\IntegerSetting;
 
 /**
- * The recovery code settings in `mfa.recovery_codes`, read on every call and
- * validated as they are read: how many codes a set holds, how long each is and
- * the alphabet it is drawn from, and how few remaining codes count as running
- * low. A value outside its bounds fails closed with an
- * `InvalidArgumentException` naming the key; the package checks them when it
- * boots and `mfa:check` reports them.
- *
- * A code is normalised before it is checked (case folded, spaces and hyphens
- * removed), so its entropy is measured on what is left: the length times the
- * bits of each character. The alphabet is printable ASCII without spaces or
- * hyphens, which normalisation would remove, and no character appears in it
- * twice once case is folded, so each character a code is drawn from is a
- * distinct symbol drawn with equal probability. A code must carry at least
- * `MINIMUM_ENTROPY_BITS`.
+ * The `mfa.recovery_codes` settings, read and validated on every call; a value
+ * out of bounds fails closed naming the key.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -30,41 +18,37 @@ use SineMacula\Laravel\Mfa\Config\IntegerSetting;
  */
 final readonly class RecoveryCodeSettings
 {
-    /** @var int The least entropy of one code, in bits, measured after normalisation. */
+    /** @var int Least entropy of one code in bits, measured after normalisation. */
     public const int MINIMUM_ENTROPY_BITS = 40;
 
-    /** @var int The longest a code may be, in characters. */
+    /** @var int Longest a code may be, in characters. */
     public const int MAXIMUM_LENGTH = 64;
 
     /** @var string Prefix of every recovery code setting's key. */
     private const string PREFIX = 'mfa.recovery_codes.';
 
-    /** @var string The alphabet when none is configured: digits and capitals, without 0, 1, I and O. */
+    /** @var string Digits and capitals without the look-alikes 0, 1, I and O. */
     private const string ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 
-    /** @var int The low-count threshold when none is configured and the set holds at least as many codes. */
+    /** @var int Default low-count threshold, capped at the set's size. */
     private const int LOW_COUNT = 3;
 
-    /** @var array<string, array{0: int, 1: int, 2: int}> Default, least and greatest value of each other numeric setting. */
+    /** @var array<string, array{0: int, 1: int, 2: int}> Default, least and greatest value per setting. */
     private const array NUMBERS = [
         'count'  => [10, 1, 50],
         'length' => [13, 1, self::MAXIMUM_LENGTH],
     ];
 
     /**
-     * Constructor.
-     *
      * @param  \Illuminate\Contracts\Config\Repository  $config
      */
     public function __construct(
 
-        /** Configuration the settings are read from on every call. */
+        /** Read on every call so changed settings apply. */
         private Repository $config,
     ) {}
 
     /**
-     * How many codes a set holds, 1 to 50.
-     *
      * @return int
      *
      * @throws \InvalidArgumentException
@@ -75,9 +59,6 @@ final readonly class RecoveryCodeSettings
     }
 
     /**
-     * How many characters each code has, 1 to 64, and enough with the alphabet
-     * for the least entropy.
-     *
      * @return int
      *
      * @throws \InvalidArgumentException
@@ -88,10 +69,8 @@ final readonly class RecoveryCodeSettings
     }
 
     /**
-     * The characters codes are drawn from: at least two, printable ASCII, no
-     * spaces or hyphens, and none appearing twice once case is folded, so a
-     * uniform draw over the alphabet is a uniform draw over the symbols a
-     * normalised code can hold.
+     * No spaces, hyphens or case-folded repeats, so a uniform draw stays
+     * uniform over the symbols a normalised code can hold.
      *
      * @return string
      *
@@ -111,8 +90,7 @@ final readonly class RecoveryCodeSettings
     }
 
     /**
-     * How few unused codes count as running low, from 0 (never) to the set's
-     * size; 3 by default, or the set's size when the set is smaller.
+     * Unused codes at or below which the set is running low; 0 never warns.
      *
      * @return int
      *
@@ -126,7 +104,7 @@ final readonly class RecoveryCodeSettings
     }
 
     /**
-     * The entropy of one code, in bits, measured after normalisation.
+     * Entropy of one code in bits, measured after normalisation.
      *
      * @return float
      *
@@ -138,8 +116,7 @@ final readonly class RecoveryCodeSettings
     }
 
     /**
-     * Read every setting, failing closed on the first that is out of bounds,
-     * then refuse a length and alphabet whose codes carry less than the least
+     * Fail on the first setting out of bounds, or on codes below the least
      * entropy.
      *
      * @return void
@@ -158,8 +135,6 @@ final readonly class RecoveryCodeSettings
     }
 
     /**
-     * The number of distinct characters in the alphabet once case is folded.
-     *
      * @param  string  $alphabet
      * @return int
      */
@@ -169,8 +144,6 @@ final readonly class RecoveryCodeSettings
     }
 
     /**
-     * Read a numeric setting from its least to its greatest value.
-     *
      * @param  string  $key
      * @return int
      *

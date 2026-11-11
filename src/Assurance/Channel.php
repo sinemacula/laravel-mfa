@@ -9,20 +9,12 @@ use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\Support\SerializedFields;
 
 /**
- * Where a factor's or a first factor's proof travels or lives: its kind and,
- * where it has one, its destination (an E.164 phone number or an email address)
- * or credential (a factor, a passkey credential or a provider).
+ * Where a proof travels or lives. Two proofs on the same channel are not
+ * independent, and an unknown first-factor channel establishes no level.
  *
- * Two proofs on the same channel are not independent. A first factor whose
- * channel is unknown establishes no independence and no level.
- *
- * The reference may be a full destination, so it is held as a
- * `\SensitiveParameterValue` and read through `reference()`: no dump of a
- * channel (`print_r`, `var_dump`, `var_export`, an array cast, or Symfony's
- * VarDumper behind Laravel's dump helpers) shows it, and PHP refuses to
- * serialise one. The serialised form, `toArray()`, is for storing a proof,
- * never for an event, a log or a response: those carry a factor's masked
- * summary.
+ * The reference may be a full destination, so it is hidden from dumps and
+ * serialisation; `toArray()` is for storing a proof, never for events, logs or
+ * responses.
  *
  * @implements \Illuminate\Contracts\Support\Arrayable<string, ?string>
  *
@@ -35,8 +27,6 @@ final readonly class Channel implements \JsonSerializable, Arrayable
     private \SensitiveParameterValue $reference;
 
     /**
-     * Constructor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enums\ChannelKind  $kind
      * @param  ?string  $reference
      *
@@ -44,10 +34,10 @@ final readonly class Channel implements \JsonSerializable, Arrayable
      */
     public function __construct(
 
-        /** The kind of channel. */
+        /** The channel kind. */
         public ChannelKind $kind,
 
-        // The destination or credential the channel names, if any.
+        // An E.164 number, email address, or factor, credential or provider id.
         #[\SensitiveParameter]
         ?string $reference = null,
     ) {
@@ -67,8 +57,7 @@ final readonly class Channel implements \JsonSerializable, Arrayable
     }
 
     /**
-     * The channel of a first factor that is not known, or not supplied by a
-     * trusted source.
+     * A first-factor channel that is not known or not from a trusted source.
      *
      * @return self
      */
@@ -78,8 +67,6 @@ final readonly class Channel implements \JsonSerializable, Arrayable
     }
 
     /**
-     * Read a channel back from its serialised form.
-     *
      * @param  array<array-key, mixed>  $data
      * @return self
      *
@@ -95,9 +82,6 @@ final readonly class Channel implements \JsonSerializable, Arrayable
     }
 
     /**
-     * The destination or credential the channel names, or `null` when it names
-     * none.
-     *
      * @return ?string
      */
     public function reference(): ?string
@@ -107,8 +91,6 @@ final readonly class Channel implements \JsonSerializable, Arrayable
     }
 
     /**
-     * The channel with snake_case keys.
-     *
      * @return array{kind: string, reference: ?string}
      */
     #[\Override]
@@ -121,8 +103,6 @@ final readonly class Channel implements \JsonSerializable, Arrayable
     }
 
     /**
-     * The channel as JSON serialises it: the same as `toArray()`.
-     *
      * @return array{kind: string, reference: ?string}
      */
     #[\Override]

@@ -15,8 +15,6 @@ namespace SineMacula\Laravel\Mfa\Lifecycle;
 final readonly class PruneResult
 {
     /**
-     * Constructor.
-     *
      * @param  int  $enrollments
      * @param  int  $codes
      * @param  int  $recoveryCodes

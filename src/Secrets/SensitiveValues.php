@@ -9,23 +9,12 @@ use SineMacula\Laravel\Mfa\Codes\CodeMessage;
 use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
 
 /**
- * The strings known to be sensitive for one scrub of an exception or one log
- * record, collected before either is redacted, so they can be redacted wherever
- * else they appear: in another frame's arguments, in an exception's message or
- * in a log record's message.
+ * Sensitive strings collected from one exception or log record before it is
+ * redacted, so they can be redacted wherever else they appear.
  *
- * They come in two kinds. A value known to be sensitive, because it was given
- * explicitly (the code and the destination of a delivery) or read from a code
- * message (its code, and its destination or its recipients' addresses), is
- * redacted from any string that contains it, whatever its length. A value
- * collected from a trace's arguments or a log's values (a string a frame of the
- * package received, a value marked as sensitive, a value under a key naming a
- * secret, a code or a destination) may be as short and as common as a factor
- * type, so a string is redacted for it only when it is the value, or when the
- * value is six characters or more and the string contains it.
- *
- * Nothing is kept beyond the value: each scrub and each record collects its
- * own, so what one delivery or one queued job collected never reaches another.
+ * Known values (a delivery's code and destination) are redacted wherever they
+ * occur. Collected values may be as short as a factor type, so they match only
+ * whole strings unless they are six characters or more.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -34,27 +23,23 @@ use SineMacula\Laravel\Mfa\Codes\MfaCodeMessage;
  */
 final readonly class SensitiveValues
 {
-    /** @var int The length from which a collected value is redacted wherever a string contains it. */
+    /** @var int Shortest collected value redacted from within a longer string. */
     private const int CONTAINED_LENGTH = 6;
 
     /**
-     * Constructor.
-     *
      * @param  list<string>  $known
      * @param  list<string>  $collected
      */
     private function __construct(
 
-        /** The values redacted from any string containing them. */
+        /** Redacted from any string containing them. */
         private array $known,
 
-        /** The values redacted from a string that is one, or contains one of six characters or more. */
+        /** Redacted from a string equal to one, or containing one of six characters or more. */
         private array $collected,
     ) {}
 
     /**
-     * No values.
-     *
      * @return self
      */
     public static function none(): self
@@ -63,8 +48,7 @@ final readonly class SensitiveValues
     }
 
     /**
-     * The values given, known to be sensitive whatever their length. Empty
-     * values and `null` are left out.
+     * Redacted whatever their length; empty values and `null` are dropped.
      *
      * @param  ?string  ...$values
      * @return self
@@ -75,10 +59,8 @@ final readonly class SensitiveValues
     }
 
     /**
-     * The values in a trace frame's arguments: every string, when the frame
-     * touches the package, and otherwise the strings a sensitive value holds or
-     * a key naming a secret, a code or a destination keys; and the code and the
-     * recipients of a code message, as known.
+     * Every string when the frame touches the package, otherwise only sensitive
+     * or secret-keyed strings and code messages.
      *
      * @param  array<array-key, mixed>  $arguments
      * @param  bool  $all
@@ -92,11 +74,8 @@ final readonly class SensitiveValues
     }
 
     /**
-     * The values in a log's values, as in a trace frame's arguments that do not
-     * touch the package, and those an exception among them recorded in its
-     * trace and the traces of its previous ones (see `ExceptionScrubber`). The
-     * values are read as `Redactor::normalize()` gives them, so an object's
-     * form, which the redaction reaches, is read too; any other object is not.
+     * As for a frame outside the package, plus what logged exceptions recorded.
+     * Expects values already passed through `Redactor::normalize()`.
      *
      * @param  array<array-key, mixed>  $values
      * @return self
@@ -109,9 +88,7 @@ final readonly class SensitiveValues
     }
 
     /**
-     * Whether the value is a code message (a `CodeMessage` handed to a sender,
-     * an `MfaCodeMessage`, or a queued job sending one), which carries the
-     * code.
+     * A `CodeMessage`, an `MfaCodeMessage` or a queued job sending one.
      *
      * @param  mixed  $value
      * @return bool
@@ -122,8 +99,7 @@ final readonly class SensitiveValues
     }
 
     /**
-     * The code a code message carries, and its destination or the address of
-     * each of its recipients.
+     * The code and the destination or recipient addresses.
      *
      * @param  \SineMacula\Laravel\Mfa\Codes\CodeMessage|\SineMacula\Laravel\Mfa\Codes\MfaCodeMessage  $message
      * @return list<string>
@@ -141,8 +117,6 @@ final readonly class SensitiveValues
     }
 
     /**
-     * These values and the other's.
-     *
      * @param  self  $other
      * @return self
      */
@@ -155,9 +129,7 @@ final readonly class SensitiveValues
     }
 
     /**
-     * Whether the string is to be redacted whole: it contains a value known to
-     * be sensitive, is a value collected, or contains one of six characters or
-     * more.
+     * Whether the string is to be redacted whole.
      *
      * @param  string  $value
      * @return bool
@@ -180,10 +152,7 @@ final readonly class SensitiveValues
     }
 
     /**
-     * The text, such as an exception's or a log record's message, with every
-     * occurrence of a value replaced by `[redacted]`: of every value known to
-     * be sensitive, and of every value collected of six characters or more. A
-     * text that is a value collected becomes `[redacted]`.
+     * The text with every redactable occurrence replaced by the marker.
      *
      * @param  string  $text
      * @return string
@@ -200,14 +169,12 @@ final readonly class SensitiveValues
             $replacements[$value] = RevealedSecret::REDACTED;
         }
 
-        // Each occurrence is replaced once, longest value first, and a marker
-        // already put in is never searched again
+        // strtr matches longest first and never rescans a marker it inserted
         return strtr($text, $replacements);
     }
 
     /**
-     * The sensitive values in the value, up to ten levels deep, each as often
-     * as it was found.
+     * Walks up to `Redactor::MAX_DEPTH` levels deep.
      *
      * @param  mixed  $value
      * @param  bool  $all
@@ -235,8 +202,7 @@ final readonly class SensitiveValues
     }
 
     /**
-     * The sensitive values in each item of the array, those under a key naming
-     * a secret, a code or a destination all collected.
+     * Everything under a key naming a secret, code or destination is collected.
      *
      * @param  array<array-key, mixed>  $values
      * @param  bool  $all
@@ -260,8 +226,6 @@ final readonly class SensitiveValues
     }
 
     /**
-     * The code message the value is, or the queued job sends.
-     *
      * @param  mixed  $value
      * @return \SineMacula\Laravel\Mfa\Codes\CodeMessage|\SineMacula\Laravel\Mfa\Codes\MfaCodeMessage|null
      */
@@ -275,8 +239,7 @@ final readonly class SensitiveValues
     }
 
     /**
-     * The values worth redacting elsewhere, each once: neither an empty string
-     * nor the redaction marker.
+     * Unique values, without empty strings or the redaction marker.
      *
      * @param  array<array-key, ?string>  $values
      * @return list<string>

@@ -9,34 +9,11 @@ use Illuminate\Database\QueryException;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 
 /**
- * Takes the values a failed query was given out of its exception, in place,
- * keeping its class and code, so what a query bound never reaches a log, an
- * error tracker or a rendered error page, whatever `zend.exception_ignore_args`
- * and `mfa.secrets.redact` say.
+ * Strips a failed query's bound values from its exception chain in place,
+ * whatever `zend.exception_ignore_args` and `mfa.secrets.redact` say.
  *
- * Laravel interpolates a query's bindings into a `QueryException`'s message and
- * keeps them on the exception, and a driver's own message can quote a stored
- * value, so no value is searched for and cut out, which an escaped or truncated
- * copy would survive. The message is rebuilt from what cannot hold one:
- *
- * - the `QueryException`'s message becomes its SQLSTATE, its driver error
- *   number, its connection's name and its SQL with placeholders;
- * - every previous exception's message becomes the SQLSTATE and the driver
- *   error number alone;
- * - the bindings are emptied, and the driver's text in `errorInfo` is cleared;
- * - the arguments its trace recorded are scrubbed as `ExceptionScrubber` scrubs
- *   them, with the bindings among the values it knows.
- *
- * Inside a nested transaction Laravel raises a concurrency failure as a
- * `DeadlockException` wrapping the query's, with the query's message copied
- * into it. That copy goes too, and the words Laravel looks for stay in its
- * place, so the transactions around it still treat it as what it is: one that
- * took it for something else would roll back to a savepoint a MySQL deadlock
- * has already discarded.
- *
- * A literal an application writes into its own raw SQL stays in the SQL, as
- * nothing can tell it from the query. The queries the package builds bind every
- * value.
+ * Messages are rebuilt from SQLSTATE, driver error number and placeholder SQL,
+ * as searching for values would miss an escaped or truncated copy.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -45,7 +22,7 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
  */
 final class QueryExceptionMask
 {
-    /** @var string What Laravel recognises a concurrency failure by, as nothing else of a wrapper's message can stay. */
+    /** @var string Kept so outer transactions still detect the deadlock and skip a lost savepoint. */
     private const string DEADLOCK = 'deadlock detected';
 
     /**
@@ -54,8 +31,6 @@ final class QueryExceptionMask
     private function __construct() {}
 
     /**
-     * Mask the query exception and every exception it wraps.
-     *
      * @param  \Illuminate\Database\QueryException  $exception
      * @return void
      */
@@ -84,8 +59,7 @@ final class QueryExceptionMask
     }
 
     /**
-     * Mask every query exception in the chain, and every deadlock exception
-     * above one: what leaves a transaction the package opened, whatever it is.
+     * For anything leaving a transaction the package opened.
      *
      * @param  \Throwable  $throwable
      * @return void
@@ -96,9 +70,8 @@ final class QueryExceptionMask
     }
 
     /**
-     * Mask every query exception in the chain whose SQL names one of the
-     * package's tables, and every deadlock exception above one, and leave the
-     * rest as they are: the report path sees an application's own failures too.
+     * Leaves queries on other tables alone, as the report path also sees the
+     * application's own failures.
      *
      * @param  \Throwable  $throwable
      * @return void
@@ -109,9 +82,6 @@ final class QueryExceptionMask
     }
 
     /**
-     * Mask the query exceptions the check picks, and the deadlock exceptions
-     * above each of them.
-     *
      * @param  \Throwable  $throwable
      * @param  \Closure(\Illuminate\Database\QueryException): bool  $picks
      * @return void
@@ -136,9 +106,8 @@ final class QueryExceptionMask
     }
 
     /**
-     * Rewrite the message of each deadlock exception above the query exception,
-     * before that is masked, and scrub its trace with the bindings, as it
-     * records the same callers and so the same values.
+     * Runs before the query is masked, as a deadlock wrapper copies its message
+     * and records the same callers.
      *
      * @param  list<\Illuminate\Database\DeadlockException>  $deadlocks
      * @param  \Illuminate\Database\QueryException  $query
@@ -156,8 +125,6 @@ final class QueryExceptionMask
     }
 
     /**
-     * Whether the SQL names one of the package's tables.
-     *
      * @param  string  $sql
      * @return bool
      *
@@ -175,8 +142,7 @@ final class QueryExceptionMask
     }
 
     /**
-     * The exception and every previous one, each once, so a chain that loops
-     * back ends.
+     * Each exception once, so a chain that loops back ends.
      *
      * @param  \Throwable  $throwable
      * @return list<\Throwable>
@@ -193,8 +159,6 @@ final class QueryExceptionMask
     }
 
     /**
-     * The string bindings of every query exception in the chain.
-     *
      * @param  list<\Throwable>  $chain
      * @return array<string>
      */
@@ -215,8 +179,7 @@ final class QueryExceptionMask
     }
 
     /**
-     * What is left of why the query failed: the SQLSTATE and the driver error
-     * number, when the driver gave them.
+     * SQLSTATE and driver error number, which cannot hold a value.
      *
      * @param  \Illuminate\Database\QueryException  $exception
      * @return string
@@ -232,9 +195,6 @@ final class QueryExceptionMask
     }
 
     /**
-     * The message of the query exception: the reason, the connection and the
-     * SQL with placeholders.
-     *
      * @param  \Illuminate\Database\QueryException  $exception
      * @param  string  $reason
      * @return string
@@ -245,8 +205,7 @@ final class QueryExceptionMask
     }
 
     /**
-     * Rewrite the exception's message. Neither `\Exception` nor `\Error` has a
-     * setter for it, so it can only be rewritten in place through reflection.
+     * Reflection, as neither `\Exception` nor `\Error` has a message setter.
      *
      * @param  \Throwable  $throwable
      * @param  string  $message
@@ -258,8 +217,7 @@ final class QueryExceptionMask
     }
 
     /**
-     * Clear the driver's text from the exception's `errorInfo`, keeping the
-     * SQLSTATE and the driver error number.
+     * The driver's text can quote a stored value.
      *
      * @param  \PDOException  $exception
      * @return void
