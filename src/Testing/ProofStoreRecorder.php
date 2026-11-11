@@ -12,9 +12,8 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Testing\Contracts\VerifiedSignInRecorder;
 
 /**
- * The default verified sign-in recorder: it begins the sign-in and records the
- * proofs through the proof store, as the package does when the identity signs
- * in and verifies.
+ * Default recorder: begins the sign-in and records the proofs through the proof
+ * store, as a real sign-in does.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -24,20 +23,17 @@ use SineMacula\Laravel\Mfa\Testing\Contracts\VerifiedSignInRecorder;
 final readonly class ProofStoreRecorder implements VerifiedSignInRecorder
 {
     /**
-     * Constructor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
      */
     public function __construct(
 
-        /** The store the sign-in is begun and the proofs are recorded in. */
+        /** Where the sign-in begins and the proofs go. */
         private ProofStore $store,
     ) {}
 
     /**
-     * Begin a new sign-in named by a fresh id and return the session id the
-     * store names as current, refusing a store that knows of none. The time is
-     * not needed: the store keeps no time a sign-in began at.
+     * Refuses a store that names no current sign-in. `$at` is unused: the store
+     * keeps no start time.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -61,8 +57,6 @@ final readonly class ProofStoreRecorder implements VerifiedSignInRecorder
     }
 
     /**
-     * Record the identity's proof through the store.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @return void

@@ -11,18 +11,9 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Testing\Seams\ChallengeCountersContract;
 
 /**
- * The challenge counters wiring kit: a challenge owner's path counts a failed
- * challenge against the factor inside the caller's transaction, before it
- * commits, counts nothing when that rolls back, nested or not, stops counting
- * once the identity's limit locks it, never counts a consumed challenge
- * answered again as a success, and does not challenge a disabled factor; and
- * its own admission and report calls refuse a call outside a transaction and a
- * binding of another identity, and keep an enrolment challenge apart.
- *
- * A test case proves its implementation by using this trait and implementing
- * the hooks; each check delegates to `ChallengeCountersContract`. The admission
- * and report hooks call the adapter under test directly, as the owner does, so
- * the checks prove the adapter's wiring rather than the package's counters.
+ * The challenge counters wiring kit for a challenge owner's path. The admission
+ * and report hooks call the adapter directly, so the checks prove its wiring
+ * rather than the package's counters.
  *
  * @phpstan-require-extends \PHPUnit\Framework\TestCase
  *
@@ -34,8 +25,6 @@ use SineMacula\Laravel\Mfa\Testing\Seams\ChallengeCountersContract;
 trait ChallengeCountersTests // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMethods
 {
     /**
-     * A failed challenge is counted against its factor.
-     *
      * @return void
      */
     public function testChallengeCountersCountAFailedChallenge(): void
@@ -44,8 +33,6 @@ trait ChallengeCountersTests // phpcs:ignore SineMacula.Metrics.MaxMethodCount.T
     }
 
     /**
-     * A failed challenge whose change rolls back counts nothing.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -56,8 +43,6 @@ trait ChallengeCountersTests // phpcs:ignore SineMacula.Metrics.MaxMethodCount.T
     }
 
     /**
-     * A failed challenge is counted before the caller's transaction commits.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -68,8 +53,6 @@ trait ChallengeCountersTests // phpcs:ignore SineMacula.Metrics.MaxMethodCount.T
     }
 
     /**
-     * A failed challenge whose nested transaction rolls back counts nothing.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -80,8 +63,6 @@ trait ChallengeCountersTests // phpcs:ignore SineMacula.Metrics.MaxMethodCount.T
     }
 
     /**
-     * The identity's limit locks it, and a further failure counts nothing.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -92,8 +73,6 @@ trait ChallengeCountersTests // phpcs:ignore SineMacula.Metrics.MaxMethodCount.T
     }
 
     /**
-     * A consumed challenge answered again is never a success.
-     *
      * @return void
      */
     public function testChallengeCountersNeverCountAReplayAsASuccess(): void
@@ -102,8 +81,6 @@ trait ChallengeCountersTests // phpcs:ignore SineMacula.Metrics.MaxMethodCount.T
     }
 
     /**
-     * A disabled factor is not challenged.
-     *
      * @return void
      */
     public function testChallengeCountersDoNotChallengeADisabledFactor(): void
@@ -112,9 +89,6 @@ trait ChallengeCountersTests // phpcs:ignore SineMacula.Metrics.MaxMethodCount.T
     }
 
     /**
-     * The path's admission and report calls refuse a call outside a
-     * transaction.
-     *
      * @return void
      */
     public function testChallengeCountersNeedTheCallersTransaction(): void
@@ -128,9 +102,6 @@ trait ChallengeCountersTests // phpcs:ignore SineMacula.Metrics.MaxMethodCount.T
     }
 
     /**
-     * The path admits the identity's own binding and refuses a binding of
-     * another identity.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -147,8 +118,6 @@ trait ChallengeCountersTests // phpcs:ignore SineMacula.Metrics.MaxMethodCount.T
     }
 
     /**
-     * A challenge for enrolling is not one for signing in, or the reverse.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -165,15 +134,12 @@ trait ChallengeCountersTests // phpcs:ignore SineMacula.Metrics.MaxMethodCount.T
     }
 
     /**
-     * The identity whose challenges are counted.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
     abstract protected function countedIdentity(): MultiFactorAuthenticatable;
 
     /**
-     * Another identity of the same kind, not the counted one, whose binding the
-     * adapter must refuse. It need hold no factor.
+     * Another identity of the same kind, which need hold no factor.
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
@@ -194,35 +160,28 @@ trait ChallengeCountersTests // phpcs:ignore SineMacula.Metrics.MaxMethodCount.T
     abstract protected function pendingFactor(): EloquentFactor&Model;
 
     /**
-     * What the identity's challenges are bound to.
-     *
      * @return \SineMacula\Laravel\Mfa\Proofs\ProofBinding
      */
     abstract protected function countedBinding(): ProofBinding;
 
     /**
-     * Fail one challenge of the factor through the owner's own path, as a
-     * person submitting a wrong code would.
+     * Fail one challenge through the owner's own path, as a wrong code would.
      *
      * @return void
      */
     abstract protected function failChallenge(): void;
 
     /**
-     * Answer one challenge of the factor rightly through the owner's own path,
-     * consuming it, and return what answers that same challenge again, with the
-     * same code.
+     * Answer one challenge rightly through the owner's path, and return a
+     * closure that answers it again with the same code.
      *
      * @return \Closure(): void
      */
     abstract protected function consumeChallenge(): \Closure;
 
     /**
-     * Ask the adapter under test whether it admits a challenge of the factor
-     * under the binding, as the owner asks before it sends or checks a code.
-     *
-     * Call the adapter itself, with the binding as given: never inside a
-     * transaction of the hook's own, and letting every exception through.
+     * Call the adapter itself with the binding as given, outside any
+     * transaction of the hook's own, letting every exception through.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
@@ -232,13 +191,8 @@ trait ChallengeCountersTests // phpcs:ignore SineMacula.Metrics.MaxMethodCount.T
     abstract protected function isChallengeAdmitted(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor, ProofBinding $binding): bool;
 
     /**
-     * Report a challenge's outcome through the adapter under test, as the owner
-     * reports once it has consumed the challenge.
-     *
-     * Call the adapter itself, with the binding as given: never inside a
-     * transaction of the hook's own, and letting every exception through.
-     * Return whether the adapter took the report: a refusal answers `false`, or
-     * throws an `Exceptions\OperationRefusedException`; any other exception is
+     * Call the adapter itself as `isChallengeAdmitted()` does. A refusal
+     * answers `false` or throws `OperationRefusedException`; anything else is
      * an error.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
@@ -250,8 +204,6 @@ trait ChallengeCountersTests // phpcs:ignore SineMacula.Metrics.MaxMethodCount.T
     abstract protected function isChallengeReported(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor, ProofBinding $binding, bool $passed): bool;
 
     /**
-     * The admission hook, for the counted identity.
-     *
      * @return \Closure(\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor, \SineMacula\Laravel\Mfa\Proofs\ProofBinding): bool
      */
     private function challengeAdmission(): \Closure
@@ -262,8 +214,6 @@ trait ChallengeCountersTests // phpcs:ignore SineMacula.Metrics.MaxMethodCount.T
     }
 
     /**
-     * The report hook, for the counted identity.
-     *
      * @return \Closure(\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor, \SineMacula\Laravel\Mfa\Proofs\ProofBinding, bool): bool
      */
     private function challengeReport(): \Closure

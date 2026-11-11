@@ -11,12 +11,8 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Testing\Seams\ChallengeGatewayContract;
 
 /**
- * The `ChallengeGateway` contract kit: a wrong code fails and is counted, a
- * code answers only its own binding, a code is consumed once, and an unknown
- * challenge is not found.
- *
- * A test case proves its implementation by using this trait and implementing
- * the hooks; each check delegates to `ChallengeGatewayContract`.
+ * The `ChallengeGateway` contract kit; each check delegates to
+ * `ChallengeGatewayContract`.
  *
  * @phpstan-require-extends \PHPUnit\Framework\TestCase
  *
@@ -28,8 +24,6 @@ use SineMacula\Laravel\Mfa\Testing\Seams\ChallengeGatewayContract;
 trait ChallengeGatewayTests
 {
     /**
-     * A code other than the one sent is refused.
-     *
      * @return void
      */
     public function testChallengeGatewayRefusesAWrongCode(): void
@@ -44,8 +38,6 @@ trait ChallengeGatewayTests
     }
 
     /**
-     * A code answers its own binding and no other purpose's.
-     *
      * @return void
      */
     public function testChallengeGatewayAnswersOnlyTheCodesOwnBinding(): void
@@ -60,8 +52,6 @@ trait ChallengeGatewayTests
     }
 
     /**
-     * A code answers once.
-     *
      * @return void
      */
     public function testChallengeGatewayConsumesACodeOnce(): void
@@ -76,8 +66,6 @@ trait ChallengeGatewayTests
     }
 
     /**
-     * A challenge that is not the binding's is not found.
-     *
      * @return void
      */
     public function testChallengeGatewayDoesNotFindAnUnknownChallenge(): void
@@ -93,8 +81,6 @@ trait ChallengeGatewayTests
     abstract protected function challengeCaller(): CallerContext;
 
     /**
-     * The gateway under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\ChallengeGateway
      */
     abstract protected function challengeGateway(): ChallengeGateway;
@@ -107,15 +93,12 @@ trait ChallengeGatewayTests
     abstract protected function challengedFactor(): Factor;
 
     /**
-     * What the codes are bound to.
-     *
      * @return \SineMacula\Laravel\Mfa\Proofs\ProofBinding
      */
     abstract protected function challengeBinding(): ProofBinding;
 
     /**
-     * The code last delivered for the challenge, as a test reads it from a fake
-     * sender.
+     * The code last delivered for the challenge, as read from a fake sender.
      *
      * @param  string  $challengeId
      * @return string

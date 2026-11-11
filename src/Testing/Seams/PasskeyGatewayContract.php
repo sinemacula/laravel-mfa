@@ -12,9 +12,8 @@ use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
 /**
- * What every `PasskeyGateway` must guarantee, as assertions: an unavailable
- * gateway lists no passkeys, no assertion verifies against an empty allowlist,
- * and an empty response never verifies.
+ * What every `PasskeyGateway` must guarantee: an unavailable gateway lists no
+ * passkeys, and neither an empty allowlist nor an empty response verifies.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -29,8 +28,6 @@ final class PasskeyGatewayContract
     private function __construct() {}
 
     /**
-     * A gateway that is not available lists no passkeys to offer.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\PasskeyGateway  $gateway
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return void
@@ -41,8 +38,6 @@ final class PasskeyGatewayContract
     }
 
     /**
-     * Nothing verifies against an empty allowlist.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\PasskeyGateway  $gateway
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -59,8 +54,6 @@ final class PasskeyGatewayContract
     }
 
     /**
-     * An empty response verifies for none of the identity's passkeys.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\PasskeyGateway  $gateway
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
@@ -72,8 +65,7 @@ final class PasskeyGatewayContract
     }
 
     /**
-     * The verification answers with why it did not verify, or refuses by
-     * throwing an `OperationRefusedException`, never with an assertion.
+     * A reason or an `OperationRefusedException`, never an assertion.
      *
      * @param  \Closure(): (\SineMacula\Laravel\Mfa\Enums\FailureReason|\SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion)  $verification
      * @param  string  $message

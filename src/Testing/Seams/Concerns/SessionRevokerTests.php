@@ -9,13 +9,8 @@ use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
 use SineMacula\Laravel\Mfa\Testing\Seams\SessionRevokerContract;
 
 /**
- * The `SessionRevoker` contract kit: a factor's removal, or revoking every
- * session, stops another session counting; a factor's removal from another
- * sign-in never spares the current session; and a revocation that rolls back
- * leaves another session counting.
- *
- * A test case proves its implementation by using this trait and implementing
- * the hooks; each check delegates to `SessionRevokerContract`.
+ * The `SessionRevoker` contract kit; each check delegates to
+ * `SessionRevokerContract`.
  *
  * @phpstan-require-extends \PHPUnit\Framework\TestCase
  *
@@ -27,8 +22,6 @@ use SineMacula\Laravel\Mfa\Testing\Seams\SessionRevokerContract;
 trait SessionRevokerTests
 {
     /**
-     * A factor's removal stops another session counting.
-     *
      * @return void
      */
     public function testSessionRevokerStopsAnotherSessionCountingWhenAFactorIsRemoved(): void
@@ -47,8 +40,6 @@ trait SessionRevokerTests
     }
 
     /**
-     * A factor's removal from another sign-in never spares the current session.
-     *
      * @return void
      */
     public function testSessionRevokerSparesNothingWhenAFactorIsRemovedFromAnotherSignIn(): void
@@ -68,8 +59,6 @@ trait SessionRevokerTests
     }
 
     /**
-     * Revoking every session stops another session counting.
-     *
      * @return void
      */
     public function testSessionRevokerStopsAnotherSessionCountingWhenRevokingAll(): void
@@ -83,8 +72,6 @@ trait SessionRevokerTests
     }
 
     /**
-     * A revocation that rolls back leaves another session counting.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -105,15 +92,11 @@ trait SessionRevokerTests
     }
 
     /**
-     * The application the identity's sessions are on.
-     *
      * @return string
      */
     abstract protected function revokedApplication(): string;
 
     /**
-     * The revoker under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\SessionRevoker
      */
     abstract protected function sessionRevoker(): SessionRevoker;
@@ -134,8 +117,7 @@ trait SessionRevokerTests
     abstract protected function removedFactorId(MultiFactorAuthenticatable $identity): string;
 
     /**
-     * The session id of the identity's current sign-in, its proofs verified so
-     * that it counts.
+     * The current sign-in's session id, verified so that it counts.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return string
@@ -143,24 +125,18 @@ trait SessionRevokerTests
     abstract protected function currentSessionOf(MultiFactorAuthenticatable $identity): string;
 
     /**
-     * Whether the identity's current session still counts.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return bool
      */
     abstract protected function doesCurrentSessionCount(MultiFactorAuthenticatable $identity): bool;
 
     /**
-     * Verify another session of the identity, so that it counts.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return void
      */
     abstract protected function verifyAnotherSession(MultiFactorAuthenticatable $identity): void;
 
     /**
-     * Whether the other session verified still counts.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return bool
      */

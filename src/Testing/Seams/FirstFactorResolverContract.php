@@ -12,9 +12,9 @@ use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 
 /**
- * What every `FirstFactorResolver` must guarantee, as assertions: it answers
- * nothing, or a first factor of the identity on the application, made no later
- * than now, and nothing for an identity with no sign-in.
+ * What every `FirstFactorResolver` must guarantee: it answers nothing, or the
+ * identity's first factor on the application made no later than now, and
+ * nothing without a sign-in.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -29,7 +29,7 @@ final class FirstFactorResolverContract
     private function __construct() {}
 
     /**
-     * The answer is `null`, or a first factor bound to the identity and the
+     * The answer is `null`, or a first factor bound to the identity and
      * application, made no later than now.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver  $resolver
@@ -53,8 +53,6 @@ final class FirstFactorResolverContract
     }
 
     /**
-     * An identity with no sign-in on the application has no first factor.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver  $resolver
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application

@@ -7,14 +7,8 @@ namespace SineMacula\Laravel\Mfa\Facades;
 use Illuminate\Support\Facades\Facade;
 
 /**
- * MFA facade.
- *
- * Static interface to the `MfaManager` singleton. It annotates exactly the
- * manager's surface: the methods it declares, and the inherited `extend()`. An
- * annotation is documentation, not an allowlist: `getDrivers()`,
- * `getContainer()` and `forgetDrivers()`, inherited from Laravel's manager,
- * stay callable as inherited infrastructure, and any method neither declares is
- * refused.
+ * Annotates exactly the manager's own methods and `extend()`; the other methods
+ * inherited from Laravel's manager stay callable but undocumented.
  *
  * @formatter:off
  *
@@ -63,8 +57,6 @@ use Illuminate\Support\Facades\Facade;
 final class Mfa extends Facade
 {
     /**
-     * Get the registered name of the component.
-     *
      * @return string
      */
     #[\Override]

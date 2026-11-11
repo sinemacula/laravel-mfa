@@ -9,11 +9,8 @@ use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 use SineMacula\Laravel\Mfa\Testing\Seams\SubjectTypeResolverContract;
 
 /**
- * The `SubjectTypeResolver` contract kit: a person is a person, and a machine
- * is not.
- *
- * A test case proves its implementation by using this trait and implementing
- * the hooks; each check delegates to `SubjectTypeResolverContract`.
+ * The `SubjectTypeResolver` contract kit; each check delegates to
+ * `SubjectTypeResolverContract`.
  *
  * @phpstan-require-extends \PHPUnit\Framework\TestCase
  *
@@ -25,8 +22,6 @@ use SineMacula\Laravel\Mfa\Testing\Seams\SubjectTypeResolverContract;
 trait SubjectTypeResolverTests
 {
     /**
-     * A person's identity is a person.
-     *
      * @return void
      */
     public function testSubjectTypeResolverFindsAPersonAPerson(): void
@@ -35,8 +30,6 @@ trait SubjectTypeResolverTests
     }
 
     /**
-     * A machine's identity is not a person.
-     *
      * @return void
      */
     public function testSubjectTypeResolverFindsAMachineNoPerson(): void
@@ -45,15 +38,11 @@ trait SubjectTypeResolverTests
     }
 
     /**
-     * The resolver under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver
      */
     abstract protected function subjectTypeResolver(): SubjectTypeResolver;
 
     /**
-     * A person's identity.
-     *
      * @return \Illuminate\Contracts\Auth\Authenticatable
      */
     abstract protected function personIdentity(): Authenticatable;

@@ -9,10 +9,8 @@ use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 /**
- * Default implementation of the `RecoveryCode` contract for Eloquent models, so
- * an application's own recovery code model satisfies it by using this trait.
- * Column names are exposed through the `get*Name()` methods, which a model
- * overrides to remap a column.
+ * `RecoveryCode` for an Eloquent model; override a `get*Name()` method to remap
+ * its column.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -20,8 +18,6 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 trait ActsAsRecoveryCode
 {
     /**
-     * Polymorphic relation to the identity the code belongs to.
-     *
      * @formatter:off
      *
      * @return \Illuminate\Database\Eloquent\Relations\MorphTo<\Illuminate\Database\Eloquent\Model, \Illuminate\Database\Eloquent\Model>
@@ -30,15 +26,12 @@ trait ActsAsRecoveryCode
      */
     public function authenticatable(): MorphTo
     {
-        // morphTo() returns `MorphTo<Model, $this>` but the contract requires
-        // `MorphTo<Model, Model>`: the bound is widened, not narrowed.
+        // The contract widens morphTo()'s `MorphTo<Model, $this>` bound.
         // @phpstan-ignore return.type
         return $this->morphTo();
     }
 
     /**
-     * Return the salted hash of the code.
-     *
      * @return ?string
      */
     public function getCodeHash(): ?string
@@ -50,8 +43,6 @@ trait ActsAsRecoveryCode
     }
 
     /**
-     * Column name holding the code's hash.
-     *
      * @return string
      */
     public function getCodeHashName(): string
@@ -60,8 +51,6 @@ trait ActsAsRecoveryCode
     }
 
     /**
-     * Column name holding the generation of the code's set.
-     *
      * @return string
      */
     public function getGenerationName(): string
@@ -70,8 +59,6 @@ trait ActsAsRecoveryCode
     }
 
     /**
-     * Return when the code was used.
-     *
      * @return ?\Carbon\CarbonInterface
      */
     public function getUsedAt(): ?CarbonInterface
@@ -83,8 +70,6 @@ trait ActsAsRecoveryCode
     }
 
     /**
-     * Column name holding when the code was used.
-     *
      * @return string
      */
     public function getUsedAtName(): string
@@ -93,7 +78,7 @@ trait ActsAsRecoveryCode
     }
 
     /**
-     * Return when a newer set replaced the code's set.
+     * When a newer set replaced the code's set.
      *
      * @return ?\Carbon\CarbonInterface
      */
@@ -106,8 +91,6 @@ trait ActsAsRecoveryCode
     }
 
     /**
-     * Column name holding when the code's set was replaced.
-     *
      * @return string
      */
     public function getReplacedAtName(): string
@@ -116,8 +99,6 @@ trait ActsAsRecoveryCode
     }
 
     /**
-     * Determine whether the code is neither used nor replaced.
-     *
      * @return bool
      */
     public function isUsable(): bool
@@ -126,8 +107,6 @@ trait ActsAsRecoveryCode
     }
 
     /**
-     * Mark the code used at the given time or now.
-     *
      * @param  ?\Carbon\CarbonInterface  $at
      * @return void
      */

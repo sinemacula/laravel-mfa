@@ -9,10 +9,8 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Testing\Seams\RequirementSeamContract;
 
 /**
- * The `IdentityRequirement` contract kit: it keeps no state between calls.
- *
- * A test case proves its implementation by using this trait and implementing
- * the hooks; each check delegates to `RequirementSeamContract`.
+ * The `IdentityRequirement` contract kit; each check delegates to
+ * `RequirementSeamContract`.
  *
  * @phpstan-require-extends \PHPUnit\Framework\TestCase
  *
@@ -24,8 +22,7 @@ use SineMacula\Laravel\Mfa\Testing\Seams\RequirementSeamContract;
 trait IdentityRequirementTests
 {
     /**
-     * The same identity answers the same requirement, whatever another identity
-     * was asked in between.
+     * Another identity is asked in between.
      *
      * @return void
      */
@@ -43,29 +40,21 @@ trait IdentityRequirementTests
     }
 
     /**
-     * The requirement under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\IdentityRequirement
      */
     abstract protected function identityRequirement(): IdentityRequirement;
 
     /**
-     * An identity asked about.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
     abstract protected function requiringIdentity(): MultiFactorAuthenticatable;
 
     /**
-     * Another identity, asked about in between.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
     abstract protected function otherRequiringIdentity(): MultiFactorAuthenticatable;
 
     /**
-     * The application asked about.
-     *
      * @return string
      */
     abstract protected function requirementApplication(): string;

@@ -15,13 +15,8 @@ use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Secrets\QueryExceptionMask;
 
 /**
- * Default implementation of the `Factor` contract for Eloquent models.
- *
- * Consumers who want to swap the shipped `Factor` model for their own can apply
- * this trait to their custom model and satisfy the contract with zero
- * additional code. Column names are exposed via override hooks (`get*Name()`
- * methods) so implementations can remap columns without overriding the
- * accessors themselves.
+ * `Factor` for an Eloquent model; override a `get*Name()` method to remap its
+ * column.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -29,12 +24,8 @@ use SineMacula\Laravel\Mfa\Secrets\QueryExceptionMask;
 trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMethods
 {
     /**
-     * Cast the columns a refusal reads, the lockout's deadline and when the
-     * factor was disabled at the failure ceiling, as datetimes, so a model that
-     * declares no cast for them still reads them back from storage as times.
-     * Eloquent calls this as it builds the model. A cast the model declares for
-     * either column is left as it is, whichever order the two are applied in,
-     * and so are its other casts.
+     * Casts the lockout and disabled columns a refusal reads as datetimes,
+     * unless the model declares its own cast for them.
      *
      * @return void
      */
@@ -51,8 +42,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Polymorphic relation to the owning authenticatable identity.
-     *
      * @formatter:off
      *
      * @return \Illuminate\Database\Eloquent\Relations\MorphTo<\Illuminate\Database\Eloquent\Model, \Illuminate\Database\Eloquent\Model>
@@ -61,16 +50,12 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
      */
     public function authenticatable(): MorphTo
     {
-        // morphTo() returns `MorphTo<Model, $this>` but the EloquentFactor
-        // contract requires `MorphTo<Model, Model>` — the bound is widened, not
-        // narrowed.
+        // The contract widens morphTo()'s `MorphTo<Model, $this>` bound.
         // @phpstan-ignore return.type
         return $this->morphTo();
     }
 
     /**
-     * Return the factor's stable identifier.
-     *
      * @return mixed
      */
     public function getFactorIdentifier(): mixed
@@ -79,7 +64,7 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Return the factor's type: the name its driver is registered under.
+     * The name its driver is registered under.
      *
      * @return string
      */
@@ -92,8 +77,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Column name holding the factor's type.
-     *
      * @return string
      */
     public function getTypeName(): string
@@ -102,8 +85,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Return the factor's human-readable label.
-     *
      * @return ?string
      */
     public function getLabel(): ?string
@@ -115,8 +96,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Column name holding the human-readable label.
-     *
      * @return string
      */
     public function getLabelName(): string
@@ -125,7 +104,7 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Return the factor's destination (phone number or email address).
+     * A phone number or email address.
      *
      * @return ?string
      */
@@ -138,8 +117,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Column name holding the delivery destination.
-     *
      * @return string
      */
     public function getDestinationName(): string
@@ -148,9 +125,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Return the reference of the credential a passkey factor is associated
-     * with.
-     *
      * @return ?string
      */
     public function getCredentialReference(): ?string
@@ -159,8 +133,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Column name holding a passkey factor's credential reference.
-     *
      * @return string
      */
     public function getCredentialReferenceName(): string
@@ -169,8 +141,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Return a TOTP factor's HMAC algorithm.
-     *
      * @return ?string
      */
     public function getTotpAlgorithm(): ?string
@@ -179,8 +149,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Column name holding a TOTP factor's HMAC algorithm.
-     *
      * @return string
      */
     public function getTotpAlgorithmName(): string
@@ -189,8 +157,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Return the number of digits of a TOTP factor's codes.
-     *
      * @return ?int
      */
     public function getTotpDigits(): ?int
@@ -199,8 +165,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Column name holding a TOTP factor's number of digits.
-     *
      * @return string
      */
     public function getTotpDigitsName(): string
@@ -209,7 +173,7 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Return the period of a TOTP factor's time steps in seconds.
+     * Time step length in seconds.
      *
      * @return ?int
      */
@@ -219,8 +183,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Column name holding a TOTP factor's period in seconds.
-     *
      * @return string
      */
     public function getTotpPeriodName(): string
@@ -229,8 +191,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Return the last TOTP time step a code was accepted for.
-     *
      * @return ?int
      */
     public function getLastAcceptedStep(): ?int
@@ -239,8 +199,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Column name holding the last accepted TOTP time step.
-     *
      * @return string
      */
     public function getLastAcceptedStepName(): string
@@ -249,16 +207,9 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Record the TOTP time step a code was accepted for if it is later than the
-     * stored one: one conditional `UPDATE` of the factor's row, which the
-     * database applies to the row as committed, so a request whose copy of the
-     * factor is stale still cannot record a step another already has. A factor
-     * not yet stored compares with its own attribute, as no other request can
-     * see it.
-     *
-     * The recorded step is kept as the attribute's original value, so a later
-     * `persist()` does not write it again over a later step another request
-     * recorded in the meantime.
+     * Records a later step with one conditional `UPDATE` on the committed row,
+     * so a stale copy cannot replay a step. It is synced as the original value
+     * so a later `persist()` cannot overwrite a newer step.
      *
      * @param  int  $step
      * @return bool
@@ -289,14 +240,9 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Return where the factor is in its enrolment: one of the statuses the
-     * package knows, as the enum or its exact value, and pending for a new
-     * factor not yet given one. Anything else throws rather than reads as
-     * pending, a stored factor with no status included: a factor read as not
-     * confirmed can let through a path that a confirmed one would hold to a
-     * stronger proof. On a model that casts the column to the enum, a value the
-     * enum does not know throws Laravel's `ValueError` from the cast before it
-     * gets here: that fails closed too, though not as `InvalidModelException`.
+     * Pending only for an unsaved factor with no status; any unknown value
+     * throws, as an unconfirmed read can skip a stronger proof. An enum cast
+     * fails closed first with `ValueError`.
      *
      * @return \SineMacula\Laravel\Mfa\Enums\FactorStatus
      *
@@ -322,8 +268,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Column name holding the factor's status.
-     *
      * @return string
      */
     public function getStatusName(): string
@@ -332,8 +276,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Determine whether the factor is confirmed, and so usable.
-     *
      * @return bool
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\InvalidModelException
@@ -344,8 +286,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Determine whether the factor is the identity's preferred one.
-     *
      * @return bool
      */
     public function isPreferred(): bool
@@ -354,8 +294,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Column name holding whether the factor is the preferred one.
-     *
      * @return string
      */
     public function getPreferredName(): string
@@ -364,8 +302,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Return the factor's count of consecutive failed verifications.
-     *
      * @return int
      */
     public function getConsecutiveFailures(): int
@@ -374,8 +310,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Column name holding the count of consecutive failed verifications.
-     *
      * @return string
      */
     public function getConsecutiveFailuresName(): string
@@ -384,9 +318,8 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Return when the factor was disabled at the failure ceiling. It fails
-     * closed, as `getLockedUntil()` does: a stored value that does not read as
-     * a time throws, as reading it as never disabled would enable the factor.
+     * Throws on a value that is not a time, as never disabled would enable the
+     * factor.
      *
      * @return ?\Carbon\CarbonInterface
      *
@@ -398,8 +331,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Column name holding when the factor was disabled at the failure ceiling.
-     *
      * @return string
      */
     public function getDisabledAtName(): string
@@ -408,9 +339,8 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Return when the factor's temporary lockout ends, as held on this
-     * instance. It fails closed: a stored value that does not read as a time
-     * throws, as reading it as no deadline would unlock the factor.
+     * As held on this instance. Throws on a value that is not a time, as no
+     * deadline would unlock the factor.
      *
      * @return ?\Carbon\CarbonInterface
      *
@@ -422,8 +352,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Column name holding when the factor's temporary lockout ends.
-     *
      * @return string
      */
     public function getLockedUntilName(): string
@@ -432,7 +360,7 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Return the application the factor was enrolled through.
+     * The application the factor was enrolled through.
      *
      * @return ?string
      */
@@ -442,8 +370,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Column name holding the application the factor was enrolled through.
-     *
      * @return string
      */
     public function getApplicationName(): string
@@ -452,8 +378,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Return when the factor was confirmed.
-     *
      * @return ?\Carbon\CarbonInterface
      */
     public function getConfirmedAt(): ?CarbonInterface
@@ -462,8 +386,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Column name holding when the factor was confirmed.
-     *
      * @return string
      */
     public function getConfirmedAtName(): string
@@ -472,8 +394,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Return when the factor was last used to verify.
-     *
      * @return ?\Carbon\CarbonInterface
      */
     public function getLastUsedAt(): ?CarbonInterface
@@ -482,8 +402,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Column name holding when the factor was last used.
-     *
      * @return string
      */
     public function getLastUsedAtName(): string
@@ -492,8 +410,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Return the persistent secret, if any.
-     *
      * @return ?string
      */
     public function getSecret(): ?string
@@ -505,8 +421,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Column name holding the persistent secret.
-     *
      * @return string
      */
     public function getSecretName(): string
@@ -515,8 +429,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Stamp a successful verification as the factor's last use.
-     *
      * @param  ?\Carbon\CarbonInterface  $at
      * @return void
      */
@@ -526,8 +438,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Mark the factor confirmed at the given time or now.
-     *
      * @param  ?\Carbon\CarbonInterface  $at
      * @return void
      */
@@ -538,11 +448,8 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Persist pending mutations to the underlying storage, throwing when a
-     * model event cancels the save, so the change it is part of never reports a
-     * state that was not stored. A failed query leaves with nothing it was
-     * given, since a factor binds a destination and a credential reference as
-     * they are (see `Secrets\QueryExceptionMask`).
+     * Throws when a model event cancels the save. A failed query is masked, as
+     * its bindings carry the destination and credential reference.
      *
      * @return void
      *
@@ -565,8 +472,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Read a string column, `null` for anything else.
-     *
      * @param  string  $column
      * @return ?string
      */
@@ -579,8 +484,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Read an integer column, `null` for anything else.
-     *
      * @param  string  $column
      * @return ?int
      */
@@ -593,11 +496,8 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Read a time column a refusal depends on: `null` only when nothing is
-     * stored, and otherwise the time, or a throw. A blank is refused here, as a
-     * datetime cast would read it as the current time; text that is not a time
-     * throws from the cast, and anything else that does not read as a time
-     * throws here, naming the column but not the value.
+     * `null` only when nothing is stored. A blank throws, as a datetime cast
+     * would read it as now; the message names the column, never the value.
      *
      * @param  string  $column
      * @param  string  $state
@@ -623,8 +523,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
-     * Read a time column, `null` for anything else.
-     *
      * @param  string  $column
      * @return ?\Carbon\CarbonInterface
      */

@@ -9,10 +9,9 @@ use PHPUnit\Framework\Assert;
 use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 
 /**
- * What every `PendingSessionResolver` must guarantee, as assertions: a request
- * that carries no pending credential has no pending session, and one that
- * carries a credential that does not validate is refused by throwing, never
- * answered as having none.
+ * What every `PendingSessionResolver` must guarantee: no pending credential
+ * means no pending session, and an invalid one throws rather than reads as
+ * none.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -27,8 +26,6 @@ final class PendingSessionResolverContract
     private function __construct() {}
 
     /**
-     * A request with no pending credential has no pending session.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver  $resolver
      * @param  \Illuminate\Http\Request  $request
      * @return void
@@ -39,9 +36,8 @@ final class PendingSessionResolverContract
     }
 
     /**
-     * A request with a pending credential that does not validate is refused by
-     * throwing a `RuntimeException`. A resolver with no pending credentials at
-     * all is given no such request, and answers none for any.
+     * Throws a `RuntimeException`. A resolver with no pending credentials is
+     * given `null` and must answer none for any request.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver  $resolver
      * @param  ?\Illuminate\Http\Request  $request

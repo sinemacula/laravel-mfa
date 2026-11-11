@@ -9,13 +9,8 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Testing\Seams\EventContextResolverContract;
 
 /**
- * The `EventContextResolver` contract kit: the context is scalar values only; a
- * subject naming no sign-in the resolver knows leaves the session, principal
- * and tenant unknown, even while another session is being served; and, when the
- * test names one, a sign-in the resolver knows names its session.
- *
- * A test case proves its implementation by using this trait and implementing
- * the hooks; each check delegates to `EventContextResolverContract`.
+ * The `EventContextResolver` contract kit; each check delegates to
+ * `EventContextResolverContract`.
  *
  * @phpstan-require-extends \PHPUnit\Framework\TestCase
  *
@@ -27,8 +22,6 @@ use SineMacula\Laravel\Mfa\Testing\Seams\EventContextResolverContract;
 trait EventContextResolverTests
 {
     /**
-     * Every value of the context is an integer, a string or `null`.
-     *
      * @return void
      */
     public function testEventContextResolverGivesScalarValuesOnly(): void
@@ -37,9 +30,7 @@ trait EventContextResolverTests
     }
 
     /**
-     * A subject naming no sign-in, or one the resolver does not know, leaves
-     * the session, principal and tenant unknown, while the session
-     * `arrangeServedEventSession()` arranges is being served.
+     * Holds while the session `arrangeServedEventSession()` arranges is served.
      *
      * @return void
      */
@@ -51,9 +42,7 @@ trait EventContextResolverTests
     }
 
     /**
-     * A subject naming the sign-in `knownEventSignIn()` gives names its
-     * session; a resolver that maps no sign-in has none to give, and the check
-     * holds trivially.
+     * Holds trivially when `knownEventSignIn()` is `null`.
      *
      * @return void
      */
@@ -71,19 +60,15 @@ trait EventContextResolverTests
     }
 
     /**
-     * Serve a session of the identity's, as the process would while an event of
-     * another is resolved; nothing by default. A resolver over an
-     * authentication layer signs the identity in here, so a resolver that read
-     * the session being served would be caught.
+     * Serve a session of the identity's; nothing by default. A resolver over an
+     * authentication layer signs in here, so reading the served session shows.
      *
      * @return void
      */
     protected function arrangeServedEventSession(): void {}
 
     /**
-     * An application and a sign-in on it the resolver knows, as
-     * `[application, sign-in]`, or `null` for a resolver that maps no sign-in,
-     * as the package's default does.
+     * `[application, sign-in]` the resolver knows, or `null` when it maps none.
      *
      * @return ?array{0: string, 1: string}
      */
@@ -93,15 +78,11 @@ trait EventContextResolverTests
     }
 
     /**
-     * The resolver under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\EventContextResolver
      */
     abstract protected function eventContextResolver(): EventContextResolver;
 
     /**
-     * An identity events are about.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
      */
     abstract protected function eventIdentity(): MultiFactorAuthenticatable;

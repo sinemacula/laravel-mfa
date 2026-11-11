@@ -10,17 +10,12 @@ use SineMacula\Laravel\Mfa\Drivers\Base32;
 use SineMacula\Laravel\Mfa\Drivers\TotpParameters;
 
 /**
- * Stands in for the authenticator app a TOTP factor is enrolled in: the secret
- * and parameters a test factor is stored with, and the code the app shows for a
- * factor now or a number of time steps away.
+ * Stands in for a TOTP authenticator app: a test factor's secret and
+ * attributes, and the code it shows now or `$steps` time steps away.
  *
- * It reads the driver's clock, so `Carbon::setTestNow()` is the frozen time.
- * The driver accepts a time step once per factor, so a code already accepted
- * replays: for another, a test moves the clock or passes `$steps`.
- *
- * The secret is the 20-byte key of RFC 6238 Appendix B, so a code can be
- * checked against the published test vectors by hand. It is public test
- * material, and no enrolment ever defaults to it. Not for production use.
+ * Reads the driver's clock, so `Carbon::setTestNow()` freezes it. A time step
+ * is accepted once per factor; for another code, move the clock or pass
+ * `$steps`. The secret is RFC 6238's public test key. Not for production use.
  *
  * @api
  *
@@ -32,7 +27,7 @@ final class AuthenticatorApp
     /** @var string The RFC 6238 SHA-1 test key `12345678901234567890`, in Base32. */
     public const string SECRET = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
 
-    /** @var array<string, int|string> The attributes of a TOTP factor enrolled with the secret and the default parameters. */
+    /** @var array<string, int|string> A TOTP factor with the secret and default parameters. */
     public const array FACTOR = [
         'type'           => 'totp',
         'secret'         => self::SECRET,
@@ -41,17 +36,13 @@ final class AuthenticatorApp
         'totp_period'    => 30,
     ];
 
-    /** @var string The type of the factors a code can be made for. */
-    private const string TOTP = 'totp';
-
     /**
      * Disallow instantiation; utility container only.
      */
     private function __construct() {}
 
     /**
-     * The code the factor's authenticator app shows the given number of time
-     * steps from now.
+     * Code the app shows `$steps` time steps from now.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  int  $steps
@@ -61,7 +52,7 @@ final class AuthenticatorApp
      */
     public static function code(Factor $factor, int $steps = 0): string
     {
-        if ($factor->getType() !== self::TOTP) {
+        if ($factor->getType() !== 'totp') {
             throw new \InvalidArgumentException('The factor is not a TOTP factor, so no authenticator app shows a code for it.');
         }
 

@@ -11,11 +11,9 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Events\EventSubject;
 
 /**
- * What every `EventContextResolver` must guarantee, as assertions: the context
- * is scalar values only, with and without an identity and a client, never a
- * model, an array or any other object; a subject naming no sign-in the resolver
- * knows leaves the session, principal and tenant unknown; and one naming a
- * sign-in it knows names its session.
+ * What every `EventContextResolver` must guarantee: scalar values only, and the
+ * session, principal and tenant only for a sign-in the subject names and the
+ * resolver knows.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -30,8 +28,6 @@ final class EventContextResolverContract
     private function __construct() {}
 
     /**
-     * Every value of the context is an integer, a string or `null`.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\EventContextResolver  $resolver
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return void
@@ -48,9 +44,7 @@ final class EventContextResolverContract
     }
 
     /**
-     * A subject that names no sign-in, or one the resolver does not know,
-     * leaves the session, the principal and the tenant unknown: they are never
-     * filled from whichever session the process happens to serve.
+     * Never filled from whichever session the process happens to serve.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\EventContextResolver  $resolver
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
@@ -71,8 +65,6 @@ final class EventContextResolverContract
     }
 
     /**
-     * A subject naming a sign-in the resolver knows names its session.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\EventContextResolver  $resolver
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application

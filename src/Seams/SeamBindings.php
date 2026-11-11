@@ -8,9 +8,8 @@ use Illuminate\Contracts\Foundation\Application;
 use SineMacula\Laravel\Mfa\Contracts\Reauthenticator;
 
 /**
- * Registers the defaults of the seams that read nothing of the package: the
- * refusing reauthenticator (`RefusingReauthenticator`). An adapter, or the
- * application, rebinds it in its own service provider.
+ * Default bindings for seams that read nothing of the package; an adapter or
+ * the application rebinds them in its own provider.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -25,8 +24,6 @@ final class SeamBindings
     private function __construct() {}
 
     /**
-     * Register the default reauthenticator.
-     *
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @return void
      */

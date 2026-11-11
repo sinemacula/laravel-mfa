@@ -9,13 +9,8 @@ use SineMacula\Laravel\Mfa\Contracts\GuardApplicationResolver;
 use SineMacula\Laravel\Mfa\Testing\Seams\GuardApplicationResolverContract;
 
 /**
- * The `GuardApplicationResolver` contract kit: a request names one application
- * through a guard, the same way each time. A resolver that implements the guard
- * aware form uses this trait beside `ApplicationResolverTests`, which proves
- * the form without a guard.
- *
- * A test case proves its implementation by using this trait and implementing
- * the hooks; each check delegates to `GuardApplicationResolverContract`.
+ * The `GuardApplicationResolver` contract kit; use it beside
+ * `ApplicationResolverTests`, which proves the form without a guard.
  *
  * @phpstan-require-extends \PHPUnit\Framework\TestCase
  *
@@ -27,9 +22,6 @@ use SineMacula\Laravel\Mfa\Testing\Seams\GuardApplicationResolverContract;
 trait GuardApplicationResolverTests
 {
     /**
-     * The request's application through the guard is named, the same way each
-     * time.
-     *
      * @return void
      */
     public function testGuardApplicationResolverNamesOneApplicationThroughTheGuard(): void
@@ -38,22 +30,17 @@ trait GuardApplicationResolverTests
     }
 
     /**
-     * The resolver under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\GuardApplicationResolver
      */
     abstract protected function guardApplicationResolver(): GuardApplicationResolver;
 
     /**
-     * A request for an application.
-     *
      * @return \Illuminate\Http\Request
      */
     abstract protected function guardApplicationRequest(): Request;
 
     /**
-     * A guard the request may be served through, such as one other than the
-     * default.
+     * Such as one other than the default.
      *
      * @return string
      */

@@ -9,10 +9,8 @@ use SineMacula\Laravel\Mfa\Codes\CodeMessage;
 use SineMacula\Laravel\Mfa\Testing\FakeSenderBinding;
 
 /**
- * What a fake sender keeps: every code message it is given, oldest first,
- * instead of delivering it, so a test can read the code a request sent and
- * verify with it, and see what else the message said. A fake using it names the
- * contract it is bound as in its `SENDER` constant.
+ * Keeps a fake sender's code messages, oldest first, instead of delivering
+ * them. The using class names its bound contract in a `SENDER` constant.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -21,12 +19,11 @@ use SineMacula\Laravel\Mfa\Testing\FakeSenderBinding;
  */
 trait RecordsCodeMessages
 {
-    /** @var list<\SineMacula\Laravel\Mfa\Codes\CodeMessage> The messages sent, oldest first. */
+    /** @var list<\SineMacula\Laravel\Mfa\Codes\CodeMessage> */
     private array $sent = [];
 
     /**
-     * Bind a fresh fake as the sender in the container (the application's, when
-     * none is given) and return it.
+     * Bind a fresh fake into the given container, or the application's.
      *
      * @param  ?\Illuminate\Contracts\Container\Container  $container
      * @return self
@@ -41,8 +38,6 @@ trait RecordsCodeMessages
     }
 
     /**
-     * Keep the message instead of delivering it.
-     *
      * @param  \SineMacula\Laravel\Mfa\Codes\CodeMessage  $message
      * @return void
      */
@@ -53,8 +48,6 @@ trait RecordsCodeMessages
     }
 
     /**
-     * Every message sent, oldest first.
-     *
      * @return list<\SineMacula\Laravel\Mfa\Codes\CodeMessage>
      */
     public function sent(): array
@@ -63,8 +56,6 @@ trait RecordsCodeMessages
     }
 
     /**
-     * The messages sent to the destination, oldest first.
-     *
      * @param  string  $destination
      * @return list<\SineMacula\Laravel\Mfa\Codes\CodeMessage>
      */
@@ -87,8 +78,6 @@ trait RecordsCodeMessages
     }
 
     /**
-     * Forget every message sent so far.
-     *
      * @return void
      */
     public function reset(): void

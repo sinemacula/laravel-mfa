@@ -8,13 +8,8 @@ use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 use SineMacula\Laravel\Mfa\Testing\Concerns\RecordsCodeMessages;
 
 /**
- * An SMS sender for tests: keeps every code message it is given instead of
- * delivering it, so a test can read the code a request sent and verify with it,
- * and see the purpose, the application and the recipient it was sent for.
- *
- * `FakeSmsSender::fake()` binds a fresh instance as the application's sender
- * and returns it; the manager builds its drivers again, so one resolved before
- * sends through the fake too. Not for production use.
+ * Test SMS sender that keeps each code message instead of delivering it.
+ * `fake()` binds it; drivers are rebuilt per call, so earlier ones use it too.
  *
  * @api
  *

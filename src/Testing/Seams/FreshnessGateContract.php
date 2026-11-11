@@ -10,12 +10,9 @@ use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
 /**
- * What every `FreshnessGate` must guarantee, as assertions: a name that is not
- * an operation's, and an operation with no requirement from either side, are
- * never fresh, a caller's requirement with no maximum age is refused, how long
- * a session is fresh is either nothing or a time still to come that the session
- * is fresh until, and the requirement it says it holds a session to asks at
- * least what the caller asks.
+ * What every `FreshnessGate` must guarantee: an invalid name or an operation
+ * with no requirement is never fresh, an unbounded caller requirement throws, a
+ * deadline is absent or ahead, and its requirement asks at least the caller's.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -33,8 +30,6 @@ final class FreshnessGateContract
     private function __construct() {}
 
     /**
-     * A name that is not in the form an operation's takes is never fresh.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\FreshnessGate  $gate
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @return void
@@ -45,8 +40,7 @@ final class FreshnessGateContract
     }
 
     /**
-     * An operation with no requirement of its own and none from the caller is
-     * never fresh.
+     * No requirement of its own and none from the caller.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\FreshnessGate  $gate
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
@@ -58,8 +52,7 @@ final class FreshnessGateContract
     }
 
     /**
-     * A caller's requirement with a part that carries no maximum age is refused
-     * with an `InvalidArgumentException`.
+     * A part with no maximum age throws `InvalidArgumentException`.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\FreshnessGate  $gate
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
@@ -79,8 +72,6 @@ final class FreshnessGateContract
     }
 
     /**
-     * An operation that is not fresh has no time it is fresh until.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\FreshnessGate  $gate
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @return void
@@ -92,8 +83,6 @@ final class FreshnessGateContract
     }
 
     /**
-     * A deadline is not in the past, and the session is fresh while it holds.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\FreshnessGate  $gate
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  string  $operation
@@ -109,10 +98,8 @@ final class FreshnessGateContract
     }
 
     /**
-     * The requirement the gate holds a session to is none for an operation with
-     * no requirement from either side, and asks at least what the caller asks,
-     * so judging it on some of the session's proofs can never ask less than the
-     * gate does.
+     * None when neither side asks, so judging only some of the session's proofs
+     * can never ask less than the gate does.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\FreshnessGate  $gate
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller

@@ -9,19 +9,9 @@ use SineMacula\Laravel\Mfa\Config\ConfigurationValidator;
 use Symfony\Component\Console\Attribute\AsCommand;
 
 /**
- * `mfa:check`: checks the configuration and the bindings it needs the way the
- * package does when it boots, and exits non-zero on a problem, for deploy
- * pipelines and readiness probes.
- *
- * Every check runs, so one run lists every problem, each as
- * `[<subject>] <message>`, and each subject without one as `[<subject>] OK`:
- * the storage connection, the factor model and table, the identity states
- * table, each capability's settings, and each configured application (its
- * settings, a delivery binding for each code type it enables, and its first
- * factor). The package skips its own boot check while this command runs, so the
- * command reports the problems rather than failing on the first. It reads
- * configuration and the container only, opens no database connection and prints
- * no secret.
+ * `mfa:check`: runs the boot-time configuration checks and exits non-zero on a
+ * problem, for deploy pipelines and readiness probes. The boot check is skipped
+ * while it runs so every problem is listed. It opens no database connection.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -29,19 +19,16 @@ use Symfony\Component\Console\Attribute\AsCommand;
 #[AsCommand(name: self::NAME)]
 final class CheckConfigurationCommand extends Command
 {
-    /** @var string The command's name. */
+    /** @var string */
     public const string NAME = 'mfa:check';
 
-    /** @var string The name and signature of the console command. */
+    /** @var string */
     protected $signature = self::NAME;
 
-    /** @var string The console command description. */
+    /** @var string */
     protected $description = 'Check the MFA configuration and the bindings it needs';
 
     /**
-     * Check the configuration and report each problem, or that a subject has
-     * none.
-     *
      * @param  \SineMacula\Laravel\Mfa\Config\ConfigurationValidator  $validator
      * @return int
      */

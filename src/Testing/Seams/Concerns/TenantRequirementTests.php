@@ -9,10 +9,8 @@ use SineMacula\Laravel\Mfa\Contracts\TenantRequirement;
 use SineMacula\Laravel\Mfa\Testing\Seams\RequirementSeamContract;
 
 /**
- * The `TenantRequirement` contract kit: it keeps no state between calls.
- *
- * A test case proves its implementation by using this trait and implementing
- * the hooks; each check delegates to `RequirementSeamContract`.
+ * The `TenantRequirement` contract kit; each check delegates to
+ * `RequirementSeamContract`.
  *
  * @phpstan-require-extends \PHPUnit\Framework\TestCase
  *
@@ -24,8 +22,7 @@ use SineMacula\Laravel\Mfa\Testing\Seams\RequirementSeamContract;
 trait TenantRequirementTests
 {
     /**
-     * The same tenant answers the same requirement, whatever another tenant was
-     * asked in between.
+     * Another tenant is asked in between.
      *
      * @return void
      */
@@ -42,8 +39,6 @@ trait TenantRequirementTests
     }
 
     /**
-     * The requirement under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\TenantRequirement
      */
     abstract protected function tenantRequirement(): TenantRequirement;
@@ -56,8 +51,6 @@ trait TenantRequirementTests
     abstract protected function tenantIdentity(): MultiFactorAuthenticatable;
 
     /**
-     * The application asked about.
-     *
      * @return string
      */
     abstract protected function tenantApplication(): string;

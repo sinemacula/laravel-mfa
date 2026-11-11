@@ -14,19 +14,12 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 
 /**
  * What a registration path's wiring to `Passkeys\PasskeyChangeGate` must
- * guarantee, as assertions: the gate is called inside the registration's own
- * change, so a registration the gate refuses keeps nothing; and the path's own
- * calls into the gate refuse a call made outside a transaction, so a path that
- * opens one of its own around the gate, or swallows its refusal, is caught.
+ * guarantee: the gate runs inside the registration's own transaction, so a
+ * refusal keeps nothing. The gate is made to refuse by associating the
+ * credential with another identity first.
  *
- * The closures given register a passkey through the path under test, and say
- * whether its credential was kept. The gate is made to refuse by associating
- * the credential with another identity first, which needs no arrangement of the
- * session.
- *
- * The path must call the gate before it takes its own session rows, so that the
- * package's rows are locked first in every change. These assertions cannot see
- * that order; the path's own tests must.
+ * The path must call the gate before taking its own session rows, so the
+ * package's rows lock first; these assertions cannot see that order.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -35,7 +28,7 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
  */
 final class PasskeyChangeGateContract
 {
-    /** @var string The credential the contract registers, canonical unpadded base64url. */
+    /** @var string Canonical unpadded base64url. */
     public const string CREDENTIAL = 'Y29udHJhY3QtY3JlZGVudGlhbA';
 
     /**
@@ -44,9 +37,6 @@ final class PasskeyChangeGateContract
     private function __construct() {}
 
     /**
-     * A registration the gate refuses fails, keeps no credential and associates
-     * nothing with the identity.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \Closure(\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable, string): mixed  $register
      * @param  \Closure(\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable, string): bool  $isStored
@@ -83,11 +73,9 @@ final class PasskeyChangeGateContract
     }
 
     /**
-     * The path's calls into the gate, registering and removing a passkey with
-     * the contract's credential id, each refuse with a `LogicException` outside
-     * a transaction on the storage connection: the path neither opens one of
-     * its own around the gate nor swallows its refusal. The check must itself
-     * be made outside any transaction on that connection.
+     * Each call must throw a `LogicException` outside a storage transaction, so
+     * the path neither opens its own nor swallows the refusal. Call this
+     * outside any transaction on that connection.
      *
      * @param  \Closure(string): mixed  $registering
      * @param  \Closure(string): mixed  $removing
@@ -105,7 +93,7 @@ final class PasskeyChangeGateContract
     }
 
     /**
-     * What a call threw, or `null` when it threw nothing.
+     * `null` when the call threw nothing.
      *
      * @param  \Closure(): mixed  $call
      * @return ?\Throwable

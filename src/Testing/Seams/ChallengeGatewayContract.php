@@ -13,12 +13,10 @@ use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
 /**
- * What every `ChallengeGateway` must guarantee, as assertions: a wrong code
- * fails and is counted, a code answers only the binding it was sent for, a code
- * is consumed once, and an unknown challenge is not found.
- *
- * Each assertion sends one code for the factor and reads it back through the
- * closure given, as a test reads it from a fake sender.
+ * What every `ChallengeGateway` must guarantee: a wrong code fails and is
+ * counted, a code answers only its own binding and only once, and an unknown
+ * challenge is not found. `$delivered` reads a sent code back, as from a fake
+ * sender.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -33,8 +31,6 @@ final class ChallengeGatewayContract
     private function __construct() {}
 
     /**
-     * A code other than the one sent fails, and that was counted.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ChallengeGateway  $gateway
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
@@ -52,8 +48,7 @@ final class ChallengeGatewayContract
     }
 
     /**
-     * The code sent answers its own binding, and no other purpose's, whose
-     * challenge is not found.
+     * Another purpose's challenge is not found.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ChallengeGateway  $gateway
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
@@ -74,8 +69,6 @@ final class ChallengeGatewayContract
     }
 
     /**
-     * The code sent answers once; used again, it is replayed.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ChallengeGateway  $gateway
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
@@ -93,8 +86,6 @@ final class ChallengeGatewayContract
     }
 
     /**
-     * A challenge that is not the binding's is not found, whatever the code.
-     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ChallengeGateway  $gateway
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
@@ -109,7 +100,7 @@ final class ChallengeGatewayContract
     }
 
     /**
-     * Send a code, which must be sent, and return its challenge's id.
+     * Fails the check unless the code is sent.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ChallengeGateway  $gateway
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
@@ -127,7 +118,7 @@ final class ChallengeGatewayContract
     }
 
     /**
-     * A code of the same length that is not the one given.
+     * Same length, different code.
      *
      * @param  string  $code
      * @return string
