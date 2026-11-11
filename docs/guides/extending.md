@@ -192,7 +192,7 @@ registers it with the container, and the classes only it uses:
 `Contracts`, `Concerns`, `Models`, `Events`, `Exceptions`, `Enums` and `Facades` hold what their names say for every
 capability (the events and how they are dispatched are in [Events](events.md), and the values and enums assurance is
 described with in [Proofs, assurance and requirements](assurance.md)), and `Config`, `Database` and `Support` the
-internal helpers the capabilities share, among them `Config\ConfigurationValidator` (see [Checking the
+helpers the capabilities share, among them `Config\ConfigurationValidator` (see [Checking the
 configuration](configuration.md#checking-the-configuration)), `Database\StorageConnection` and
 `Support\FactorStateTransaction` (see [Storage](configuration.md#storage)). Each capability reads its own block of
 `config/mfa.php` through its `*Settings` class, on every call. `Contracts` also declares the seams the requirement,
@@ -306,6 +306,12 @@ A row that says what a seam needs names no method, as there is no public name to
 documentation for it. Until the layer provides it, `Contracts\ProofStore` must still be rebound. The default keeps
 proofs in the Laravel session, which a stateless layer does not have, so there is no sign-in and every verification
 answers `not_found`.
+
+An adapter can reuse three of this package's helpers. `MfaServiceProvider::isPackageDefault($container, $contract)` says
+whether a contract is still bound to one of this package's classes, so the adapter replaces the default and keeps a
+binding the application made. `Proofs\ProofOwner::of($identity)` gives the type and key this package records an identity
+under, with `Support\IdentityType::of()` for the type alone. `Database\AfterStorageCommit::run($container, $callback)`
+runs work once the storage connection's open transaction commits, at once when none is open, and never on rollback.
 
 `Contracts\SessionTransition::factorChanged()` is called after every factor change made on an active session, whether
 or not this package finds the session short: a factor confirmed, a passkey registered as a factor, and a removal the
