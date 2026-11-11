@@ -19,11 +19,6 @@ use Tests\Fixtures\Seams\RecordingSessionTransition;
 use Tests\TestCase;
 
 /**
- * Tests for `SessionReevaluation`: a judgement hands every change to the bound
- * session transition, with the requirement the session no longer meets or none,
- * and returns the package's assessment with what the transition returned; an
- * assessment alone calls no seam.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -33,8 +28,8 @@ use Tests\TestCase;
 final class SessionReevaluationTest extends TestCase
 {
     /**
-     * Met or not, the change goes to the transition as made, and the judgement
-     * carries the assessment and the transition's answer.
+     * Met or not, the change goes as made, and the judgement carries the
+     * assessment and the transition's answer.
      *
      * @return void
      */
@@ -75,8 +70,6 @@ final class SessionReevaluationTest extends TestCase
     }
 
     /**
-     * An assessment alone calls no seam.
-     *
      * @return void
      */
     public function testAnAssessmentAloneCallsNoSeam(): void
@@ -93,8 +86,6 @@ final class SessionReevaluationTest extends TestCase
     }
 
     /**
-     * The reevaluation under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Requirements\SessionReevaluation
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

@@ -11,9 +11,6 @@ use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Enums\KeyProtection;
 
 /**
- * Unit tests for the `ObservedProperties` value: nothing is assumed, the
- * WebAuthn backup flags stay consistent, and the value serialises.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -23,7 +20,7 @@ use SineMacula\Laravel\Mfa\Enums\KeyProtection;
 final class ObservedPropertiesTest extends TestCase
 {
     /**
-     * Nothing is observed unless it is given: no property defaults to true.
+     * No property defaults to true.
      *
      * @return void
      */
@@ -40,7 +37,7 @@ final class ObservedPropertiesTest extends TestCase
     }
 
     /**
-     * The properties keep what was observed, false included.
+     * False included.
      *
      * @return void
      */
@@ -64,8 +61,7 @@ final class ObservedPropertiesTest extends TestCase
     }
 
     /**
-     * A credential seen backed up while seen as not eligible for backup is a
-     * contradiction WebAuthn rules out.
+     * WebAuthn rules out backed up while not backup eligible.
      *
      * @return void
      */
@@ -78,8 +74,6 @@ final class ObservedPropertiesTest extends TestCase
     }
 
     /**
-     * Backup combinations that are consistent.
-     *
      * @return iterable<string, array{?bool, ?bool}>
      */
     public static function provideConsistentBackupFlags(): iterable
@@ -93,8 +87,6 @@ final class ObservedPropertiesTest extends TestCase
     }
 
     /**
-     * Every other combination of the backup flags is accepted.
-     *
      * @param  ?bool  $eligibility
      * @param  ?bool  $state
      * @return void
@@ -109,8 +101,7 @@ final class ObservedPropertiesTest extends TestCase
     }
 
     /**
-     * The serialised form uses snake_case keys, with null for what was not
-     * observed.
+     * Snake_case keys, with null for what was not observed.
      *
      * @return void
      */
@@ -132,8 +123,7 @@ final class ObservedPropertiesTest extends TestCase
     }
 
     /**
-     * No key protection observed is serialised as null without a warning, which
-     * an application's error handler would turn into an exception.
+     * An application's error handler would turn the warning into an exception.
      *
      * @return void
      */
@@ -153,8 +143,7 @@ final class ObservedPropertiesTest extends TestCase
     }
 
     /**
-     * The properties read back from their serialised form equal the originals,
-     * and a missing key reads as not observed.
+     * A missing key reads as not observed.
      *
      * @return void
      */
@@ -167,8 +156,6 @@ final class ObservedPropertiesTest extends TestCase
     }
 
     /**
-     * Serialised forms that are not observed properties.
-     *
      * @return iterable<string, array{array<string, mixed>, string}>
      */
     public static function provideMalformedProperties(): iterable
@@ -193,8 +180,6 @@ final class ObservedPropertiesTest extends TestCase
     }
 
     /**
-     * A serialised form that is not observed properties is refused.
-     *
      * @param  array<string, mixed>  $data
      * @param  string  $message
      * @return void

@@ -15,12 +15,6 @@ use Tests\Fixtures\Exceptions\MidRotationFailureException;
 use Tests\TestCase;
 
 /**
- * Unit tests for `ActsAsFactor::storeAcceptedStep()`: the compare-and-set of a
- * TOTP factor's last accepted time step, on a stored row and on a factor not
- * yet stored, that a stale copy of the factor can neither record a step another
- * copy recorded nor write an older one back over it, and that a step recorded
- * inside a transaction is undone with it.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -35,8 +29,6 @@ final class ActsAsFactorStoreAcceptedStepTest extends TestCase
     private const int STEP = 60000000;
 
     /**
-     * A stored factor records its first step, then each later one, in its row.
-     *
      * @return void
      */
     public function testAStoredFactorRecordsItsFirstAndEachLaterStep(): void
@@ -53,8 +45,7 @@ final class ActsAsFactorStoreAcceptedStepTest extends TestCase
     }
 
     /**
-     * A stored factor refuses its last step and any earlier one, leaving its
-     * row as it was.
+     * The row is left as it was.
      *
      * @return void
      */
@@ -70,8 +61,7 @@ final class ActsAsFactorStoreAcceptedStepTest extends TestCase
     }
 
     /**
-     * A copy of the factor read before another copy recorded a step cannot
-     * record the same step: the row as stored decides, not the copy.
+     * The row as stored decides, not the copy.
      *
      * @return void
      */
@@ -89,9 +79,6 @@ final class ActsAsFactorStoreAcceptedStepTest extends TestCase
     }
 
     /**
-     * A copy that recorded a step does not write it back when it is persisted
-     * later, after another copy recorded a later step.
-     *
      * @return void
      */
     public function testPersistingAfterwardKeepsALaterStepAnotherCopyRecorded(): void
@@ -112,8 +99,6 @@ final class ActsAsFactorStoreAcceptedStepTest extends TestCase
     }
 
     /**
-     * Another factor's row is never touched.
-     *
      * @return void
      */
     public function testOnlyTheFactorsOwnRowIsUpdated(): void
@@ -126,9 +111,7 @@ final class ActsAsFactorStoreAcceptedStepTest extends TestCase
     }
 
     /**
-     * A step recorded inside the factor state transaction is part of it: when
-     * the transaction rolls back, the step is not recorded, and a later request
-     * can record it.
+     * A later request can then record the step.
      *
      * @return void
      *
@@ -159,8 +142,7 @@ final class ActsAsFactorStoreAcceptedStepTest extends TestCase
     }
 
     /**
-     * A factor not yet stored compares with its own attribute, and the step it
-     * recorded is stored with it.
+     * The step it recorded is stored with it.
      *
      * @return void
      */
@@ -183,8 +165,6 @@ final class ActsAsFactorStoreAcceptedStepTest extends TestCase
     }
 
     /**
-     * Store a TOTP factor with no step accepted, and read it back.
-     *
      * @return \SineMacula\Laravel\Mfa\Models\Factor
      */
     private function storedFactor(): Factor
@@ -199,8 +179,6 @@ final class ActsAsFactorStoreAcceptedStepTest extends TestCase
     }
 
     /**
-     * The step stored in the factor's row.
-     *
      * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
      * @return ?int
      *

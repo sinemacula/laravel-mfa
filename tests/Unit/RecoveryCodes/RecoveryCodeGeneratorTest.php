@@ -10,11 +10,6 @@ use Random\RandomException;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeGenerator;
 
 /**
- * Unit tests for `RecoveryCodeGenerator`: a set of the size asked for, each
- * code of the length asked for, drawn uniformly from the alphabet with the
- * source of randomness, upper-cased and distinct, with a repeated code drawn
- * again and a source that keeps repeating itself refused.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -27,9 +22,6 @@ final class RecoveryCodeGeneratorTest extends TestCase
     private const string ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 
     /**
-     * The default source draws a set of distinct codes of the given size and
-     * length, from the alphabet only.
-     *
      * @return void
      *
      * @throws \Random\RandomException
@@ -47,9 +39,8 @@ final class RecoveryCodeGeneratorTest extends TestCase
     }
 
     /**
-     * Every draw asks the source for an index across the whole alphabet, and
-     * the code is the alphabet's characters at the indices drawn, upper-cased,
-     * so every character can be drawn.
+     * Each draw asks for an index across the whole alphabet, and the code is
+     * upper-cased.
      *
      * @return void
      *
@@ -71,8 +62,8 @@ final class RecoveryCodeGeneratorTest extends TestCase
     }
 
     /**
-     * A code already in the set is drawn again, so the set holds the size asked
-     * for, every code distinct, in the order drawn.
+     * The set still holds the size asked for, every code distinct, in the order
+     * drawn.
      *
      * @return void
      *
@@ -91,8 +82,8 @@ final class RecoveryCodeGeneratorTest extends TestCase
     }
 
     /**
-     * A source of randomness that keeps repeating itself is refused once each
-     * code of the set has had its draws, rather than drawn from for ever.
+     * Once each code of the set has had its draws, rather than drawing for
+     * ever.
      *
      * @return void
      */
@@ -117,8 +108,6 @@ final class RecoveryCodeGeneratorTest extends TestCase
     }
 
     /**
-     * An empty set draws nothing.
-     *
      * @return void
      *
      * @throws \Random\RandomException

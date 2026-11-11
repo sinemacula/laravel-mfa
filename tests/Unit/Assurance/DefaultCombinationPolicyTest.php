@@ -23,11 +23,6 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use Tests\Fixtures\Assurance\SessionProofs;
 
 /**
- * Tests for `DefaultCombinationPolicy`: which factors may follow which first
- * factors, the classification of every combination of the default table, the
- * `amr` values reported, and the requirement parts met, with their maximum
- * ages.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -45,8 +40,6 @@ final class DefaultCombinationPolicyTest extends TestCase
     private const int TWO_HOURS = 7200;
 
     /**
-     * Fix the time every proof's age is measured from.
-     *
      * @return void
      */
     #[\Override]
@@ -58,8 +51,6 @@ final class DefaultCombinationPolicyTest extends TestCase
     }
 
     /**
-     * Release the fixed time.
-     *
      * @return void
      */
     #[\Override]
@@ -71,9 +62,6 @@ final class DefaultCombinationPolicyTest extends TestCase
     }
 
     /**
-     * Rows of a first factor, a factor's channel, and whether the factor may
-     * follow it.
-     *
      * @return iterable<string, array{\SineMacula\Laravel\Mfa\Proofs\Proof, \SineMacula\Laravel\Mfa\Assurance\Channel, bool}>
      */
     public static function provideFactorsAfterFirstFactors(): iterable
@@ -119,9 +107,8 @@ final class DefaultCombinationPolicyTest extends TestCase
     }
 
     /**
-     * A factor may follow a known first factor unless it shares its channel or
-     * cannot carry a factor; a first factor that is unknown, or no first factor
-     * at all, accepts nothing.
+     * Not one sharing the first factor's channel or unable to carry a factor;
+     * an unknown or missing first factor accepts nothing.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $firstFactor
      * @param  \SineMacula\Laravel\Mfa\Assurance\Channel  $factor
@@ -135,10 +122,10 @@ final class DefaultCombinationPolicyTest extends TestCase
     }
 
     /**
-     * One row per row of the default classification, then the unknown channel,
-     * the same channel and a passkey that did not verify the person: the
-     * proofs, then whether the combination is accepted, multifactor,
-     * phishing-resistant and restricted, its level and its `amr` values.
+     * Each row of the default classification, then the unknown channel, the
+     * same channel and a passkey that did not verify the person. Columns:
+     * proofs, accepted, multifactor, phishing-resistant, restricted, level,
+     * `amr`.
      *
      * @return iterable<string, array{list<\SineMacula\Laravel\Mfa\Proofs\Proof>, bool, bool, bool, bool, \SineMacula\Laravel\Mfa\Enums\AssuranceLevel, list<string>}>
      */
@@ -291,8 +278,7 @@ final class DefaultCombinationPolicyTest extends TestCase
     }
 
     /**
-     * Each combination is accepted, multifactor and levelled as the default
-     * classification says, from what its proofs observed.
+     * As the default classification says, from what its proofs observed.
      *
      * @param  list<\SineMacula\Laravel\Mfa\Proofs\Proof>  $proofs
      * @param  bool  $accepted
@@ -328,8 +314,7 @@ final class DefaultCombinationPolicyTest extends TestCase
     }
 
     /**
-     * The proofs are classified the same in any order, and the first factor's
-     * `amr` values come first.
+     * The first factor's `amr` values come first.
      *
      * @return void
      */
@@ -344,8 +329,8 @@ final class DefaultCombinationPolicyTest extends TestCase
     }
 
     /**
-     * A combination is restricted only when every way of reaching its level
-     * relies on a restricted authenticator.
+     * Restricted only when every way of reaching its level relies on a
+     * restricted authenticator.
      *
      * @return void
      */
@@ -359,9 +344,8 @@ final class DefaultCombinationPolicyTest extends TestCase
     }
 
     /**
-     * The level never reaches AAL3, even for a passkey observed to verify the
-     * person on a hardware key, and the key's protection is reported only as
-     * observed.
+     * Even for a passkey that verified the person on a hardware key; the key's
+     * protection is reported only as observed.
      *
      * @return void
      */
@@ -378,8 +362,8 @@ final class DefaultCombinationPolicyTest extends TestCase
     }
 
     /**
-     * A first factor's own `amr` values report user presence only when it was
-     * observed, and a property observed false reports nothing.
+     * User presence only when observed; a property observed false reports
+     * nothing.
      *
      * @return void
      */
@@ -394,8 +378,7 @@ final class DefaultCombinationPolicyTest extends TestCase
     }
 
     /**
-     * A multi-factor first factor meets an additional verification and
-     * multifactor authentication on its own, and its level and phishing
+     * Additional verification and multifactor; its level and phishing
      * resistance are evaluated like any proof's.
      *
      * @return void
@@ -416,8 +399,7 @@ final class DefaultCombinationPolicyTest extends TestCase
     }
 
     /**
-     * An old multi-factor first factor does not meet a requirement for a fresh
-     * proof, while what it established stays reported.
+     * What it established stays reported.
      *
      * @return void
      */
@@ -434,10 +416,6 @@ final class DefaultCombinationPolicyTest extends TestCase
     }
 
     /**
-     * Rows of a fresh further proof after a verified passkey sign-in made two
-     * hours ago, then the parts of a fresh requirement it meets and does not
-     * meet.
-     *
      * @return iterable<string, array{
      *     \SineMacula\Laravel\Mfa\Proofs\Proof,
      *     list<\SineMacula\Laravel\Mfa\Enums\RequirementPart>,
@@ -458,10 +436,8 @@ final class DefaultCombinationPolicyTest extends TestCase
     }
 
     /**
-     * A fresh further proof after an old multi-factor first factor is a fresh
-     * additional verification, but refreshes only what it gives itself: a fresh
-     * weaker proof never refreshes the old passkey's multifactor
-     * authentication, level or phishing resistance.
+     * After an old passkey sign-in it is a fresh additional verification, but
+     * never refreshes the passkey's multifactor, level or phishing resistance.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $further
      * @param  list<\SineMacula\Laravel\Mfa\Enums\RequirementPart>  $met
@@ -484,8 +460,7 @@ final class DefaultCombinationPolicyTest extends TestCase
     }
 
     /**
-     * A fresh further proof refreshes the combination it completes after an old
-     * first factor.
+     * After an old first factor.
      *
      * @return void
      */
@@ -499,9 +474,8 @@ final class DefaultCombinationPolicyTest extends TestCase
     }
 
     /**
-     * A fresh reauthentication with the first factor meets a fresh level it
-     * reaches on its own, but never stands in for an additional factor made
-     * long ago.
+     * A fresh reauthentication meets a fresh level it reaches alone, never an
+     * additional factor made long ago.
      *
      * @return void
      */
@@ -522,8 +496,7 @@ final class DefaultCombinationPolicyTest extends TestCase
     }
 
     /**
-     * A reauthentication on an unknown channel establishes nothing, so it does
-     * not refresh the first factor.
+     * So it does not refresh the first factor.
      *
      * @return void
      */
@@ -539,9 +512,6 @@ final class DefaultCombinationPolicyTest extends TestCase
     }
 
     /**
-     * Rows of a proof's age and whether it meets a part with a maximum age of
-     * fifteen minutes.
-     *
      * @return iterable<string, array{int, bool}>
      */
     public static function provideAges(): iterable
@@ -553,8 +523,7 @@ final class DefaultCombinationPolicyTest extends TestCase
     }
 
     /**
-     * A part with a maximum age is met by a proof no older than it, and never
-     * by one made in the future.
+     * Never met by a proof made in the future.
      *
      * @param  int  $secondsAgo
      * @param  bool  $met
@@ -571,9 +540,6 @@ final class DefaultCombinationPolicyTest extends TestCase
     }
 
     /**
-     * Rows of a session's proofs, a requirement, and the parts it meets and
-     * does not meet.
-     *
      * @return iterable<string, array{
      *     list<\SineMacula\Laravel\Mfa\Proofs\Proof>,
      *     \SineMacula\Laravel\Mfa\Requirements\Requirement,
@@ -663,9 +629,6 @@ final class DefaultCombinationPolicyTest extends TestCase
     }
 
     /**
-     * Each part of a requirement is met or not on its own, from what the
-     * combinations provide.
-     *
      * @param  list<\SineMacula\Laravel\Mfa\Proofs\Proof>  $proofs
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @param  list<\SineMacula\Laravel\Mfa\Enums\RequirementPart>  $met
@@ -682,9 +645,6 @@ final class DefaultCombinationPolicyTest extends TestCase
     }
 
     /**
-     * Rows of a further proof bound to another identity or application than the
-     * first factor.
-     *
      * @return iterable<string, array{\SineMacula\Laravel\Mfa\Proofs\Proof}>
      */
     public static function provideForeignProofs(): iterable
@@ -695,8 +655,7 @@ final class DefaultCombinationPolicyTest extends TestCase
     }
 
     /**
-     * A further proof bound to another identity or application than the first
-     * factor counts for nothing.
+     * Bound to another identity or application than the first factor.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $foreign
      * @return void
@@ -713,9 +672,6 @@ final class DefaultCombinationPolicyTest extends TestCase
     }
 
     /**
-     * Rows of a further proof made before the first factor or after the current
-     * time.
-     *
      * @return iterable<string, array{\SineMacula\Laravel\Mfa\Proofs\Proof}>
      */
     public static function provideProofsOutOfTime(): iterable
@@ -725,9 +681,8 @@ final class DefaultCombinationPolicyTest extends TestCase
     }
 
     /**
-     * A further proof made before the first factor, which an earlier sign-in
-     * left, or dated after the current time counts for nothing: the session
-     * stays at the first factor's own classification.
+     * Made before the first factor, by an earlier sign-in, or after now; the
+     * session keeps the first factor's own classification.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $further
      * @return void
@@ -744,9 +699,6 @@ final class DefaultCombinationPolicyTest extends TestCase
     }
 
     /**
-     * A proof that counts for nothing does not stop the proofs after it from
-     * counting.
-     *
      * @return void
      */
     public function testAProofBoundElsewhereDoesNotHideTheProofsAfterIt(): void
@@ -763,8 +715,6 @@ final class DefaultCombinationPolicyTest extends TestCase
     }
 
     /**
-     * Evaluate the proofs with the default policy.
-     *
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  ...$proofs
      * @return \SineMacula\Laravel\Mfa\Assurance\Evaluation

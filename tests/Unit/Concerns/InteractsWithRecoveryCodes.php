@@ -18,12 +18,6 @@ use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 use Tests\Fixtures\Identities\FactorHolder;
 
 /**
- * Shared setup for the recovery code service tests: the `web` application
- * accepts recovery codes, bcrypt runs at its cheapest cost so a set hashes
- * quickly, and an identity using the shipped `HasFactors` trait signs in with a
- * factor of the status given, which begins the sign-in a redemption records its
- * proof on.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -32,7 +26,7 @@ use Tests\Fixtures\Identities\FactorHolder;
 trait InteractsWithRecoveryCodes
 {
     /**
-     * Accept recovery codes on the `web` application and hash cheaply.
+     * Cheapest bcrypt cost so a set hashes quickly.
      *
      * @param  mixed  $app
      * @return void
@@ -58,8 +52,7 @@ trait InteractsWithRecoveryCodes
     }
 
     /**
-     * Create an identity with a factor of the given status, and sign it in,
-     * which begins its sign-in on the `web` application.
+     * Signing in begins the sign-in a redemption records its proof on.
      *
      * @param  string  $email
      * @param  ?string  $status
@@ -80,8 +73,6 @@ trait InteractsWithRecoveryCodes
     }
 
     /**
-     * Give the identity a TOTP factor of the given status.
-     *
      * @param  \Tests\Fixtures\Identities\FactorHolder  $holder
      * @param  string  $status
      * @return \SineMacula\Laravel\Mfa\Models\Factor
@@ -98,8 +89,6 @@ trait InteractsWithRecoveryCodes
     }
 
     /**
-     * Resolve the recovery code service.
-     *
      * @return \SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -110,8 +99,6 @@ trait InteractsWithRecoveryCodes
     }
 
     /**
-     * What a redemption by the identity is bound to.
-     *
      * @param  \Tests\Fixtures\Identities\FactorHolder  $holder
      * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
      * @return \SineMacula\Laravel\Mfa\Proofs\ProofBinding
@@ -122,8 +109,6 @@ trait InteractsWithRecoveryCodes
     }
 
     /**
-     * The plaintext of each generated code.
-     *
      * @param  list<\SineMacula\Laravel\Mfa\Secrets\RevealedSecret>  $codes
      * @return list<string>
      */
@@ -133,7 +118,7 @@ trait InteractsWithRecoveryCodes
     }
 
     /**
-     * The identity's stored codes, oldest first.
+     * Oldest first.
      *
      * @param  \Tests\Fixtures\Identities\FactorHolder  $holder
      * @return \Illuminate\Support\Collection<int, \SineMacula\Laravel\Mfa\Models\RecoveryCode>
@@ -151,8 +136,6 @@ trait InteractsWithRecoveryCodes
     }
 
     /**
-     * The identity's state row.
-     *
      * @param  \Tests\Fixtures\Identities\FactorHolder  $holder
      * @return \SineMacula\Laravel\Mfa\Models\IdentityState
      */

@@ -11,9 +11,7 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use Tests\TestCase;
 
 /**
- * Tests for `RecoveryCodeBindings`: the recovery code service is built afresh,
- * and no factor driver is registered for recovery codes, which are not a
- * factor.
+ * Recovery codes are not a factor, so no driver is registered for them.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -24,8 +22,6 @@ use Tests\TestCase;
 final class RecoveryCodeBindingsTest extends TestCase
 {
     /**
-     * The recovery code service is built on every resolution.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -38,8 +34,6 @@ final class RecoveryCodeBindingsTest extends TestCase
     }
 
     /**
-     * The resolved manager has no driver for recovery codes.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

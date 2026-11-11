@@ -33,12 +33,6 @@ use Tests\Fixtures\Requirements\FixedActiveTenant;
 use Tests\TestCase;
 
 /**
- * Tests for `RequirementService`: the composition table of a sign-in's
- * requirement (every application mode, crossed with the identity's own
- * requirement, its re-enrolment obligation and an active tenant's requirement),
- * the requirement of the current identity, and the step-up freshness asked of
- * the bound gate with this package's own setting.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -62,11 +56,8 @@ final class RequirementServiceTest extends TestCase
     private const string IDENTITY = 'plain-1';
 
     /**
-     * Every row of the composition table: the application's mode (or none for
-     * an application nobody configured) and whether the identity has a
-     * confirmed factor, whether it requires something of its own, whether it is
-     * obliged to enrol again, whether a tenant requiring a level is active, and
-     * the composed requirement, serialised.
+     * Mode (null when unconfigured), confirmed factor, own requirement, obliged
+     * to enrol again, tenant active, and the serialised requirement.
      *
      * @return iterable<string, array{?string, bool, bool, bool, bool, array<string, array<string, int|string|null>>}>
      */
@@ -90,9 +81,6 @@ final class RequirementServiceTest extends TestCase
     }
 
     /**
-     * The requirement is the strictest of the parts that apply, for every row
-     * of the table.
-     *
      * @param  ?string  $mode
      * @param  bool  $enabled
      * @param  bool  $own
@@ -126,8 +114,7 @@ final class RequirementServiceTest extends TestCase
     }
 
     /**
-     * The composed requirement is the strictest of its parts taken in any
-     * order, so the order the sources are asked in never changes the answer.
+     * So the order the sources are asked in never changes the answer.
      *
      * @return void
      *
@@ -156,9 +143,8 @@ final class RequirementServiceTest extends TestCase
     }
 
     /**
-     * The tenant's requirement is asked with the identity, the application and
-     * the tenant, and only when the bound resolver names one: by default none
-     * is active, and the default tenant requirement asks for nothing.
+     * With the identity, application and tenant, and only when the bound
+     * resolver names one.
      *
      * @return void
      *
@@ -190,8 +176,7 @@ final class RequirementServiceTest extends TestCase
     }
 
     /**
-     * The identity's own requirement is asked of the bound seam, with the
-     * identity and the application.
+     * With the identity and the application.
      *
      * @return void
      *
@@ -212,9 +197,8 @@ final class RequirementServiceTest extends TestCase
     }
 
     /**
-     * The obligation is the identity's own: another identity's, or one of
-     * another type with the same key, obliges nothing, and a cleared one
-     * obliges nothing either.
+     * Another identity's, one of another type with the same key, or a cleared
+     * one obliges nothing.
      *
      * @return void
      *
@@ -233,7 +217,7 @@ final class RequirementServiceTest extends TestCase
     }
 
     /**
-     * The obligation applies in every application, configured or not.
+     * Configured or not.
      *
      * @return void
      *
@@ -253,8 +237,8 @@ final class RequirementServiceTest extends TestCase
     }
 
     /**
-     * The current identity's requirement is composed on the current
-     * application; without an MFA-capable identity it asks for nothing.
+     * Composed on the current application; without an MFA-capable identity it
+     * asks for nothing.
      *
      * @return void
      *
@@ -276,8 +260,6 @@ final class RequirementServiceTest extends TestCase
     }
 
     /**
-     * Every application mode, and an application nobody configured.
-     *
      * @return iterable<string, array{?string}>
      */
     public static function modes(): iterable
@@ -289,10 +271,8 @@ final class RequirementServiceTest extends TestCase
     }
 
     /**
-     * An identity whose key is neither a non-empty string nor an integer cannot
-     * have its obligation read, so its requirement is refused rather than
-     * answered as empty, under every mode, `never` included; the current
-     * identity's is refused alike.
+     * Its obligation cannot be read, so it is refused rather than answered as
+     * empty, under every mode.
      *
      * @param  ?string  $mode
      * @return void
@@ -323,9 +303,8 @@ final class RequirementServiceTest extends TestCase
     }
 
     /**
-     * The gate is asked with this package's setting for the operation as the
-     * caller's requirement, made stricter by the one given; an operation the
-     * package does not name passes only the one given, or none.
+     * The package's setting for the operation, made stricter by the one given;
+     * an operation the package does not name passes only the one given.
      *
      * @return void
      *
@@ -356,9 +335,8 @@ final class RequirementServiceTest extends TestCase
     }
 
     /**
-     * A name that is not an operation's is never fresh, whatever the gate would
-     * answer and whatever the caller asks, so it never throws; the gate is not
-     * asked.
+     * Whatever the gate or the caller would say, so it never throws; the gate
+     * is not asked.
      *
      * @return void
      *
@@ -377,8 +355,7 @@ final class RequirementServiceTest extends TestCase
     }
 
     /**
-     * A caller's requirement with a part that carries no maximum age, or one
-     * longer than a day, is refused before the gate is asked.
+     * Before the gate is asked.
      *
      * @return void
      *
@@ -403,8 +380,6 @@ final class RequirementServiceTest extends TestCase
     }
 
     /**
-     * The requirement an identity requires of its own in the table.
-     *
      * @return \SineMacula\Laravel\Mfa\Requirements\Requirement
      */
     private static function identityRequirement(): Requirement
@@ -413,9 +388,7 @@ final class RequirementServiceTest extends TestCase
     }
 
     /**
-     * Every setting of the three other sources: whether the identity requires
-     * something of its own, whether it is obliged to enrol again, and whether a
-     * tenant is active.
+     * Own requirement, obliged to enrol again, tenant active.
      *
      * @return list<array{bool, bool, bool}>
      */
@@ -434,9 +407,6 @@ final class RequirementServiceTest extends TestCase
     }
 
     /**
-     * The name of a row of the table: the application's mode, then each other
-     * source's setting.
-     *
      * @param  string  $label
      * @param  bool  $own
      * @param  bool  $obliged
@@ -455,8 +425,6 @@ final class RequirementServiceTest extends TestCase
     }
 
     /**
-     * The serialised requirement a row of the table composes to.
-     *
      * @param  bool  $additional
      * @param  bool  $own
      * @param  bool  $tenant
@@ -481,8 +449,6 @@ final class RequirementServiceTest extends TestCase
     }
 
     /**
-     * Every order of the given parts.
-     *
      * @param  list<\SineMacula\Laravel\Mfa\Requirements\Requirement>  $parts
      * @return list<list<\SineMacula\Laravel\Mfa\Requirements\Requirement>>
      */
@@ -509,9 +475,6 @@ final class RequirementServiceTest extends TestCase
     }
 
     /**
-     * Set the re-enrolment obligation of the identity of the given type and
-     * key.
-     *
      * @param  string  $type
      * @param  string  $key
      * @param  bool  $required
@@ -532,8 +495,6 @@ final class RequirementServiceTest extends TestCase
     }
 
     /**
-     * A tenant requirement that answers the given requirement for any tenant.
-     *
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @return \SineMacula\Laravel\Mfa\Contracts\TenantRequirement
      */
@@ -541,8 +502,6 @@ final class RequirementServiceTest extends TestCase
     {
         return new readonly class ($requirement) implements TenantRequirement {
             /**
-             * Constructor.
-             *
              * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
              */
             public function __construct(
@@ -552,8 +511,6 @@ final class RequirementServiceTest extends TestCase
             ) {}
 
             /**
-             * The tenant's requirement.
-             *
              * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
              * @param  string  $application
              * @param  string  $tenant
@@ -568,8 +525,8 @@ final class RequirementServiceTest extends TestCase
     }
 
     /**
-     * A freshness gate that records each operation and caller's requirement it
-     * is asked with, serialised, and answers as given.
+     * Records each operation and serialised caller requirement it is asked
+     * with.
      *
      * @param  list<array{string, ?array<string, array<string, int|string|null>>}>  $asked
      * @param  bool  $answer
@@ -583,8 +540,6 @@ final class RequirementServiceTest extends TestCase
 
         return new readonly class ($record, $answer) implements FreshnessGate {
             /**
-             * Constructor.
-             *
              * @param  \Closure(string, ?\SineMacula\Laravel\Mfa\Requirements\Requirement): void  $record
              * @param  bool  $answer
              */
@@ -598,8 +553,6 @@ final class RequirementServiceTest extends TestCase
             ) {}
 
             /**
-             * Record the question and answer it.
-             *
              * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
              * @param  string  $operation
              * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
@@ -630,8 +583,7 @@ final class RequirementServiceTest extends TestCase
             }
 
             /**
-             * Record the question and answer it with the end of the next
-             * minute.
+             * Answers with the end of the next minute.
              *
              * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
              * @param  string  $operation
@@ -649,8 +601,6 @@ final class RequirementServiceTest extends TestCase
     }
 
     /**
-     * Make the tenant the active one, or none.
-     *
      * @param  ?string  $tenant
      * @return void
      */
@@ -660,8 +610,6 @@ final class RequirementServiceTest extends TestCase
     }
 
     /**
-     * Resolve the service under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Requirements\RequirementService
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

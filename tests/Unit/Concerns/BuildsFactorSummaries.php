@@ -9,11 +9,8 @@ use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 
 /**
- * Shared FactorSummary builders for the FactorSummary test family.
- *
- * Centralises the two recurring stub-builders so each consuming test file stays
- * focused on its assertions and keeps its method count below the project's
- * max-methods-per-class threshold.
+ * Kept out of the test classes to hold them under the max-methods-per-class
+ * threshold.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -23,8 +20,6 @@ use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 trait BuildsFactorSummaries
 {
     /**
-     * Build a minimal summary for contract tests.
-     *
      * @return \SineMacula\Laravel\Mfa\Factors\FactorSummary
      */
     protected function buildMinimalSummary(): FactorSummary
@@ -41,8 +36,6 @@ trait BuildsFactorSummaries
     }
 
     /**
-     * Build a FactorSummary via `fromFactor()` for the given destination.
-     *
      * @param  string  $destination
      * @return \SineMacula\Laravel\Mfa\Factors\FactorSummary
      *

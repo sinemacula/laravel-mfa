@@ -25,12 +25,6 @@ use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\TestCase;
 
 /**
- * Tests for `FactorChanges`, `FactorChangeRequest` and `FactorChange`: the
- * bound gate is asked only inside a transaction, with the request each flow
- * builds and the requirement the application configures; a grant without an end
- * in the future is refused; and a bound gate's refusal is the package's, while
- * one a seam throws through the default stays the seam's.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -42,8 +36,6 @@ use Tests\TestCase;
 final class FactorChangesTest extends TestCase
 {
     /**
-     * The gate is never asked outside a transaction.
-     *
      * @return void
      */
     public function testTheGateIsNeverAskedOutsideATransaction(): void
@@ -61,9 +53,8 @@ final class FactorChangesTest extends TestCase
     }
 
     /**
-     * The request carries the identity, the application, the sign-in, the
-     * change, the factors and the factor a removal names, and the requirement
-     * the application configures for the change's operation.
+     * The identity, application, sign-in, change, factors, the factor a removal
+     * names, and the requirement configured for the operation.
      *
      * @return void
      *
@@ -91,8 +82,7 @@ final class FactorChangesTest extends TestCase
     }
 
     /**
-     * A first additional factor carries no configured requirement, whatever the
-     * application configures under its name.
+     * Whatever the application configures under its name.
      *
      * @return void
      *
@@ -110,8 +100,6 @@ final class FactorChangesTest extends TestCase
     }
 
     /**
-     * Rows of a grant's end the gate gives that the package refuses.
-     *
      * @return iterable<string, array{?\Carbon\CarbonImmutable}>
      */
     public static function endsRefused(): iterable
@@ -122,8 +110,7 @@ final class FactorChangesTest extends TestCase
     }
 
     /**
-     * A grant the gate gives no end in the future is refused as the package's
-     * own `not_fresh`.
+     * Refused as the package's own `not_fresh`.
      *
      * @param  ?\Carbon\CarbonImmutable  $until
      * @return void
@@ -149,8 +136,6 @@ final class FactorChangesTest extends TestCase
     }
 
     /**
-     * A grant lasts until the end the gate gives it.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -165,8 +150,7 @@ final class FactorChangesTest extends TestCase
     }
 
     /**
-     * A bound gate's refusal is reported as the package's own, with its reason
-     * and detail.
+     * With its reason and detail.
      *
      * @return void
      *
@@ -187,8 +171,6 @@ final class FactorChangesTest extends TestCase
     }
 
     /**
-     * Anything else a bound gate throws propagates as it is.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -208,8 +190,6 @@ final class FactorChangesTest extends TestCase
     }
 
     /**
-     * A refusal a seam throws through the default gate stays the seam's.
-     *
      * @return void
      *
      * @throws \Throwable
@@ -231,8 +211,6 @@ final class FactorChangesTest extends TestCase
     }
 
     /**
-     * Rows of a change asked the wrong way.
-     *
      * @return iterable<string, array{\SineMacula\Laravel\Mfa\Enums\FactorChange, bool, string}>
      */
     public static function misaskedChanges(): iterable
@@ -292,7 +270,7 @@ final class FactorChangesTest extends TestCase
     }
 
     /**
-     * Ask for the grant for the person, inside a transaction.
+     * Asked inside a transaction.
      *
      * @param  \SineMacula\Laravel\Mfa\Enums\FactorChange  $change
      * @return \Carbon\CarbonImmutable
@@ -305,7 +283,7 @@ final class FactorChangesTest extends TestCase
     }
 
     /**
-     * Ask for the change for the person, inside a transaction.
+     * Asked inside a transaction.
      *
      * @param  \SineMacula\Laravel\Mfa\Enums\FactorChange  $change
      * @return void
@@ -318,8 +296,6 @@ final class FactorChangesTest extends TestCase
     }
 
     /**
-     * Bind the gate, and return it.
-     *
      * @param  \Tests\Fixtures\Requirements\ScriptedFactorChangeGate  $gate
      * @return \Tests\Fixtures\Requirements\ScriptedFactorChangeGate
      */
@@ -331,8 +307,6 @@ final class FactorChangesTest extends TestCase
     }
 
     /**
-     * A person.
-     *
      * @return \Tests\Fixtures\Identities\TestUser
      */
     private function person(): TestUser
@@ -342,8 +316,6 @@ final class FactorChangesTest extends TestCase
     }
 
     /**
-     * The service under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Requirements\FactorChanges
      */
     private function changes(): FactorChanges

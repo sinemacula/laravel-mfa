@@ -13,12 +13,6 @@ use SineMacula\Laravel\Mfa\Requirements\OperationRequirements;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
 /**
- * Tests for `OperationRequirements`: the requirement an operation's step-up
- * must meet is the stricter of the application's configured one and the
- * caller's, either alone when the other is absent, and none with neither or for
- * a name that is not an operation's. A caller's requirement that asks for
- * nothing adds nothing; one without a bounded age on every part is refused.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -31,9 +25,6 @@ final class OperationRequirementsTest extends TestCase
     private const string APPLICATION = 'web';
 
     /**
-     * Rows of an operation, the caller's requirement, and the effective
-     * requirement, serialised, or `null` for none.
-     *
      * @return iterable<string, array{string, ?\SineMacula\Laravel\Mfa\Requirements\Requirement, ?array<string, array<string, int|string|null>>}>
      */
     public static function operations(): iterable
@@ -70,9 +61,6 @@ final class OperationRequirementsTest extends TestCase
     }
 
     /**
-     * The effective requirement is the strictest of whichever of the configured
-     * and the caller's requirements exist.
-     *
      * @param  string  $operation
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $caller
      * @param  ?array<string, array<string, int|string|null>>  $expected
@@ -85,8 +73,6 @@ final class OperationRequirementsTest extends TestCase
     }
 
     /**
-     * Rows of a caller's requirement that is not bounded, and the part named.
-     *
      * @return iterable<string, array{\SineMacula\Laravel\Mfa\Requirements\Requirement, string}>
      */
     public static function unboundedCallers(): iterable
@@ -96,8 +82,8 @@ final class OperationRequirementsTest extends TestCase
     }
 
     /**
-     * A caller's requirement with a part that carries no maximum age, or one
-     * longer than a day, is refused, for an operation nobody configures too.
+     * No maximum age, or one longer than a day, for an unconfigured operation
+     * too.
      *
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $caller
      * @param  string  $part
@@ -120,9 +106,7 @@ final class OperationRequirementsTest extends TestCase
     }
 
     /**
-     * A name that is not an operation's has no requirement whatever the caller
-     * asks: it is answered before the caller's requirement is checked, so even
-     * an unbounded one is not refused.
+     * So even an unbounded caller requirement is not refused.
      *
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $caller
      * @param  string  $part
@@ -135,8 +119,6 @@ final class OperationRequirementsTest extends TestCase
     }
 
     /**
-     * A caller's requirement of exactly a day is bounded.
-     *
      * @return void
      */
     public function testACallerRequirementOfADayIsBounded(): void
@@ -150,8 +132,6 @@ final class OperationRequirementsTest extends TestCase
     }
 
     /**
-     * The requirements of the application the tests configure.
-     *
      * @return \SineMacula\Laravel\Mfa\Requirements\OperationRequirements
      */
     private static function requirements(): OperationRequirements

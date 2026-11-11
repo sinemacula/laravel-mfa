@@ -18,9 +18,8 @@ use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\TestCase;
 
 /**
- * When an evaluation stops meeting its requirement: the earliest time any part
- * bounded by a maximum age stops being met, judged on the evidence each part
- * rests on.
+ * The earliest time a part bounded by a maximum age stops being met, judged on
+ * the evidence each part rests on.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -36,8 +35,6 @@ final class MetUntilEvaluationTest extends TestCase
     private const string NOW = '2026-11-01 12:00:00';
 
     /**
-     * Freeze the clock.
-     *
      * @return void
      */
     #[\Override]
@@ -49,7 +46,7 @@ final class MetUntilEvaluationTest extends TestCase
     }
 
     /**
-     * A part stops being met at its evidence's time plus its maximum age.
+     * Its evidence's time plus its maximum age.
      *
      * @return void
      */
@@ -63,8 +60,6 @@ final class MetUntilEvaluationTest extends TestCase
     }
 
     /**
-     * Several parts take the earliest of their times.
-     *
      * @return void
      */
     public function testSeveralPartsTakeTheEarliest(): void
@@ -80,7 +75,7 @@ final class MetUntilEvaluationTest extends TestCase
     }
 
     /**
-     * A part takes the latest evidence among the combinations providing it.
+     * Among the combinations providing it.
      *
      * @return void
      */
@@ -94,9 +89,8 @@ final class MetUntilEvaluationTest extends TestCase
     }
 
     /**
-     * A fresh weaker proof does not extend what a stronger part rests on: a
-     * minimum level the first factor gives alone is as old as the first factor,
-     * and an additional factor does not refresh it.
+     * A level the first factor gives alone is as old as it, and an additional
+     * factor does not refresh it.
      *
      * @return void
      */
@@ -111,8 +105,7 @@ final class MetUntilEvaluationTest extends TestCase
     }
 
     /**
-     * A requirement with no maximum age has no time it stops being met, and one
-     * bounded part sets it among unbounded ones.
+     * One bounded part still sets it among unbounded ones.
      *
      * @return void
      */
@@ -129,8 +122,7 @@ final class MetUntilEvaluationTest extends TestCase
     }
 
     /**
-     * An evaluation with an unmet part says nothing, and one built that way is
-     * refused.
+     * One built with an unmet part and a time is refused.
      *
      * @return void
      */
@@ -149,8 +141,7 @@ final class MetUntilEvaluationTest extends TestCase
     }
 
     /**
-     * Neither the array nor the JSON shows the time, which is an answer about
-     * now.
+     * It is an answer about now.
      *
      * @return void
      */
@@ -165,8 +156,6 @@ final class MetUntilEvaluationTest extends TestCase
     }
 
     /**
-     * A combination that does not give the answer holds it until no time.
-     *
      * @return void
      */
     public function testACombinationWithoutTheAnswerHoldsItUntilNoTime(): void
@@ -178,8 +167,6 @@ final class MetUntilEvaluationTest extends TestCase
     }
 
     /**
-     * The time the given number of seconds from now.
-     *
      * @param  int  $seconds
      * @return \Carbon\CarbonImmutable
      */
@@ -189,8 +176,6 @@ final class MetUntilEvaluationTest extends TestCase
     }
 
     /**
-     * The default policy's evaluation of the proofs.
-     *
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  ...$proofs
      * @return \SineMacula\Laravel\Mfa\Assurance\Evaluation
@@ -201,8 +186,6 @@ final class MetUntilEvaluationTest extends TestCase
     }
 
     /**
-     * Assert the time is the given number of seconds from now.
-     *
      * @param  int  $seconds
      * @param  ?\Carbon\CarbonImmutable  $until
      * @return void

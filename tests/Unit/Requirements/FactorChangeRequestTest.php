@@ -15,10 +15,6 @@ use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\TestCase;
 
 /**
- * Tests for `FactorChangeRequest`: a request that contradicts itself is refused
- * when it is built, and a request takes a collection of the shipped factor
- * model as it is.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -28,8 +24,6 @@ use Tests\TestCase;
 final class FactorChangeRequestTest extends TestCase
 {
     /**
-     * Rows of a request that contradicts itself.
-     *
      * @return iterable<string, array{string, \SineMacula\Laravel\Mfa\Enums\FactorChange, ?string, string}>
      */
     public static function contradictoryRequests(): iterable
@@ -40,8 +34,6 @@ final class FactorChangeRequestTest extends TestCase
     }
 
     /**
-     * A request that contradicts itself is refused when it is built.
-     *
      * @param  string  $session
      * @param  \SineMacula\Laravel\Mfa\Enums\FactorChange  $change
      * @param  ?string  $factorId
@@ -58,9 +50,6 @@ final class FactorChangeRequestTest extends TestCase
     }
 
     /**
-     * A request takes a collection of the shipped factor model as it is, and
-     * carries it unchanged.
-     *
      * @return void
      */
     public function testARequestTakesTheShippedFactorModelsCollection(): void
@@ -73,8 +62,6 @@ final class FactorChangeRequestTest extends TestCase
     }
 
     /**
-     * A person.
-     *
      * @return \Tests\Fixtures\Identities\TestUser
      */
     private function person(): TestUser

@@ -11,9 +11,6 @@ use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\TestCase;
 
 /**
- * Tests for `ReenrollmentObligation`: an identity with no row has no
- * obligation, and what is recorded is what is read back, whichever way it goes.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -23,8 +20,7 @@ use Tests\TestCase;
 final class ReenrollmentObligationTest extends TestCase
 {
     /**
-     * An obligation is recorded as stated, a later `false` clears an earlier
-     * `true`, and ending it clears it too.
+     * A later `false` clears an earlier `true`, and ending it clears it too.
      *
      * @return void
      *

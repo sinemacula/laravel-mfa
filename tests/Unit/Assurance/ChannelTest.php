@@ -12,9 +12,6 @@ use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use Tests\Fixtures\Verification\Dumps;
 
 /**
- * Unit tests for the `Channel` value: construction, validation and
- * serialisation.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -24,8 +21,6 @@ use Tests\Fixtures\Verification\Dumps;
 final class ChannelTest extends TestCase
 {
     /**
-     * A channel keeps its kind and its destination or credential.
-     *
      * @return void
      */
     public function testAChannelKeepsItsKindAndReference(): void
@@ -37,8 +32,8 @@ final class ChannelTest extends TestCase
     }
 
     /**
-     * No way of dumping a channel shows its destination, and PHP refuses to
-     * serialise one: only `toArray()` gives it up, for storing a proof.
+     * PHP refuses to serialise one; only `toArray()` gives it up, for storing a
+     * proof.
      *
      * @return void
      */
@@ -58,8 +53,6 @@ final class ChannelTest extends TestCase
     }
 
     /**
-     * A channel that names nothing has no reference.
-     *
      * @return void
      */
     public function testAReferenceIsOptional(): void
@@ -69,7 +62,7 @@ final class ChannelTest extends TestCase
     }
 
     /**
-     * The unknown channel is of the unknown kind and names nothing.
+     * Of the unknown kind, naming nothing.
      *
      * @return void
      */
@@ -82,8 +75,6 @@ final class ChannelTest extends TestCase
     }
 
     /**
-     * Blank references.
-     *
      * @return iterable<string, array{string}>
      */
     public static function provideBlankReferences(): iterable
@@ -94,8 +85,6 @@ final class ChannelTest extends TestCase
     }
 
     /**
-     * A reference, when given, is never blank.
-     *
      * @param  string  $reference
      * @return void
      */
@@ -109,8 +98,6 @@ final class ChannelTest extends TestCase
     }
 
     /**
-     * A password or an unknown channel names no destination or credential.
-     *
      * @return iterable<string, array{\SineMacula\Laravel\Mfa\Enums\ChannelKind}>
      */
     public static function provideKindsWithoutAReference(): iterable
@@ -120,8 +107,6 @@ final class ChannelTest extends TestCase
     }
 
     /**
-     * A kind that names nothing refuses a reference.
-     *
      * @param  \SineMacula\Laravel\Mfa\Enums\ChannelKind  $kind
      * @return void
      */
@@ -135,7 +120,7 @@ final class ChannelTest extends TestCase
     }
 
     /**
-     * The serialised form uses snake_case keys and the kind's value.
+     * Snake_case keys and the kind's value.
      *
      * @return void
      */
@@ -151,8 +136,6 @@ final class ChannelTest extends TestCase
     }
 
     /**
-     * A channel read back from its serialised form equals the original.
-     *
      * @return void
      */
     public function testAChannelRoundTrips(): void
@@ -164,8 +147,6 @@ final class ChannelTest extends TestCase
     }
 
     /**
-     * Serialised forms that are not a channel.
-     *
      * @return iterable<string, array{array<string, mixed>, string}>
      */
     public static function provideMalformedChannels(): iterable
@@ -179,8 +160,6 @@ final class ChannelTest extends TestCase
     }
 
     /**
-     * A serialised form that is not a channel is refused.
-     *
      * @param  array<string, mixed>  $data
      * @param  string  $message
      * @return void

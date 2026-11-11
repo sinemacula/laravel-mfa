@@ -24,10 +24,6 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * Tests for `ResolvesFactorRouteBinding`: a factor binds only for the caller
- * who owns it, through the parent's own lookup, so custom keys and soft deletes
- * keep working, and a miss is `null`.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -38,8 +34,6 @@ use Tests\TestCase;
 final class ResolvesFactorRouteBindingTest extends TestCase
 {
     /**
-     * The caller's own factor binds, as the row stored.
-     *
      * @return void
      */
     public function testBindsTheCallersOwnFactor(): void
@@ -54,8 +48,7 @@ final class ResolvesFactorRouteBindingTest extends TestCase
     }
 
     /**
-     * Another identity's factor misses, by owner key and by owner type, exactly
-     * as an id that does not exist.
+     * By owner key and by owner type, exactly as an id that does not exist.
      *
      * @return void
      */
@@ -70,8 +63,6 @@ final class ResolvesFactorRouteBindingTest extends TestCase
     }
 
     /**
-     * With no caller nothing binds and no query is made.
-     *
      * @return void
      */
     public function testNoCallerMissesWithNoQuery(): void
@@ -85,7 +76,7 @@ final class ResolvesFactorRouteBindingTest extends TestCase
     }
 
     /**
-     * A machine identity binds nothing, its own factor included, with no query.
+     * Its own factor included, with no query.
      *
      * @return void
      */
@@ -103,8 +94,6 @@ final class ResolvesFactorRouteBindingTest extends TestCase
     }
 
     /**
-     * The bound subject type resolver decides who is a person.
-     *
      * @return void
      */
     public function testTheBoundSubjectTypeResolverDecidesWhoIsAPerson(): void
@@ -123,8 +112,7 @@ final class ResolvesFactorRouteBindingTest extends TestCase
     }
 
     /**
-     * An identity whose key is neither a string nor an integer owns nothing,
-     * and does not fail the binding.
+     * And does not fail the binding.
      *
      * @return void
      */
@@ -139,8 +127,7 @@ final class ResolvesFactorRouteBindingTest extends TestCase
     }
 
     /**
-     * A custom key is looked up through the field, by the parent's lookup, and
-     * the row it finds is still held to the caller.
+     * The row the parent's lookup finds is still held to the caller.
      *
      * @return void
      */
@@ -154,10 +141,8 @@ final class ResolvesFactorRouteBindingTest extends TestCase
     }
 
     /**
-     * A custom key that another identity's row also holds fails closed when
-     * that row is the first found: it is never treated as the caller's. The
-     * fixture orders the lookup by primary key, so the other identity's row is
-     * first on every database, and the premise is asserted before the binding.
+     * The fixture orders the lookup by primary key, so the other identity's row
+     * is first on every database.
      *
      * @return void
      */
@@ -177,8 +162,7 @@ final class ResolvesFactorRouteBindingTest extends TestCase
     }
 
     /**
-     * A malformed unique id misses as `null` rather than as the exception the
-     * shipped model's lookup answers it with.
+     * Rather than as the exception the shipped model's lookup throws.
      *
      * @return void
      */
@@ -190,8 +174,7 @@ final class ResolvesFactorRouteBindingTest extends TestCase
     }
 
     /**
-     * A base model's own route binding is the lookup that runs: the value in
-     * the URL is decoded there, and what it finds is held to the caller.
+     * The URL value is decoded there, and what it finds is held to the caller.
      *
      * @return void
      */
@@ -207,8 +190,7 @@ final class ResolvesFactorRouteBindingTest extends TestCase
     }
 
     /**
-     * A lookup that finds a model of another class misses, whoever it belongs
-     * to.
+     * Whoever it belongs to.
      *
      * @return void
      */
@@ -220,8 +202,8 @@ final class ResolvesFactorRouteBindingTest extends TestCase
     }
 
     /**
-     * The soft-deletable lookup finds the caller's soft-deleted factor, and the
-     * ordinary lookup does not; another identity's misses either way.
+     * It finds the caller's soft-deleted factor, the ordinary lookup does not;
+     * another identity's misses either way.
      *
      * @return void
      */
@@ -242,8 +224,6 @@ final class ResolvesFactorRouteBindingTest extends TestCase
     }
 
     /**
-     * Ownership is read from the columns the model's owner relation names.
-     *
      * @return void
      */
     public function testRemappedOwnerColumnsAreRead(): void
@@ -263,8 +243,7 @@ final class ResolvesFactorRouteBindingTest extends TestCase
     }
 
     /**
-     * An owner differing only in case is not the owner, as a case-insensitive
-     * collation would have it.
+     * As a case-insensitive collation would have it.
      *
      * @return void
      */
@@ -282,7 +261,7 @@ final class ResolvesFactorRouteBindingTest extends TestCase
     }
 
     /**
-     * An integer owner key is the owner's, as the string it is stored as.
+     * As the string it is stored as.
      *
      * @return void
      */
@@ -296,7 +275,7 @@ final class ResolvesFactorRouteBindingTest extends TestCase
     }
 
     /**
-     * A failing query is not a miss: it surfaces as the server error it is.
+     * A failing query is not a miss.
      *
      * @return void
      */
@@ -318,8 +297,6 @@ final class ResolvesFactorRouteBindingTest extends TestCase
     }
 
     /**
-     * A person signed in through the guard.
-     *
      * @return \Tests\Fixtures\Identities\TestUser
      */
     private function signedInUser(): TestUser
@@ -332,8 +309,6 @@ final class ResolvesFactorRouteBindingTest extends TestCase
     }
 
     /**
-     * A factor of the user's.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @param  array<string, mixed>  $attributes
      * @return \SineMacula\Laravel\Mfa\Models\Factor
@@ -344,8 +319,6 @@ final class ResolvesFactorRouteBindingTest extends TestCase
     }
 
     /**
-     * A factor of the owner's.
-     *
      * @param  string  $type
      * @param  string  $key
      * @param  array<string, mixed>  $attributes
@@ -366,8 +339,6 @@ final class ResolvesFactorRouteBindingTest extends TestCase
     }
 
     /**
-     * A factor of the user's, soft deleted.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return \Tests\Fixtures\Factors\SoftDeletingFactor
      */

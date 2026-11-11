@@ -18,13 +18,6 @@ use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\TestCase;
 
 /**
- * Tests for `ProofRequirementCheck`: a session's proofs are judged by the bound
- * combination policy on the proofs of the one sign-in its first factor began,
- * so each part is met only by a proof that provides it within its maximum age.
- * A fresh weaker proof never refreshes an old stronger one, a fresh first
- * factor never stands in for an additional factor, and an external provider's
- * reauthentication gives no assurance.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -40,8 +33,6 @@ final class ProofRequirementCheckTest extends TestCase
     private const int TWO_HOURS = 7200;
 
     /**
-     * Fix the time every proof's age is measured from.
-     *
      * @return void
      */
     #[\Override]
@@ -53,8 +44,6 @@ final class ProofRequirementCheckTest extends TestCase
     }
 
     /**
-     * Release the fixed time.
-     *
      * @return void
      */
     #[\Override]
@@ -66,9 +55,6 @@ final class ProofRequirementCheckTest extends TestCase
     }
 
     /**
-     * Rows of a requirement, the session's proofs as made by the sign-in, and
-     * the parts met and unmet.
-     *
      * @return iterable<string, array{
      *     \SineMacula\Laravel\Mfa\Requirements\Requirement,
      *     \Closure(\Tests\Fixtures\Requirements\SignInProofs): list<\SineMacula\Laravel\Mfa\Proofs\Proof>,
@@ -162,8 +148,7 @@ final class ProofRequirementCheckTest extends TestCase
     }
 
     /**
-     * Each part is met only by a proof of the sign-in that provides it within
-     * its maximum age.
+     * Met only by a proof that provides the part within its maximum age.
      *
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
      * @param  \Closure(\Tests\Fixtures\Requirements\SignInProofs): list<\SineMacula\Laravel\Mfa\Proofs\Proof>  $proofs
@@ -184,9 +169,7 @@ final class ProofRequirementCheckTest extends TestCase
     }
 
     /**
-     * Only the proofs bound to the first factor's sign-in reach the bound
-     * combination policy, in the order given; none reach it without exactly one
-     * first factor.
+     * In the order given; none reach it without exactly one first factor.
      *
      * @return void
      *
@@ -209,8 +192,6 @@ final class ProofRequirementCheckTest extends TestCase
     }
 
     /**
-     * The check is the default the container binds.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -221,8 +202,6 @@ final class ProofRequirementCheckTest extends TestCase
     }
 
     /**
-     * Resolve the check under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Requirements\ProofRequirementCheck
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

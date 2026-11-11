@@ -19,15 +19,8 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
 /**
- * Unit tests for the `ActsAsFactor` trait via the shipped `Factor` model.
- *
- * The trait implements the full `EloquentFactor` contract, its public methods
- * spanning column-name accessors, attribute readers, verification state and
- * persistence. Every public surface has a paired test (and most readers have
- * separate "value present" / "value absent" cases), so the class size is
- * intrinsic to the contract's surface area, not a sign of conflated subjects.
- * The `php:S1448` suppression below documents that judgement in code so the
- * next quality-gate refresh does not re-flag it.
+ * Size follows the `EloquentFactor` contract's surface, hence the `php:S1448`
+ * suppression.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -45,8 +38,6 @@ final class ActsAsFactorTest extends TestCase
     private const string TEST_USER_EMAIL = 'alice@example.com';
 
     /**
-     * Set up the test fixtures.
-     *
      * @return void
      */
     #[\Override]
@@ -58,8 +49,6 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Tear down the test fixtures.
-     *
      * @return void
      */
     #[\Override]
@@ -71,9 +60,8 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * The trait casts the deadline's and the disabled time's columns itself,
-     * remapped ones included and with no cast declared, and leaves the model's
-     * other casts alone.
+     * Remapped columns included and with no cast declared; the model's other
+     * casts are left alone.
      *
      * @return void
      */
@@ -94,8 +82,6 @@ final class ActsAsFactorTest extends TestCase
 
         $remapped = new class extends Factor {
             /**
-             * Name a column of its own for when the factor was disabled.
-             *
              * @return string
              */
             #[\Override]
@@ -109,9 +95,8 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * A model that casts the column itself keeps its own cast, declared either
-     * way, and a time it reads to is a deadline whatever its class; the
-     * disabled time it does not cast is cast all the same.
+     * Declared either way; a time it reads to is a deadline whatever its class,
+     * and the disabled time is still cast.
      *
      * @return void
      */
@@ -119,8 +104,6 @@ final class ActsAsFactorTest extends TestCase
     {
         $method = new class extends Factor {
             /**
-             * Cast the deadline as an immutable time.
-             *
              * @return array<string, string>
              */
             #[\Override]
@@ -135,8 +118,6 @@ final class ActsAsFactorTest extends TestCase
             protected $casts = ['locked_until' => 'immutable_datetime'];
 
             /**
-             * Cast nothing by the method.
-             *
              * @return array<string, string>
              */
             #[\Override]
@@ -157,9 +138,6 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Stored times that do not read as a time, in either column a refusal
-     * reads, on a model with no cast of its own for it.
-     *
      * @return iterable<string, array{string, mixed, class-string<\Throwable>}>
      */
     public static function unreadableTimes(): iterable
@@ -172,8 +150,7 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * A deadline or a disabled time that cannot be read as a time throws, and
-     * never reads as no lockout or as enabled.
+     * Never read as no lockout or as enabled.
      *
      * @param  string  $column
      * @param  mixed  $stored
@@ -193,9 +170,6 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * A model whose own cast makes either time anything but a time throws,
-     * naming the column and not the value.
-     *
      * @return iterable<string, array{string, string}>
      */
     public static function timesCastAsStrings(): iterable
@@ -205,8 +179,7 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * A model whose own cast makes either time anything but a time throws,
-     * naming the column and not the value.
+     * Naming the column and not the value.
      *
      * @param  string  $column
      * @param  string  $state
@@ -217,8 +190,6 @@ final class ActsAsFactorTest extends TestCase
     {
         $factor = new class extends Factor {
             /**
-             * Cast both times as strings.
-             *
              * @return array<string, string>
              */
             #[\Override]
@@ -237,7 +208,7 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * No time stored reads as none, on a model with or without a row.
+     * On a model with or without a row.
      *
      * @return void
      */
@@ -253,8 +224,7 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Run by hand, the initialiser is public, as Eloquent's convention has it,
-     * and a cast already on the column stays.
+     * Public, as Eloquent's convention has it.
      *
      * @return void
      */
@@ -269,8 +239,6 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Test authenticatable returns morph to.
-     *
      * @return void
      */
     public function testAuthenticatableReturnsMorphTo(): void
@@ -279,8 +247,6 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Test driver column name accessor.
-     *
      * @return void
      */
     public function testGetTypeNameReturnsTypeColumn(): void
@@ -289,8 +255,6 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Test label column name accessor.
-     *
      * @return void
      */
     public function testGetLabelNameReturnsLabelColumn(): void
@@ -299,8 +263,6 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Test destination column name accessor.
-     *
      * @return void
      */
     public function testGetDestinationNameReturnsDestinationColumn(): void
@@ -309,8 +271,6 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Test secret column name accessor.
-     *
      * @return void
      */
     public function testGetSecretNameReturnsSecretColumn(): void
@@ -319,8 +279,6 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Test get factor identifier returns model key.
-     *
      * @return void
      */
     public function testGetFactorIdentifierReturnsModelKey(): void
@@ -332,8 +290,6 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Test get driver returns string value.
-     *
      * @return void
      */
     public function testGetTypeReturnsStringValue(): void
@@ -344,8 +300,6 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Test get driver returns empty string when unset.
-     *
      * @return void
      */
     public function testGetTypeReturnsEmptyStringWhenUnset(): void
@@ -354,8 +308,6 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Test get label returns string value.
-     *
      * @return void
      */
     public function testGetLabelReturnsStringValue(): void
@@ -366,8 +318,6 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Test get label returns null when unset.
-     *
      * @return void
      */
     public function testGetLabelReturnsNullWhenUnset(): void
@@ -376,8 +326,6 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Test get destination returns string value.
-     *
      * @return void
      */
     public function testGetDestinationReturnsStringValue(): void
@@ -388,8 +336,6 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Test get destination returns null when unset.
-     *
      * @return void
      */
     public function testGetDestinationReturnsNullWhenUnset(): void
@@ -398,8 +344,6 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Test get secret returns string value.
-     *
      * @return void
      */
     public function testGetSecretReturnsStringValue(): void
@@ -410,8 +354,6 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Test get secret returns null when unset.
-     *
      * @return void
      */
     public function testGetSecretReturnsNullWhenUnset(): void
@@ -420,8 +362,6 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Test record verification stamps the last use.
-     *
      * @return void
      */
     public function testRecordVerificationStampsLastUse(): void
@@ -434,8 +374,7 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Test record verification leaves the failures in a row to the attempt
-     * service, which resets them under the identity's lock.
+     * The attempt service resets them under the identity's lock.
      *
      * @return void
      */
@@ -449,8 +388,6 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Test record verification uses provided timestamp.
-     *
      * @return void
      */
     public function testRecordVerificationUsesProvidedTimestamp(): void
@@ -465,8 +402,6 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Test persist saves to the database.
-     *
      * @return void
      */
     public function testPersistSavesToTheDatabase(): void
@@ -488,8 +423,6 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Return the test user's key as a string for morph-to wiring.
-     *
      * @param  \Tests\Fixtures\Identities\TestUser  $user
      * @return string
      */
@@ -502,8 +435,6 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
-     * Build a factor with failures in a row populated.
-     *
      * @return \SineMacula\Laravel\Mfa\Models\Factor
      */
     private function makeFullyPopulatedFactor(): Factor

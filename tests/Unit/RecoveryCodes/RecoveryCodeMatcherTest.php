@@ -11,11 +11,7 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeMatcher;
 use Tests\Fixtures\RecoveryCodes\CountingHasher;
 
 /**
- * Unit tests for `RecoveryCodeMatcher`: the work does not depend on which code
- * matches, or whether one does. The submitted code is checked against every
- * hash, in order, whether the match is first, in the middle, last or absent,
- * and a malformed code is checked as the placeholder against every hash too,
- * and matches nothing.
+ * The work must not depend on which code matches, or whether one does.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -29,9 +25,6 @@ final class RecoveryCodeMatcherTest extends TestCase
     private const array CODES = ['AAAAAAAAAAAA', 'BBBBBBBBBBBB', 'CCCCCCCCCCCC', 'DDDDDDDDDDDD', 'EEEEEEEEEEEE'];
 
     /**
-     * Where the submitted code sits in the set, if anywhere, and the key it
-     * matches.
-     *
      * @return iterable<string, array{string, ?int}>
      */
     public static function positions(): iterable
@@ -43,8 +36,7 @@ final class RecoveryCodeMatcherTest extends TestCase
     }
 
     /**
-     * Whichever code matches, and when none does, every hash is checked, with
-     * the submitted code, and the key of the match is returned.
+     * The key of the match is returned.
      *
      * @param  string  $submitted
      * @param  ?int  $key
@@ -60,8 +52,7 @@ final class RecoveryCodeMatcherTest extends TestCase
     }
 
     /**
-     * A malformed code is checked as the placeholder against every hash, and
-     * matches nothing, even a hash of the placeholder itself.
+     * Checked as the placeholder; not even the placeholder's own hash matches.
      *
      * @return void
      */
@@ -75,8 +66,6 @@ final class RecoveryCodeMatcherTest extends TestCase
     }
 
     /**
-     * Of two hashes the code matches, the first is the match.
-     *
      * @return void
      */
     public function testTheFirstMatchIsKept(): void
@@ -89,8 +78,6 @@ final class RecoveryCodeMatcherTest extends TestCase
     }
 
     /**
-     * An empty set checks nothing and matches nothing.
-     *
      * @return void
      */
     public function testAnEmptySetChecksNothing(): void
@@ -102,8 +89,6 @@ final class RecoveryCodeMatcherTest extends TestCase
     }
 
     /**
-     * The hashes of the set's codes.
-     *
      * @param  \Tests\Fixtures\RecoveryCodes\CountingHasher  $hasher
      * @return list<string>
      */

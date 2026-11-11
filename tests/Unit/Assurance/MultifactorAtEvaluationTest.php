@@ -17,9 +17,7 @@ use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\TestCase;
 
 /**
- * When the freshest evidence that a session's proofs are multifactor was made:
- * a further proof's time when it supplies or completes the evidence, the first
- * factor's when it gives it alone, and never a weaker proof's.
+ * When the freshest multifactor evidence was made: never a weaker proof's time.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -35,8 +33,6 @@ final class MultifactorAtEvaluationTest extends TestCase
     private const string NOW = '2026-11-01 12:00:00';
 
     /**
-     * Freeze the clock.
-     *
      * @return void
      */
     #[\Override]
@@ -48,8 +44,6 @@ final class MultifactorAtEvaluationTest extends TestCase
     }
 
     /**
-     * A further proof that completes the combination is its evidence.
-     *
      * @return void
      */
     public function testAProofCompletingTheCombinationIsItsEvidence(): void
@@ -60,8 +54,7 @@ final class MultifactorAtEvaluationTest extends TestCase
     }
 
     /**
-     * A first factor multifactor on its own keeps its own time, however fresh
-     * the weaker proof after it.
+     * However fresh the weaker proof after it.
      *
      * @return void
      */
@@ -73,8 +66,7 @@ final class MultifactorAtEvaluationTest extends TestCase
     }
 
     /**
-     * A further proof multifactor on its own is fresh evidence, after a first
-     * factor that is too.
+     * After a first factor that is too.
      *
      * @return void
      */
@@ -86,9 +78,6 @@ final class MultifactorAtEvaluationTest extends TestCase
     }
 
     /**
-     * The latest evidence wins, and a newer weaker proof does not displace
-     * older multifactor evidence.
-     *
      * @return void
      */
     public function testTheLatestEvidenceWinsAndAWeakerProofDisplacesNone(): void
@@ -100,8 +89,6 @@ final class MultifactorAtEvaluationTest extends TestCase
     }
 
     /**
-     * Proofs that are not multifactor have no multifactor evidence.
-     *
      * @return void
      */
     public function testNoMultifactorHasNoEvidence(): void
@@ -114,8 +101,6 @@ final class MultifactorAtEvaluationTest extends TestCase
     }
 
     /**
-     * The evidence time is no part of the evaluation's array or JSON.
-     *
      * @return void
      */
     public function testTheEvidenceTimeIsNotSerialised(): void
@@ -128,8 +113,7 @@ final class MultifactorAtEvaluationTest extends TestCase
     }
 
     /**
-     * An evaluation that is not multifactor cannot say when its multifactor
-     * evidence was made; one that is may leave it unsaid.
+     * One that is may leave it unsaid.
      *
      * @return void
      */
@@ -144,8 +128,7 @@ final class MultifactorAtEvaluationTest extends TestCase
     }
 
     /**
-     * A combination says when the evidence for an answer was made, and nothing
-     * for an answer it does not give.
+     * Nothing for an answer it does not give.
      *
      * @return void
      */
@@ -160,7 +143,7 @@ final class MultifactorAtEvaluationTest extends TestCase
     }
 
     /**
-     * The policy's evaluation of the proofs against no requirement.
+     * Against no requirement.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  ...$proofs
      * @return \SineMacula\Laravel\Mfa\Assurance\Evaluation
@@ -171,8 +154,6 @@ final class MultifactorAtEvaluationTest extends TestCase
     }
 
     /**
-     * An evaluation, multifactor or not, saying the time given.
-     *
      * @param  bool  $multifactor
      * @param  ?\Carbon\CarbonImmutable  $at
      * @return \SineMacula\Laravel\Mfa\Assurance\Evaluation
@@ -193,8 +174,6 @@ final class MultifactorAtEvaluationTest extends TestCase
     }
 
     /**
-     * The frozen time less the seconds given.
-     *
      * @param  int  $seconds
      * @return \Carbon\CarbonImmutable
      */
@@ -204,8 +183,6 @@ final class MultifactorAtEvaluationTest extends TestCase
     }
 
     /**
-     * Assert the time is the frozen time less the seconds given.
-     *
      * @param  int  $seconds
      * @param  ?\Carbon\CarbonImmutable  $at
      * @return void

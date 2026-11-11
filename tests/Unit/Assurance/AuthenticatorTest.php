@@ -14,9 +14,6 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 use Tests\Fixtures\Assurance\SessionProofs;
 
 /**
- * Tests for `Authenticator`: what each kind of proof shows as an authenticator,
- * from its channel and what it observed.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -26,9 +23,8 @@ use Tests\Fixtures\Assurance\SessionProofs;
 final class AuthenticatorTest extends TestCase
 {
     /**
-     * Rows of a proof, then whether it is something known, something had, a
-     * multi-factor authenticator, restricted and phishing-resistant, and its
-     * `amr` values.
+     * Proof, then knowledge, possession, multi-factor, restricted,
+     * phishing-resistant and `amr` values.
      *
      * @return iterable<string, array{\SineMacula\Laravel\Mfa\Proofs\Proof, bool, bool, bool, bool, bool, list<string>}>
      */
@@ -57,7 +53,7 @@ final class AuthenticatorTest extends TestCase
     }
 
     /**
-     * Each proof is classified from its channel and what it observed.
+     * From its channel and what it observed.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
      * @param  bool  $knowledge

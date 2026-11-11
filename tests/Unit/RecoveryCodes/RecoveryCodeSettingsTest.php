@@ -11,9 +11,6 @@ use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeSettings;
 
 /**
- * Unit tests for `RecoveryCodeSettings`: each setting's default, the bounds it
- * accepts, and the message a value past them fails with.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -34,11 +31,9 @@ final class RecoveryCodeSettingsTest extends TestCase
     }
 
     /**
-     * Each setting takes its default (within its bounds) when unset, reads
-     * either bound as an integer or the digit string `env()` returns, and
-     * refuses a value past either bound, or one that is not an integer, naming
-     * the key and its bounds, both as it is read and when every setting is
-     * validated.
+     * Either bound reads as an integer or as the digit string `env()` returns;
+     * a value past a bound or not an integer is refused, naming the key and its
+     * bounds.
      *
      * @param  string  $key
      * @param  \Closure(\SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeSettings): int  $read
@@ -75,8 +70,6 @@ final class RecoveryCodeSettingsTest extends TestCase
     }
 
     /**
-     * The defaults validate.
-     *
      * @return void
      */
     public function testTheDefaultsValidate(): void
@@ -87,9 +80,8 @@ final class RecoveryCodeSettingsTest extends TestCase
     }
 
     /**
-     * The alphabet defaults to digits and capitals without 0, 1, I and O, and
-     * reads one of at least two printable ASCII characters, none repeated once
-     * case is folded.
+     * Digits and capitals without 0, 1, I and O; a configured one is at least
+     * two printable ASCII characters, none repeated once case is folded.
      *
      * @return void
      */
@@ -101,10 +93,8 @@ final class RecoveryCodeSettingsTest extends TestCase
     }
 
     /**
-     * An alphabet with fewer than two characters, a character repeated or one
-     * that repeats another once case is folded (either would make the draw
-     * favour it), a space, a hyphen, a character outside printable ASCII, or a
-     * value that is not a string is refused.
+     * A repeated character, including one repeated once case is folded, would
+     * make the draw favour it.
      *
      * @return void
      */
@@ -119,8 +109,8 @@ final class RecoveryCodeSettingsTest extends TestCase
     }
 
     /**
-     * The low-count threshold defaults to 3, or to the set's size when the set
-     * is smaller, and reaches from 0 to the set's size, which bounds it.
+     * Defaults to 3, or the set's size when smaller, and ranges from 0 to the
+     * set's size.
      *
      * @return void
      */
@@ -145,8 +135,7 @@ final class RecoveryCodeSettingsTest extends TestCase
     }
 
     /**
-     * A low-count threshold configured above a smaller set's size is refused,
-     * though the default would have followed the set down.
+     * Though the default would have followed the set down.
      *
      * @return void
      */
@@ -161,8 +150,7 @@ final class RecoveryCodeSettingsTest extends TestCase
     }
 
     /**
-     * The default code reaches the 64 bits NIST SP 800-63B-4 asks of a saved
-     * recovery code.
+     * NIST SP 800-63B-4 asks 64 bits of a saved recovery code.
      *
      * @return void
      */
@@ -172,9 +160,8 @@ final class RecoveryCodeSettingsTest extends TestCase
     }
 
     /**
-     * Entropy is the length times the bits of each character of the alphabet,
-     * every one a distinct symbol once case is folded: the default gives 65
-     * bits.
+     * Length times the bits per character of the case-folded alphabet; the
+     * default gives 65 bits.
      *
      * @return void
      */
@@ -186,8 +173,7 @@ final class RecoveryCodeSettingsTest extends TestCase
     }
 
     /**
-     * A length and alphabet that give at least 40 bits validate; fewer are
-     * refused naming both keys.
+     * At least 40 bits validate; fewer are refused naming both keys.
      *
      * @return void
      */
@@ -205,8 +191,7 @@ final class RecoveryCodeSettingsTest extends TestCase
     }
 
     /**
-     * Assert each value is refused with the message, as it is read and when
-     * every setting is validated.
+     * As it is read and when every setting is validated.
      *
      * @param  list<mixed>  $values
      * @param  string  $key
@@ -233,8 +218,6 @@ final class RecoveryCodeSettingsTest extends TestCase
     }
 
     /**
-     * Build the settings over an `mfa.recovery_codes` block.
-     *
      * @param  array<string, mixed>  $block
      * @return \SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeSettings
      */

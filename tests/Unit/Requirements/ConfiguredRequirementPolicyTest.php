@@ -19,13 +19,6 @@ use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\TestCase;
 
 /**
- * Tests for `ConfiguredRequirementPolicy`: after the first factor, the sign-in
- * must meet the requirement composed from the application's mode and the
- * identity's own, unless the first factor meets all of it on its own, as a
- * passkey that verified the person meets an additional verification. A proof
- * that is not the identity's first factor on the application suppresses
- * nothing.
- *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  *
@@ -37,10 +30,6 @@ final class ConfiguredRequirementPolicyTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * Rows of the application's mode, the identity's own requirement, the first
-     * factor as the sign-in made it, and the requirement the sign-in must still
-     * meet, serialised.
-     *
      * @return iterable<string, array{
      *     string,
      *     ?\SineMacula\Laravel\Mfa\Requirements\Requirement,
@@ -78,8 +67,8 @@ final class ConfiguredRequirementPolicyTest extends TestCase
     }
 
     /**
-     * The sign-in must meet the whole composed requirement unless the first
-     * factor meets all of it on its own.
+     * The whole composed requirement, unless the first factor meets all of it
+     * on its own.
      *
      * @param  string  $mode
      * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $own
@@ -102,8 +91,7 @@ final class ConfiguredRequirementPolicyTest extends TestCase
     }
 
     /**
-     * A proof that is not a first factor suppresses nothing, even when the
-     * bound check finds it meets the requirement.
+     * Even when the bound check finds it meets the requirement.
      *
      * @return void
      *
@@ -122,8 +110,6 @@ final class ConfiguredRequirementPolicyTest extends TestCase
     }
 
     /**
-     * The policy is the default the container binds.
-     *
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -134,8 +120,6 @@ final class ConfiguredRequirementPolicyTest extends TestCase
     }
 
     /**
-     * Configure the application the sign-ins are on with the given mode.
-     *
      * @param  string  $mode
      * @return void
      */
@@ -148,8 +132,6 @@ final class ConfiguredRequirementPolicyTest extends TestCase
     }
 
     /**
-     * Resolve the policy under test.
-     *
      * @return \SineMacula\Laravel\Mfa\Requirements\ConfiguredRequirementPolicy
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -160,16 +142,12 @@ final class ConfiguredRequirementPolicyTest extends TestCase
     }
 
     /**
-     * A check that finds every requirement met by any proofs.
-     *
      * @return \SineMacula\Laravel\Mfa\Contracts\RequirementCheck
      */
     private static function checkMeetingEverything(): RequirementCheck
     {
         return new class implements RequirementCheck {
             /**
-             * Find the requirement met.
-             *
              * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
              * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  ...$proofs
              * @return \SineMacula\Laravel\Mfa\Assurance\Evaluation
