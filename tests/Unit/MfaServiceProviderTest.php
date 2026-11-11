@@ -13,6 +13,7 @@ use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\ServiceProvider;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Codes\CodeService;
 use SineMacula\Laravel\Mfa\Codes\NullEmailSender;
 use SineMacula\Laravel\Mfa\Codes\NullSmsSender;
@@ -535,23 +536,48 @@ final class MfaServiceProviderTest extends TestCase
     }
 
     /**
-     * Anything an application binds, or holds, is not the package's default.
+     * Ways an application binds, holds or changes a contract.
      *
+     * @return iterable<string, array{\Closure(\Illuminate\Container\Container): void}>
+     */
+    public static function applicationBindings(): iterable
+    {
+        yield 'unbound' => [static function (): void {}];
+        yield 'another class' => [static fn (Container $container) => $container->bind('contract', \stdClass::class)];
+        yield 'a closure' => [static fn (Container $container) => $container->bind('contract', static fn (): \stdClass => new \stdClass)];
+        yield 'shared' => [static fn (Container $container) => $container->singleton('contract', NullSmsSender::class)];
+        yield 'an instance' => [static function (Container $container): void {
+            $container->bind('contract', NullSmsSender::class);
+            $container->instance('contract', new NullSmsSender);
+        }];
+        yield 'an alias' => [static function (Container $container): void {
+            $container->bind('contract', NullSmsSender::class);
+            $container->alias(\stdClass::class, 'contract');
+        }];
+        yield 'an extender' => [static function (Container $container): void {
+            $container->bind('contract', NullSmsSender::class);
+            $container->extend('contract', static fn (object $sender): object => $sender);
+        }];
+        yield 'the class rebound' => [static function (Container $container): void {
+            $container->bind('contract', NullSmsSender::class);
+            $container->bind(NullSmsSender::class, \stdClass::class);
+        }];
+    }
+
+    /**
+     * Anything an application binds, holds or changes is not the default.
+     *
+     * @param  \Closure(\Illuminate\Container\Container): void  $arrange
      * @return void
      */
-    public function testAnApplicationsBindingIsNotThePackages(): void
+    #[DataProvider('applicationBindings')]
+    public function testAnApplicationsBindingIsNotThePackages(\Closure $arrange): void
     {
         $container = new Container;
 
-        $container->bind('by-class', \stdClass::class);
-        $container->bind('by-closure', static fn (): \stdClass => new \stdClass);
-        $container->singleton('shared', NullSmsSender::class);
-        $container->bind('held', NullSmsSender::class);
-        $container->instance('held', new NullSmsSender);
+        $arrange($container);
 
-        foreach (['unbound', 'by-class', 'by-closure', 'shared', 'held'] as $contract) {
-            self::assertFalse(MfaServiceProvider::isPackageDefault($container, $contract), $contract);
-        }
+        self::assertFalse(MfaServiceProvider::isPackageDefault($container, 'contract'));
     }
 
     /**

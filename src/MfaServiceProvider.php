@@ -82,9 +82,10 @@ final class MfaServiceProvider extends ServiceProvider
     }
 
     /**
-     * Whether the contract is bound to one of this package's classes, so a
-     * sibling package can replace the default and keep an application's own
-     * binding. An instance or a shared binding is never the default.
+     * Whether the contract is still bound to one of this package's classes, so
+     * a sibling package can replace the default and keep an application's own
+     * binding. An alias, an instance, a shared binding, an extender, or a
+     * rebinding of the class the default names is never the default.
      *
      * @param  \Illuminate\Container\Container  $container
      * @param  string  $contract
@@ -94,17 +95,21 @@ final class MfaServiceProvider extends ServiceProvider
     {
         $concrete = $container->getBindings()[$contract]['concrete'] ?? null;
 
-        if (!$concrete instanceof \Closure || $container->isShared($contract)) {
+        if (!$concrete instanceof \Closure || $container->isAlias($contract) || $container->isShared($contract) || self::isExtended($container, $contract)) {
             return false;
         }
 
         $closure = new \ReflectionFunction($concrete);
         $scope   = $closure->getClosureScopeClass()?->getName();
 
-        // A class bound by name is wrapped in a closure the container defines.
-        $origin = $scope === Container::class ? $closure->getStaticVariables()['concrete'] ?? null : $scope;
+        if ($scope !== Container::class) {
+            return is_string($scope) && str_starts_with($scope, __NAMESPACE__ . '\\');
+        }
 
-        return is_string($origin) && str_starts_with($origin, __NAMESPACE__ . '\\');
+        // A class bound by name is wrapped in a closure the container defines.
+        $class = $closure->getStaticVariables()['concrete'] ?? null;
+
+        return is_string($class) && str_starts_with($class, __NAMESPACE__ . '\\') && !$container->bound($class);
     }
 
     /**
@@ -159,5 +164,19 @@ final class MfaServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__ . '/../lang' => $this->app->langPath('vendor/mfa'),
         ], 'mfa-lang');
+    }
+
+    /**
+     * Laravel offers no public read of a binding's extenders.
+     *
+     * @param  \Illuminate\Container\Container  $container
+     * @param  string  $contract
+     * @return bool
+     */
+    private static function isExtended(Container $container, string $contract): bool
+    {
+        $extenders = (new \ReflectionProperty(Container::class, 'extenders'))->getValue($container); // NOSONAR
+
+        return is_array($extenders) && ($extenders[$contract] ?? []) !== [];
     }
 }

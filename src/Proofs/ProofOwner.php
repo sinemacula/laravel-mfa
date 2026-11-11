@@ -85,6 +85,8 @@ final readonly class ProofOwner
      * Prefixed with the type's length, so a separator inside either part cannot
      * make two owners meet.
      *
+     * @internal
+     *
      * @return string
      */
     public function slot(): string
