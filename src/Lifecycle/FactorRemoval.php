@@ -109,9 +109,11 @@ final readonly class FactorRemoval
         $kept = [];
 
         foreach ($this->container->make(SessionFirstFactor::class)->proofsOf($identity, $application, $session) as $proof) {
-            if ($proof->reference !== $id) {
-                $kept[] = $proof;
+            if ($proof->reference === $id) {
+                continue;
             }
+
+            $kept[] = $proof;
         }
 
         $revocation   = $this->container->make(SessionRevoker::class)->factorRemoved($identity, $id, $application, $session);
