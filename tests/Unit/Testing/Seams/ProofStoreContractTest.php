@@ -4,20 +4,26 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Testing\Seams;
 
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Session\ArraySessionHandler;
 use Illuminate\Session\Store;
+use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
+use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Proofs\SessionProofStore;
 use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\ProofStoreTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\ProofStoreContract;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Seams\Enums\ProofStoreFlaw;
 use Tests\Fixtures\Seams\FlawedProofStore;
+use Tests\Fixtures\Seams\InterceptedProofStore;
 use Tests\Fixtures\Seams\KeepingProofStore;
 use Tests\Fixtures\Seams\LayerWrittenProofStore;
 use Tests\Fixtures\Seams\SignInRowsProofStore;
@@ -359,6 +365,77 @@ final class ProofStoreContractTest extends TestCase
         $this->expectException(AssertionFailedError::class);
 
         ProofStoreContract::assertForgettingAFactorStopsItsProofsCounting(new KeepingProofStore, $this->proofStoreIdentity(), 'web', ProofStoreContract::SESSION);
+    }
+
+    /**
+     * As the package does, the factor is deleted before the store forgets it.
+     *
+     * @return void
+     */
+    public function testTheFactorIsDeletedBeforeTheStoreForgetsIt(): void
+    {
+        $identity = $this->proofStoreIdentity();
+        $owner    = ProofOwner::of($identity);
+        $factor   = Factor::query()->create(['authenticatable_type' => $owner->type, 'authenticatable_id' => $owner->key, 'type' => 'totp', 'status' => 'confirmed']);
+        $store    = $this->proofStore();
+
+        $deletedFirst = new InterceptedProofStore($store, static function (MultiFactorAuthenticatable $identity, string $id) use ($store): void {
+            Assert::assertFalse(Factor::query()->whereKey($id)->exists(), 'The factor must be deleted before the store forgets it.');
+
+            $store->forgetFactor($identity, $id);
+        });
+
+        $deleted = false;
+
+        Factor::deleting(static function () use (&$deleted): void {
+            $deleted = true;
+        });
+
+        ProofStoreContract::assertForgettingAFactorStopsItsProofsCounting($deletedFirst, $identity, 'web', ProofStoreContract::SESSION, $factor->id);
+
+        self::assertTrue($deleted, 'The factor must be deleted through its model.');
+    }
+
+    /**
+     * A store whose revoker voids the factor's proofs passes when the check is
+     * handed what forgets them.
+     *
+     * @return void
+     */
+    public function testTheCheckForgetsThroughTheClosureGiven(): void
+    {
+        $identity = $this->proofStoreIdentity();
+        $voiding  = $this->proofStore();
+        $store    = new InterceptedProofStore($voiding, static function (): void {});
+
+        ProofStoreContract::assertForgettingAFactorStopsItsProofsCounting(
+            $store,
+            $identity,
+            'web',
+            ProofStoreContract::SESSION,
+            forget: static fn () => $voiding->forgetFactor($identity, ProofStoreContract::FACTOR),
+        );
+
+        $this->addToAssertionCount(1);
+    }
+
+    /**
+     * The synthetic default names no stored factor, so no factor is looked up.
+     *
+     * @return void
+     */
+    public function testTheSyntheticFactorIsNeverLookedUp(): void
+    {
+        $table   = (new Factor)->getTable();
+        $queries = [];
+
+        DB::listen(static function (QueryExecuted $query) use (&$queries): void {
+            $queries[] = $query->sql;
+        });
+
+        ProofStoreContract::assertForgettingAFactorStopsItsProofsCounting($this->proofStore(), $this->proofStoreIdentity(), 'web', ProofStoreContract::SESSION);
+
+        self::assertSame([], array_values(array_filter($queries, static fn (string $sql): bool => str_contains($sql, $table))));
     }
 
     /**

@@ -70,8 +70,9 @@ interface ProofStore
     public function proofs(MultiFactorAuthenticatable $identity, string $application, string $sessionId): array;
 
     /**
-     * Stop counting every proof made with the factor, on any session the store
-     * can reach.
+     * Called once the factor is deleted. Stop counting every proof made with
+     * it, on any session the store can reach, unless the bound
+     * `SessionRevoker`, which the package tells next, voids them.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $factorId

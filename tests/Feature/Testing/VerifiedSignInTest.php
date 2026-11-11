@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Events\Authenticated;
 use Illuminate\Auth\Events\Login;
+use Illuminate\Container\Container;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
@@ -28,6 +29,7 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use SineMacula\Laravel\Mfa\Testing\Concerns\InteractsWithMfa;
 use SineMacula\Laravel\Mfa\Testing\Contracts\VerifiedSignInRecorder;
+use SineMacula\Laravel\Mfa\Testing\LevelEvidence;
 use SineMacula\Laravel\Mfa\Testing\ProofStoreRecorder;
 use SineMacula\Laravel\Mfa\Testing\VerifiedSignIn;
 use Tests\Fixtures\Drivers\HeaderApplicationResolver;
@@ -362,7 +364,7 @@ final class VerifiedSignInTest extends TestCase
      */
     public function testAPolicyRejectingTheFurtherProofFailsNamingIt(): void
     {
-        $this->container()->instance(CombinationPolicy::class, new UnacceptingCombinationPolicy(VerifiedSignIn::EMAIL_REFERENCE));
+        $this->container()->instance(CombinationPolicy::class, new UnacceptingCombinationPolicy(LevelEvidence::EMAIL_REFERENCE));
 
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage('Requested aal1 with additional verification; reached aal1; unmet: additional_verification.');
@@ -551,6 +553,46 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
+     * The further proof names the factor the recorder gives.
+     *
+     * @return void
+     */
+    public function testTheFurtherProofNamesTheRecordersFactor(): void
+    {
+        $user = $this->person();
+
+        $this->container()->instance(VerifiedSignInRecorder::class, self::naming('enrolled-factor'));
+
+        $this->actingAsVerified($user);
+
+        $further = array_values(array_filter($this->heldBy($user, 'web'), static fn (Proof $proof): bool => $proof->kind === ProofKind::ADDITIONAL_FACTOR));
+
+        self::assertCount(1, $further);
+        self::assertSame('enrolled-factor', $further[0]->reference);
+    }
+
+    /**
+     * A recorder that names no factor is refused before anything is recorded.
+     *
+     * @return void
+     */
+    public function testARecorderNamingNoFactorIsRefused(): void
+    {
+        $user = $this->person();
+
+        $this->container()->instance(VerifiedSignInRecorder::class, self::naming(' '));
+
+        try {
+            $this->actingAsVerified($user);
+            self::fail('A blank factor reference was expected to be refused.');
+        } catch (\LogicException $exception) {
+            self::assertSame('The recorder named no factor for the further proof.', $exception->getMessage());
+        }
+
+        self::assertSame([], $this->heldBy($user, 'web'));
+    }
+
+    /**
      * Such a store begins no sign-in of its own.
      *
      * @return void
@@ -608,6 +650,18 @@ final class VerifiedSignInTest extends TestCase
             {
                 $this->layer->write($proof);
             }
+
+            /**
+             * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+             * @param  string  $application
+             * @param  \SineMacula\Laravel\Mfa\Enums\AssuranceLevel  $level
+             * @return string
+             */
+            #[\Override]
+            public function factorReference(MultiFactorAuthenticatable $identity, string $application, AssuranceLevel $level): string
+            {
+                return LevelEvidence::syntheticReference($level);
+            }
         });
 
         $this->expectException(\LogicException::class);
@@ -661,6 +715,18 @@ final class VerifiedSignInTest extends TestCase
             public function record(MultiFactorAuthenticatable $identity, Proof $proof): void
             {
                 // Nothing is kept.
+            }
+
+            /**
+             * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+             * @param  string  $application
+             * @param  \SineMacula\Laravel\Mfa\Enums\AssuranceLevel  $level
+             * @return string
+             */
+            #[\Override]
+            public function factorReference(MultiFactorAuthenticatable $identity, string $application, AssuranceLevel $level): string
+            {
+                return LevelEvidence::syntheticReference($level);
             }
         });
 
@@ -968,6 +1034,67 @@ final class VerifiedSignInTest extends TestCase
         $session = $store->currentSession($identity, $application);
 
         return $session === null ? [] : $store->proofs($identity, $application, $session);
+    }
+
+    /**
+     * The default recorder, naming the factor given.
+     *
+     * @param  string  $reference
+     * @return \SineMacula\Laravel\Mfa\Testing\Contracts\VerifiedSignInRecorder
+     */
+    private static function naming(string $reference): VerifiedSignInRecorder
+    {
+        $recorder = new ProofStoreRecorder(Container::getInstance()->make(ProofStore::class));
+
+        return new readonly class ($recorder, $reference) implements VerifiedSignInRecorder {
+            /**
+             * @param  \SineMacula\Laravel\Mfa\Testing\ProofStoreRecorder  $recorder
+             * @param  string  $reference
+             */
+            public function __construct(
+
+                /** The recorder every other call goes to. */
+                private ProofStoreRecorder $recorder,
+
+                /** The factor named. */
+                private string $reference,
+            ) {}
+
+            /**
+             * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+             * @param  string  $application
+             * @param  \Carbon\CarbonImmutable  $at
+             * @return string
+             */
+            #[\Override]
+            public function begin(MultiFactorAuthenticatable $identity, string $application, CarbonImmutable $at): string
+            {
+                return $this->recorder->begin($identity, $application, $at);
+            }
+
+            /**
+             * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+             * @param  \SineMacula\Laravel\Mfa\Proofs\Proof  $proof
+             * @return void
+             */
+            #[\Override]
+            public function record(MultiFactorAuthenticatable $identity, Proof $proof): void
+            {
+                $this->recorder->record($identity, $proof);
+            }
+
+            /**
+             * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+             * @param  string  $application
+             * @param  \SineMacula\Laravel\Mfa\Enums\AssuranceLevel  $level
+             * @return string
+             */
+            #[\Override]
+            public function factorReference(MultiFactorAuthenticatable $identity, string $application, AssuranceLevel $level): string
+            {
+                return $this->reference;
+            }
+        };
     }
 
     /**

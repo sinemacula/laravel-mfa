@@ -137,14 +137,16 @@ trait ProofStoreTests
         [$store, $identity, $application] = [$this->proofStore(), $this->proofStoreIdentity(), $this->proofStoreApplication()];
 
         $session = $this->proofStoreSignIn($identity, $application);
+        $factor  = $this->proofStoreFactor($identity);
 
         ProofStoreContract::assertForgettingAFactorStopsItsProofsCounting(
             $store,
             $identity,
             $application,
             $session,
-            $this->proofStoreFactor($identity),
+            $factor,
             fn (Proof $proof) => $this->arrangeProofStoreProof($store, $identity, $application, $session, $proof),
+            fn () => $this->forgetProofStoreFactor($store, $identity, $application, $session, $factor),
         );
     }
 
@@ -173,6 +175,28 @@ trait ProofStoreTests
     protected function voidProofStoreProofs(MultiFactorAuthenticatable $identity): void
     {
         ProofStoreContract::voidByGeneration($identity);
+    }
+
+    /**
+     * Forget the deleted factor as the package does; by default through the
+     * store. A store that leaves this to its `SessionRevoker` calls the
+     * revoker's `factorRemoved()` here too.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
+     * @param  string  $session
+     * @param  string  $factor
+     * @return void
+     */
+    protected function forgetProofStoreFactor(
+        ProofStore $store,
+        MultiFactorAuthenticatable $identity,
+        string $application, // NOSONAR: for an override
+        string $session, // NOSONAR: for an override
+        string $factor,
+    ): void {
+        $store->forgetFactor($identity, $factor);
     }
 
     /**

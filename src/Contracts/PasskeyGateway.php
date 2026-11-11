@@ -29,10 +29,13 @@ interface PasskeyGateway
     public function isAvailable(): bool;
 
     /**
+     * The identity's passkeys usable on the application.
+     *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
      * @return list<string>
      */
-    public function credentialIds(MultiFactorAuthenticatable $identity): array;
+    public function credentialIds(MultiFactorAuthenticatable $identity, string $application): array;
 
     /**
      * Assertion request options bound as the binding says and limited to the

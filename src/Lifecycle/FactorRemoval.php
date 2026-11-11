@@ -105,7 +105,16 @@ final readonly class FactorRemoval
             && $this->recoveryCodes->deleteSet($identity);
 
         // Read first: the revocation hides proofs it does not record again.
-        $kept = $this->container->make(SessionFirstFactor::class)->proofsOf($identity, $application, $session);
+        // A store may list the removed factor's proofs until they are voided.
+        $kept = [];
+
+        foreach ($this->container->make(SessionFirstFactor::class)->proofsOf($identity, $application, $session) as $proof) {
+            if ($proof->reference === $id) {
+                continue;
+            }
+
+            $kept[] = $proof;
+        }
 
         $revocation   = $this->container->make(SessionRevoker::class)->factorRemoved($identity, $id, $application, $session);
         $reevaluation = $this->container->make(SessionReevaluation::class);
