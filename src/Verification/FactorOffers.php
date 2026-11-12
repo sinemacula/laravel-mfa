@@ -85,7 +85,6 @@ final readonly class FactorOffers
 
         $settings = new ApplicationSettings($this->container->make(Repository::class), $application);
 
-        /** @var list<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor> $factors */
         $factors = WriteConnection::query($caller->identity->authFactors())->get()->all();
 
         $offered = array_filter(

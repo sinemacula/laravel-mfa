@@ -310,8 +310,9 @@ answers `not_found`.
 An adapter can reuse three of this package's helpers. `MfaServiceProvider::isPackageDefault($container, $contract)` says
 whether a contract is still bound to one of this package's classes, so the adapter replaces the default and keeps a
 binding the application made. `Proofs\ProofOwner::of($identity)` gives the type and key this package records an identity
-under, with `Support\IdentityType::of()` for the type alone. `Database\AfterStorageCommit::run($container, $callback)`
-runs work once the storage connection's open transaction commits, at once when none is open, and never on rollback.
+under, with `Support\IdentityType::of()` for the type alone, and `$owner->is($other)` compares two owners strictly.
+`Database\AfterStorageCommit::run($container, $callback)` runs work once the storage connection's open transaction
+commits, at once when none is open, and never on rollback.
 
 `Contracts\SessionTransition::factorChanged()` is called after every factor change made on an active session, whether
 or not this package finds the session short: a factor confirmed, a passkey registered as a factor, and a removal the

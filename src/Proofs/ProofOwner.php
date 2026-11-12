@@ -62,6 +62,17 @@ final readonly class ProofOwner
     }
 
     /**
+     * Compares type and key strictly, so `'01'` and `'1'` are different owners.
+     *
+     * @param  self  $other
+     * @return bool
+     */
+    public function is(self $other): bool
+    {
+        return $other->type === $this->type && $other->key === $this->key;
+    }
+
+    /**
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @return bool
      */
