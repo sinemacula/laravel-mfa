@@ -42,7 +42,7 @@ final class NamespaceDependenciesTest extends TestCase
     private const array DISPATCHER_EXEMPTIONS = [
         'Events\EventDispatcher'       => 'the one way the package dispatches an event',
         'Config\ConfigurationBindings' => 'listens for Laravel\'s CommandStarting to check a worker as it starts and dispatches nothing',
-        'Proofs\ProofBindings'         => 'registers listeners for Laravel\'s Login, Logout and CurrentDeviceLogout events and dispatches nothing',
+        'Proofs\ProofBindings'         => 'registers listeners for Laravel\'s Login, Logout, CurrentDeviceLogout and JobProcessing events and dispatches nothing',
     ];
 
     /** @var array<string, array{from: non-empty-list<string>, except: list<string>, forbids: non-empty-list<string>, allows: list<string>}> `from` less `except` may not name `forbids` less `allows`; `*` is the whole package. */

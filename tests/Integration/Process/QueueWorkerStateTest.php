@@ -15,7 +15,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\Session;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\EmailSender;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
@@ -30,8 +29,8 @@ use Tests\Integration\Process\Fixtures\JobObservations;
 use Tests\TestCase;
 
 /**
- * One worker runs jobs for different people, clearing the guards and session in
- * `Queue::before()` as the operations guide documents; Laravel clears neither.
+ * One worker runs jobs for different people, clearing the guards in
+ * `Queue::before()` as the operations guide documents; Laravel does not.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -45,9 +44,6 @@ final class QueueWorkerStateTest extends TestCase
 {
     /** @var string Alice's email factor destination. */
     private const string ADDRESS = 'alice@example.test';
-
-    /** @var bool Whether the session is cleared before each job. */
-    private bool $clearsTheSession = true;
 
     /**
      * @return void
@@ -76,12 +72,6 @@ final class QueueWorkerStateTest extends TestCase
             }
 
             Auth::forgetGuards();
-
-            if (!$this->clearsTheSession) {
-                return;
-            }
-
-            Session::flush();
         });
     }
 
@@ -146,25 +136,14 @@ final class QueueWorkerStateTest extends TestCase
     }
 
     /**
-     * No sign-in event forgets the proof; clearing the session does.
+     * No sign-in event forgets the proof, and the worker's session is never
+     * flushed.
      *
      * @return void
      */
     public function testAProofDoesNotOutliveTheJobThatMadeIt(): void
     {
         self::assertSame([1, 0, 0], $this->proofsAcrossJobs());
-    }
-
-    /**
-     * Why the guide clears the session: the person's next job reads the proof.
-     *
-     * @return void
-     */
-    public function testAProofLivesInAWorkersSessionUntilItIsCleared(): void
-    {
-        $this->clearsTheSession = false;
-
-        self::assertSame([1, 1, 0], $this->proofsAcrossJobs());
     }
 
     /**

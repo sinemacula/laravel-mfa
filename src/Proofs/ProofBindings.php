@@ -10,6 +10,7 @@ use Illuminate\Auth\Events\Logout;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Session\Session;
+use Illuminate\Queue\Events\JobProcessing;
 use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
@@ -17,7 +18,7 @@ use SineMacula\Laravel\Mfa\Contracts\StepUp;
 use SineMacula\Laravel\Mfa\Support\PackageDefault;
 
 /**
- * Registers the proof service, the default proof seams and the sign-in
+ * Registers the proof service, the default proof seams and the sign-in and job
  * listeners, each built when asked for so no request's session outlives it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
@@ -55,5 +56,6 @@ final class ProofBindings
         $events->listen(Login::class, BeginSignInOnLogin::class);
         $events->listen(Logout::class, ForgetSignInOnLogout::class);
         $events->listen(CurrentDeviceLogout::class, ForgetSignInOnLogout::class);
+        $events->listen(JobProcessing::class, ForgetProofsBeforeJob::class);
     }
 }
