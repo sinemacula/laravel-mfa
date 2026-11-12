@@ -7,6 +7,7 @@ namespace SineMacula\Laravel\Mfa\Lifecycle;
 use Illuminate\Contracts\Foundation\Application;
 use SineMacula\Laravel\Mfa\Contracts\LastFactorPolicy;
 use SineMacula\Laravel\Mfa\Contracts\SelfServiceRecovery;
+use SineMacula\Laravel\Mfa\Support\PackageDefault;
 
 /**
  * Binds the lifecycle service and the default last-factor and self-service
@@ -31,7 +32,7 @@ final class LifecycleBindings
     public static function register(Application $app): void
     {
         $app->bindIf(LifecycleService::class);
-        $app->bindIf(LastFactorPolicy::class, RequiredFactorPolicy::class);
-        $app->bindIf(SelfServiceRecovery::class, NoSelfServiceRecovery::class);
+        PackageDefault::bind($app, LastFactorPolicy::class, RequiredFactorPolicy::class);
+        PackageDefault::bind($app, SelfServiceRecovery::class, NoSelfServiceRecovery::class);
     }
 }

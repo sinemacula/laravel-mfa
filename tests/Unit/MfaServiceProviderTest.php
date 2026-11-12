@@ -69,6 +69,7 @@ use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 use SineMacula\Laravel\Mfa\Seams\RefusingReauthenticator;
 use SineMacula\Laravel\Mfa\Secrets\NoStore;
 use SineMacula\Laravel\Mfa\Secrets\RedactSecretsInLogs;
+use SineMacula\Laravel\Mfa\Support\PackageDefault;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
 use Tests\Fixtures\Factors\SecondaryConnectionFactor;
 use Tests\TestCase;
@@ -547,19 +548,20 @@ final class MfaServiceProviderTest extends TestCase
         yield 'a closure' => [static fn (Container $container) => $container->bind('contract', static fn (): \stdClass => new \stdClass)];
         yield 'shared' => [static fn (Container $container) => $container->singleton('contract', NullSmsSender::class)];
         yield 'an instance' => [static function (Container $container): void {
-            $container->bind('contract', NullSmsSender::class);
+            PackageDefault::bind($container, 'contract', NullSmsSender::class);
             $container->instance('contract', new NullSmsSender);
         }];
         yield 'an alias' => [static function (Container $container): void {
-            $container->bind('contract', NullSmsSender::class);
+            PackageDefault::bind($container, 'contract', NullSmsSender::class);
             $container->alias(\stdClass::class, 'contract');
         }];
         yield 'an extender' => [static function (Container $container): void {
-            $container->bind('contract', NullSmsSender::class);
+            PackageDefault::bind($container, 'contract', NullSmsSender::class);
             $container->extend('contract', static fn (object $sender): object => $sender);
         }];
+        yield 'a package class by name' => [static fn (Container $container) => $container->bind('contract', NullSmsSender::class)];
         yield 'the class rebound' => [static function (Container $container): void {
-            $container->bind('contract', NullSmsSender::class);
+            PackageDefault::bind($container, 'contract', NullSmsSender::class);
             $container->bind(NullSmsSender::class, \stdClass::class);
         }];
     }
@@ -581,16 +583,82 @@ final class MfaServiceProviderTest extends TestCase
     }
 
     /**
-     * A package class bound by name counts as the default, whoever bound it.
-     *
      * @return void
      */
-    public function testAPackageClassBoundByNameIsThePackages(): void
+    public function testEveryContractTheProviderBindsIsThePackages(): void
+    {
+        $contracts = array_filter(
+            array_keys($this->container()->getBindings()),
+            static fn (string $abstract): bool => str_starts_with($abstract, 'SineMacula\Laravel\Mfa\Contracts\\'),
+        );
+
+        self::assertNotEmpty($contracts);
+
+        foreach ($contracts as $contract) {
+            self::assertTrue(MfaServiceProvider::isPackageDefault($this->container(), $contract), $contract);
+        }
+    }
+
+    /**
+     * Its resolving callbacks run once, as for a class bound by name.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testADefaultResolvesAsABindingByName(): void
+    {
+        $resolving = 0;
+        $resolved  = 0;
+        $container = new Container;
+
+        PackageDefault::bind($container, 'contract', MiddlewareSessionTransition::class);
+
+        $container->resolving(MiddlewareSessionTransition::class, static function () use (&$resolving): void {
+            $resolving++;
+        });
+
+        $container->afterResolving(MiddlewareSessionTransition::class, static function () use (&$resolved): void {
+            $resolved++;
+        });
+
+        self::assertInstanceOf(MiddlewareSessionTransition::class, $container->make('contract'));
+        self::assertSame(1, $resolving);
+        self::assertSame(1, $resolved);
+        self::assertTrue(MfaServiceProvider::isPackageDefault($container, 'contract'));
+    }
+
+    /**
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testADefaultPassesParametersToTheClass(): void
     {
         $container = new Container;
 
-        $container->bind(SmsSender::class, NullSmsSender::class);
+        PackageDefault::bind($container, 'contract', \ArrayObject::class);
 
-        self::assertTrue(MfaServiceProvider::isPackageDefault($container, SmsSender::class));
+        $object = $container->make('contract', ['array' => ['kept']]);
+
+        self::assertInstanceOf(\ArrayObject::class, $object);
+        self::assertSame(['kept'], $object->getArrayCopy());
+    }
+
+    /**
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testADefaultHonoursABindingOfItsClass(): void
+    {
+        $container = new Container;
+        $override  = new \stdClass;
+
+        PackageDefault::bind($container, 'contract', MiddlewareSessionTransition::class);
+
+        $container->bind(MiddlewareSessionTransition::class, static fn (): \stdClass => $override);
+
+        self::assertSame($override, $container->make('contract'));
     }
 }

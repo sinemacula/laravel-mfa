@@ -6,6 +6,7 @@ namespace SineMacula\Laravel\Mfa\Assurance;
 
 use Illuminate\Contracts\Foundation\Application;
 use SineMacula\Laravel\Mfa\Contracts\CombinationPolicy;
+use SineMacula\Laravel\Mfa\Support\PackageDefault;
 
 /**
  * Binds the default `CombinationPolicy` only if the application has not bound
@@ -29,6 +30,6 @@ final class AssuranceBindings
      */
     public static function register(Application $app): void
     {
-        $app->bindIf(CombinationPolicy::class, DefaultCombinationPolicy::class);
+        PackageDefault::bind($app, CombinationPolicy::class, DefaultCombinationPolicy::class);
     }
 }

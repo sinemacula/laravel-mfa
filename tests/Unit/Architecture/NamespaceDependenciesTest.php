@@ -58,11 +58,11 @@ final class NamespaceDependenciesTest extends TestCase
             'forbids' => ['*'],
             'allows'  => ['Models', 'Concerns', 'Contracts', 'Database', 'Enums'],
         ],
-        'the seam defaults name nothing of the package but its contracts and enums' => [
+        'the seam defaults name nothing of the package but its contracts, enums and the default binder' => [
             'from'    => ['Seams'],
             'except'  => [],
             'forbids' => ['*'],
-            'allows'  => ['Seams', 'Contracts', 'Enums'],
+            'allows'  => ['Seams', 'Contracts', 'Enums', 'Support\PackageDefault'],
         ],
         'exceptions name nothing of the package but enums, the support helpers and the summaries and results they carry' => [
             'from'    => ['Exceptions'],

@@ -25,6 +25,7 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeBindings;
 use SineMacula\Laravel\Mfa\Requirements\RequirementBindings;
 use SineMacula\Laravel\Mfa\Seams\SeamBindings;
 use SineMacula\Laravel\Mfa\Secrets\SecretBindings;
+use SineMacula\Laravel\Mfa\Support\PackageDefault;
 use SineMacula\Laravel\Mfa\Verification\VerificationBindings;
 
 /**
@@ -82,10 +83,11 @@ final class MfaServiceProvider extends ServiceProvider
     }
 
     /**
-     * Whether the contract is still bound to one of this package's classes, so
-     * a sibling package can replace the default and keep an application's own
-     * binding. An alias, an instance, a shared binding, an extender, or a
-     * rebinding of the class the default names is never the default.
+     * Whether the contract is still bound to this package's own default, so a
+     * sibling package can replace the default and keep an application's own
+     * binding. A class bound by name is never the default, even one of this
+     * package's, and neither is an alias, an instance, a shared binding, an
+     * extender, or a rebinding of the class the default names.
      *
      * @param  \Illuminate\Container\Container  $container
      * @param  string  $contract
@@ -102,14 +104,13 @@ final class MfaServiceProvider extends ServiceProvider
         $closure = new \ReflectionFunction($concrete);
         $scope   = $closure->getClosureScopeClass()?->getName();
 
-        if ($scope !== Container::class) {
-            return is_string($scope) && str_starts_with($scope, __NAMESPACE__ . '\\');
+        if (!is_string($scope) || !str_starts_with($scope, __NAMESPACE__ . '\\')) {
+            return false;
         }
 
-        // A class bound by name is wrapped in a closure the container defines.
-        $class = $closure->getStaticVariables()['concrete'] ?? null;
+        $class = $scope === PackageDefault::class ? $closure->getStaticVariables()['class'] ?? null : null;
 
-        return is_string($class) && str_starts_with($class, __NAMESPACE__ . '\\') && !$container->bound($class);
+        return !is_string($class) || !$container->bound($class);
     }
 
     /**
