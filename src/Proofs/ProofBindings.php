@@ -14,6 +14,7 @@ use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
 use SineMacula\Laravel\Mfa\Contracts\StepUp;
+use SineMacula\Laravel\Mfa\Support\PackageDefault;
 
 /**
  * Registers the proof service, the default proof seams and the sign-in
@@ -45,9 +46,9 @@ final class ProofBindings
         );
 
         $app->bindIf(ProofService::class);
-        $app->bindIf(SessionRevoker::class, GenerationSessionRevoker::class);
-        $app->bindIf(PendingCompletion::class, ProofStoreCompletion::class);
-        $app->bindIf(StepUp::class, ProofStoreCompletion::class);
+        PackageDefault::bind($app, SessionRevoker::class, GenerationSessionRevoker::class);
+        PackageDefault::bind($app, PendingCompletion::class, ProofStoreCompletion::class);
+        PackageDefault::bind($app, StepUp::class, ProofStoreCompletion::class);
 
         $events = $app->make(Dispatcher::class);
 

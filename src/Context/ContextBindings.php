@@ -8,6 +8,7 @@ use Illuminate\Contracts\Foundation\Application;
 use SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver;
 use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
+use SineMacula\Laravel\Mfa\Support\PackageDefault;
 
 /**
  * Binds the default seams that say who a request is for, each only if an
@@ -31,8 +32,8 @@ final class ContextBindings
      */
     public static function register(Application $app): void
     {
-        $app->bindIf(PendingSessionResolver::class, NoPendingSessionResolver::class);
-        $app->bindIf(SubjectTypeResolver::class, IdentityContractSubjectType::class);
-        $app->bindIf(ActiveStateResolver::class, IdentityContractActiveState::class);
+        PackageDefault::bind($app, PendingSessionResolver::class, NoPendingSessionResolver::class);
+        PackageDefault::bind($app, SubjectTypeResolver::class, IdentityContractSubjectType::class);
+        PackageDefault::bind($app, ActiveStateResolver::class, IdentityContractActiveState::class);
     }
 }

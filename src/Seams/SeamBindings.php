@@ -6,6 +6,7 @@ namespace SineMacula\Laravel\Mfa\Seams;
 
 use Illuminate\Contracts\Foundation\Application;
 use SineMacula\Laravel\Mfa\Contracts\Reauthenticator;
+use SineMacula\Laravel\Mfa\Support\PackageDefault;
 
 /**
  * Default bindings for seams that read nothing of the package; an adapter or
@@ -29,6 +30,6 @@ final class SeamBindings
      */
     public static function register(Application $app): void
     {
-        $app->bindIf(Reauthenticator::class, RefusingReauthenticator::class);
+        PackageDefault::bind($app, Reauthenticator::class, RefusingReauthenticator::class);
     }
 }

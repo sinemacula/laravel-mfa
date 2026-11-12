@@ -8,6 +8,7 @@ use Illuminate\Contracts\Foundation\Application;
 use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\EmailSender;
 use SineMacula\Laravel\Mfa\Contracts\SmsSender;
+use SineMacula\Laravel\Mfa\Support\PackageDefault;
 
 /**
  * Container bindings for delivered codes, the default gateway and the default
@@ -31,9 +32,9 @@ final class CodeBindings
      */
     public static function register(Application $app): void
     {
-        $app->bindIf(SmsSender::class, NullSmsSender::class);
-        $app->bindIf(EmailSender::class, NullEmailSender::class);
+        PackageDefault::bind($app, SmsSender::class, NullSmsSender::class);
+        PackageDefault::bind($app, EmailSender::class, NullEmailSender::class);
         $app->bindIf(CodeService::class);
-        $app->bindIf(ChallengeGateway::class, PackageChallengeGateway::class);
+        PackageDefault::bind($app, ChallengeGateway::class, PackageChallengeGateway::class);
     }
 }

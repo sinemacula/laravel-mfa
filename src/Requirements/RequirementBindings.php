@@ -14,6 +14,7 @@ use SineMacula\Laravel\Mfa\Contracts\IdentityRequirement;
 use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
 use SineMacula\Laravel\Mfa\Contracts\RequirementPolicy;
 use SineMacula\Laravel\Mfa\Contracts\TenantRequirement;
+use SineMacula\Laravel\Mfa\Support\PackageDefault;
 
 /**
  * Registers the requirement service and the default requirement seams, each
@@ -38,13 +39,13 @@ final class RequirementBindings
     public static function register(Application $app): void
     {
         $app->bindIf(RequirementService::class);
-        $app->bindIf(RequirementPolicy::class, ConfiguredRequirementPolicy::class);
-        $app->bindIf(IdentityRequirement::class, IdentityContractRequirement::class);
-        $app->bindIf(TenantRequirement::class, NoTenantRequirement::class);
-        $app->bindIf(ActiveTenantResolver::class, NoActiveTenant::class);
-        $app->bindIf(RequirementCheck::class, ProofRequirementCheck::class);
-        $app->bindIf(FreshnessGate::class, ConfiguredFreshnessGate::class);
-        $app->bindIf(FactorChangeGate::class, ConfiguredFactorChangeGate::class);
-        $app->bindIf(FirstFactorResolver::class, DeclaredFirstFactorResolver::class);
+        PackageDefault::bind($app, RequirementPolicy::class, ConfiguredRequirementPolicy::class);
+        PackageDefault::bind($app, IdentityRequirement::class, IdentityContractRequirement::class);
+        PackageDefault::bind($app, TenantRequirement::class, NoTenantRequirement::class);
+        PackageDefault::bind($app, ActiveTenantResolver::class, NoActiveTenant::class);
+        PackageDefault::bind($app, RequirementCheck::class, ProofRequirementCheck::class);
+        PackageDefault::bind($app, FreshnessGate::class, ConfiguredFreshnessGate::class);
+        PackageDefault::bind($app, FactorChangeGate::class, ConfiguredFactorChangeGate::class);
+        PackageDefault::bind($app, FirstFactorResolver::class, DeclaredFirstFactorResolver::class);
     }
 }

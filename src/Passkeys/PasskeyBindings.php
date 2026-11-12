@@ -6,6 +6,7 @@ namespace SineMacula\Laravel\Mfa\Passkeys;
 
 use Illuminate\Contracts\Foundation\Application;
 use SineMacula\Laravel\Mfa\Contracts\PasskeyGateway;
+use SineMacula\Laravel\Mfa\Support\PackageDefault;
 
 /**
  * Binds `UnavailablePasskeyGateway` until an authentication layer binds its
@@ -29,7 +30,7 @@ final class PasskeyBindings
      */
     public static function register(Application $app): void
     {
-        $app->bindIf(PasskeyGateway::class, UnavailablePasskeyGateway::class);
+        PackageDefault::bind($app, PasskeyGateway::class, UnavailablePasskeyGateway::class);
         $app->bindIf(PasskeyAssociations::class);
         $app->bindIf(PasskeyAssertions::class);
         $app->bindIf(PasskeyChangeGate::class);

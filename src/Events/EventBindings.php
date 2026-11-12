@@ -7,6 +7,7 @@ namespace SineMacula\Laravel\Mfa\Events;
 use Illuminate\Contracts\Foundation\Application;
 use SineMacula\Laravel\Mfa\Context\DefaultEventContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\EventContextResolver;
+use SineMacula\Laravel\Mfa\Support\PackageDefault;
 
 /**
  * Binds the default `EventContextResolver`, which an authentication layer or
@@ -30,7 +31,7 @@ final class EventBindings
      */
     public static function register(Application $app): void
     {
-        $app->bindIf(EventContextResolver::class, DefaultEventContextResolver::class);
+        PackageDefault::bind($app, EventContextResolver::class, DefaultEventContextResolver::class);
         $app->bindIf(EventDispatcher::class);
     }
 }

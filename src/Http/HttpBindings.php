@@ -12,6 +12,7 @@ use Illuminate\Routing\Router;
 use SineMacula\Laravel\Mfa\Contracts\SessionTransition;
 use SineMacula\Laravel\Mfa\Http\Middleware\EnsureMfaRequirementIsMet;
 use SineMacula\Laravel\Mfa\Http\Middleware\ExemptFromMfa;
+use SineMacula\Laravel\Mfa\Support\PackageDefault;
 
 /**
  * Registers the default `SessionTransition` and the `mfa` and `mfa.exempt`
@@ -36,7 +37,7 @@ final class HttpBindings
      */
     public static function register(Application $app): void
     {
-        $app->bindIf(SessionTransition::class, MiddlewareSessionTransition::class);
+        PackageDefault::bind($app, SessionTransition::class, MiddlewareSessionTransition::class);
     }
 
     /**
