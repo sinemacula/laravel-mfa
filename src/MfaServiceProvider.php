@@ -87,7 +87,7 @@ final class MfaServiceProvider extends ServiceProvider
      * sibling package can replace the default and keep an application's own
      * binding. A class bound by name is never the default, even one of this
      * package's, and neither is an alias, an instance, a shared binding, an
-     * extender, or a rebinding of the class the default names.
+     * extender, or a rebinding or extender of the class the default names.
      *
      * @param  \Illuminate\Container\Container  $container
      * @param  string  $contract
@@ -110,7 +110,7 @@ final class MfaServiceProvider extends ServiceProvider
 
         $class = $scope === PackageDefault::class ? $closure->getStaticVariables()['class'] ?? null : null;
 
-        return !is_string($class) || !$container->bound($class);
+        return !is_string($class) || (!$container->bound($class) && !self::isExtended($container, $class));
     }
 
     /**

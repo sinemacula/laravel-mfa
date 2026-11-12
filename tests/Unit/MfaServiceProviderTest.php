@@ -564,6 +564,10 @@ final class MfaServiceProviderTest extends TestCase
             PackageDefault::bind($container, 'contract', NullSmsSender::class);
             $container->bind(NullSmsSender::class, \stdClass::class);
         }];
+        yield 'the class extended' => [static function (Container $container): void {
+            PackageDefault::bind($container, 'contract', NullSmsSender::class);
+            $container->extend(NullSmsSender::class, static fn (object $sender): object => $sender);
+        }];
     }
 
     /**
