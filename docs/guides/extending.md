@@ -310,7 +310,8 @@ answers `not_found`.
 An adapter can reuse three of this package's helpers. `MfaServiceProvider::isPackageDefault($container, $contract)` says
 whether a contract is still bound to this package's own default, so the adapter replaces the default and keeps a binding
 the application made, including one naming this package's own class. `Proofs\ProofOwner::of($identity)` gives the type
-and key this package records an identity under, with `Support\IdentityType::of()` for the type alone.
+and key this package records an identity under, with `Support\IdentityType::of()` for the type alone, and
+`$owner->is($other)` compares two owners strictly.
 `Database\AfterStorageCommit::run($container, $callback)` runs work once the storage connection's open transaction
 commits, at once when none is open, and never on rollback.
 

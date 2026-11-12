@@ -50,11 +50,11 @@ interface MultiFactorAuthenticatable extends Authenticatable
     public function requiresAdditionalFactor(): ?Requirement;
 
     /**
-     * The model behind the builder must implement the `Factor` contract.
+     * The model behind the builder must implement `EloquentFactor`.
      *
      * @formatter:off
      *
-     * @return \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor>
+     * @return \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>
      *
      * @formatter:on
      */

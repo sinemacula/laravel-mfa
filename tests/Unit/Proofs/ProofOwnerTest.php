@@ -113,6 +113,36 @@ final class ProofOwnerTest extends TestCase
     /**
      * @return void
      */
+    public function testIsTheSameOwnerByTypeAndKey(): void
+    {
+        self::assertTrue((new ProofOwner('user', '7'))->is(new ProofOwner('user', '7')));
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function otherOwners(): iterable
+    {
+        yield 'another type' => ['admin', '7'];
+        yield 'another key' => ['user', '8'];
+        yield 'a key equal only as a number' => ['user', '07'];
+        yield 'a key in exponent form' => ['user', '7e0'];
+    }
+
+    /**
+     * @param  string  $type
+     * @param  string  $key
+     * @return void
+     */
+    #[DataProvider('otherOwners')]
+    public function testIsNotAnOwnerThatDiffersInTypeOrKey(string $type, string $key): void
+    {
+        self::assertFalse((new ProofOwner('user', '7'))->is(new ProofOwner($type, $key)));
+    }
+
+    /**
+     * @return void
+     */
     public function testOwnsASignInOnlyThroughABindingNamingItsApplicationAndSession(): void
     {
         $owner = new ProofOwner('user', '7');

@@ -113,7 +113,7 @@ The temporary attempt throttles are left to expire: they are keyed by a hash and
 ## Identities that are not Eloquent models
 
 An identity the guard builds from somewhere other than Eloquent implements the contract's methods itself, returning its
-factors from the configured factor model, owned by its class name and its key:
+factors as a builder over the configured factor model, an `EloquentFactor`, owned by its class name and its key:
 
 ```php
 use SineMacula\Laravel\Mfa\Models\Factor;

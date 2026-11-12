@@ -69,7 +69,7 @@ final class TestUser extends Model implements Authenticatable, MultiFactorAuthen
     /**
      * @formatter:off
      *
-     * @return \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor>
+     * @return \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>
      *
      * @formatter:on
      */
@@ -105,7 +105,7 @@ final class TestUser extends Model implements Authenticatable, MultiFactorAuthen
      *
      * @formatter:off
      *
-     * @param  \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor>  $builder
+     * @param  \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>  $builder
      * @return int
      *
      * @formatter:on
@@ -121,7 +121,7 @@ final class TestUser extends Model implements Authenticatable, MultiFactorAuthen
      * @formatter:off
      *
      * @param  mixed  $builder
-     * @return \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor>
+     * @return \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>
      *
      * @throws \Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException
      *
@@ -133,7 +133,7 @@ final class TestUser extends Model implements Authenticatable, MultiFactorAuthen
             throw new UnexpectedBuilderTypeException('Expected an Eloquent Builder instance.');
         }
 
-        /** @var \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor> $builder */
+        /** @var \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor> $builder */
         return $builder;
     }
 }
