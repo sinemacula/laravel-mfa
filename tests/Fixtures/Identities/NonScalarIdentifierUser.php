@@ -59,7 +59,7 @@ final class NonScalarIdentifierUser extends Model implements Authenticatable, Mu
     /**
      * @formatter:off
      *
-     * @return \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor>
+     * @return \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>
      *
      * @formatter:on
      */
@@ -83,7 +83,7 @@ final class NonScalarIdentifierUser extends Model implements Authenticatable, Mu
      * @formatter:off
      *
      * @param  mixed  $builder
-     * @return \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor>
+     * @return \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>
      *
      * @throws \Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException
      *
@@ -95,7 +95,7 @@ final class NonScalarIdentifierUser extends Model implements Authenticatable, Mu
             throw new UnexpectedBuilderTypeException('Expected an Eloquent Builder instance.');
         }
 
-        /** @var \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor> $builder */
+        /** @var \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor> $builder */
         return $builder;
     }
 }

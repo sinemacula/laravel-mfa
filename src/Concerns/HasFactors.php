@@ -99,7 +99,7 @@ trait HasFactors
      *
      * @formatter:off
      *
-     * @return \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor>
+     * @return \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>
      *
      * @formatter:on
      */
@@ -112,7 +112,7 @@ trait HasFactors
 
         $key = $this instanceof Authenticatable ? $this->getAuthIdentifier() : $this->getKey();
 
-        /** @var \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\Factor> */
+        /** @var \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor> */
         return $factor->newQuery()
             ->where($factor->qualifyColumn($typeColumn), $this->getMorphClass())
             ->where($factor->qualifyColumn($keyColumn), is_int($key) ? (string) $key : $key);
