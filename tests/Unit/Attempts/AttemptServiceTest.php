@@ -443,6 +443,37 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
+     * A model event cancelling the reset of the identity's failures in a row
+     * throws and rolls the success back, so nothing is counted as proved.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testACancelledSaveOfASuccessRollsItBack(): void
+    {
+        $user   = $this->user();
+        $factor = $this->factor($user, failures: 1);
+
+        $this->attempt($user, null, false);
+
+        IdentityState::saving(static fn (): bool => false);
+
+        try {
+            $this->attempt($user, $factor, true);
+
+            self::fail('A cancelled save must not be counted as made.');
+        } catch (WriteCanceledException $exception) {
+            self::assertStringContainsString('the identity\'s failures in a row', $exception->getMessage());
+        } finally {
+            IdentityState::flushEventListeners();
+        }
+
+        self::assertSame(1, $this->state($user)?->consecutive_failures);
+        self::assertSame(1, $this->fresh($factor)->getConsecutiveFailures());
+    }
+
+    /**
      * With no cast declared, the deadline is written to, refuses from and is
      * lifted from it; the shipped column is never touched.
      *
