@@ -332,9 +332,9 @@ hyphens, which normalisation would remove, and no character may appear twice, co
 the same: a repeated character would be drawn more often than the others, so the codes would carry less entropy than the
 measure says. `low_count` is how few unused codes count as running low, from 0 (never) to the set's size; left unset it
 is 3, or the set's size when that is smaller. A redemption that leaves the set at or below it dispatches
-`RecoveryCodesLow`. `count`, `length` and `alphabet` govern new sets only: a set already issued keeps redeeming after
-they change. `low_count` is read at each redemption, so it applies to a set already issued too. See
-[Recovery codes](recovery-codes.md).
+`RecoveryCodesLow`. `count`, `length` and `alphabet` govern new sets: a set already issued keeps redeeming after they
+change. `low_count` is read at each redemption, so it applies to a set already issued too, and so does `count`, as its
+default and upper bound. See [Recovery codes](recovery-codes.md).
 
 ## Attempts
 
