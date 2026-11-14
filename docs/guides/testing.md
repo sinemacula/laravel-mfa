@@ -64,8 +64,9 @@ the window.
 with it, so a code can be checked against the published vectors. This is public test material, and no enrolment defaults
 to it.
 
-A factor that is not `totp`, or whose parameters or secret cannot be read, is refused with an
-`InvalidArgumentException`, which never holds the secret.
+A factor that is not `totp`, or whose parameters cannot be read, or whose secret is missing or not Base32, is refused
+with an `InvalidArgumentException`, which never holds the secret. A secret the model cannot decrypt throws Laravel's
+`DecryptException` as it is read.
 
 ## Acting as a verified identity
 

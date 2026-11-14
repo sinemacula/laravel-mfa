@@ -17,22 +17,24 @@ the enrolment grant as them (see [Enrolment](enrollment.md)), as the TOTP driver
 
 A `RevealedSecret`'s plaintext leaves it only through `reveal()`; every other way out refuses:
 
-| Use                                                                 | What happens                               |
-|---------------------------------------------------------------------|--------------------------------------------|
-| `reveal()`                                                          | The plaintext                              |
-| Cast to a string, interpolated into one, or concatenated            | `Exceptions\SecretNotRevealedException`    |
-| Encoded as JSON, `response()->json()` included                      | `Exceptions\SecretNotRevealedException`    |
-| Serialised (a session, a cache, a queued job) or unserialised       | `Exceptions\SecretNotRevealedException`    |
-| Dumped with `print_r`, `var_dump`, `var_export` or Laravel's dumper | A `[redacted]` marker, never the plaintext |
-| Logged, in a log's context or Laravel's shared context              | `[redacted]`, as described below           |
+| Use                                                           | What happens                                            |
+|---------------------------------------------------------------|---------------------------------------------------------|
+| `reveal()`                                                    | The plaintext                                           |
+| Cast to a string, interpolated into one, or concatenated      | `Exceptions\SecretNotRevealedException`                 |
+| Encoded as JSON, `response()->json()` included                | `Exceptions\SecretNotRevealedException`                 |
+| Serialised (a session, a cache, a queued job) or unserialised | `Exceptions\SecretNotRevealedException`                 |
+| Dumped with `print_r`, `var_dump` or Laravel's dumper         | A `[redacted]` marker, never the plaintext              |
+| Exported with `var_export`                                    | An empty `SensitiveParameterValue`, never the plaintext |
+| Logged, in a log's context or Laravel's shared context        | `[redacted]`, as described below                        |
 
 Class names are relative to `SineMacula\Laravel\Mfa`. The exception is a `LogicException`: reaching for the plaintext
 any other way is a bug in the calling code, so it fails loudly rather than send or keep the secret.
 
 ## Sending a secret
 
-Send a secret with `Secrets\SecretResponse::json()`. It reveals every `RevealedSecret` in the data, at any depth, and
-sends the response with `Cache-Control: no-store` and `Pragma: no-cache`, so neither the browser nor a proxy keeps it:
+Send a secret with `Secrets\SecretResponse::json()`. It reveals every `RevealedSecret` in the data and its nested
+arrays, and sends the response with `Cache-Control: no-store` and `Pragma: no-cache`, so neither the browser nor a proxy
+keeps it. One inside an object, a collection included, is not revealed and still throws when encoded:
 
 ```php
 use SineMacula\Laravel\Mfa\Secrets\SecretResponse;

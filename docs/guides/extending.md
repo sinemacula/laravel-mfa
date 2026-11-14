@@ -354,7 +354,9 @@ the storage connection that consumes the challenge, and answers with an `Attempt
 reaches the caller:
 
 ```php
-DB::transaction(function () use ($counters, $caller, $factor, $binding, $code): ChallengeOutcome {
+$storage = DB::connection(StorageConnection::name()); // Database\StorageConnection: null for the default connection
+
+$storage->transaction(function () use ($counters, $caller, $factor, $binding, $code): ChallengeOutcome {
     $admission = $counters->isUsable($caller, $factor, $binding);
 
     if (!$admission->isAdmitted()) {
@@ -399,7 +401,9 @@ Every path that registers or removes a passkey calls `Passkeys\PasskeyChangeGate
 the storage connection:
 
 ```php
-DB::transaction(function () use ($gate, $caller, $credential, $properties, $binding): void {
+$storage = DB::connection(StorageConnection::name()); // Database\StorageConnection: null for the default connection
+
+$storage->transaction(function () use ($gate, $caller, $credential, $properties, $binding): void {
     $this->storeCredential($credential); // the authentication layer's own write
 
     $result = $gate->registering($caller, new PasskeyRegistration($credential, $properties, $binding));
@@ -452,6 +456,11 @@ final class SessionProofStoreAdapterTest extends TestCase
     }
 
     protected function proofStoreIdentity(): MultiFactorAuthenticatable
+    {
+        return User::factory()->create();
+    }
+
+    protected function otherProofStoreIdentity(): MultiFactorAuthenticatable
     {
         return User::factory()->create();
     }

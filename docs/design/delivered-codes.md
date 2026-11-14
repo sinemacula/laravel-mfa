@@ -87,8 +87,8 @@ concurrency, who delivers a code, and why a code is never kept or queued in clea
   sign-in, the purpose), the factor state transaction opens and they are checked again, the factor is admitted, and the
   bound `ChallengeGateway` sends: by default `Codes\PackageChallengeGateway`, through `CodeService::send()`: the
   identity's and the factor's sends counted, a challenge started or resent, the code delivered through the bound
-  `EmailSender`. `CodeSent` is queued for the commit, and the answer is a `Codes\SendResult` with the challenge's id and
-  expiry.
+  `EmailSender` for an email factor or `SmsSender` for an SMS one. `CodeSent` is queued for the commit, and the answer
+  is a `Codes\SendResult` with the challenge's id and expiry.
 - `Mfa::verify($caller, Submission::challenge($factorId, $challengeId, $code))` under the same purpose, in the same
   sign-in: the gateway asks `ChallengeCounters::isUsable()`, `CodeService::check()` makes the read, the counting
   `UPDATE`, the comparison and the using `UPDATE`, and `ChallengeCounters::report()` counts the outcome against the
@@ -106,8 +106,9 @@ concurrency, who delivers a code, and why a code is never kept or queued in clea
 - Any throwable from building the message or from the driver's `deliver()`, the two above included, is caught around
   those alone, scrubbed of the code and the factor's destination (see [Secrets in Responses and
   Logs](secrets-in-responses-and-logs.md)), and rethrown as `CodeDeliveryFailedException`, which names the factor's type
-  and masked destination and keeps the scrubbed throwable as its previous one. The transaction rolls back, so the code
-  is not kept.
+  and masked destination and keeps the scrubbed throwable as its previous one. A throwable from reading the destination
+  or building the factor's summary, before there is a summary to name the factor by, is rethrown itself, scrubbed. The
+  transaction rolls back, so the code is not kept.
 - A factor that is not a stored Eloquent factor: `UnsupportedFactorException`. A binding that names another identity
   than the factor's owner: `InvalidArgumentException`. Neither reads anything.
 - A code sent inside a transaction that rolls back is gone with it, and `CodeSent` is never dispatched.

@@ -39,9 +39,10 @@ CallerContext::nobody('web');
 
 A `CallerContext` is trusted input from your own code: building one authenticates nobody, so build one only for an
 identity your application has already authenticated. Each helper still decides whether it serves the caller. It serves
-only a person, and a pending session only the actions its credential allows. Under the identity's lock it checks again
-that the pending credential still validates, through the resolver's `revalidate()`, or that the proof store's current
-sign-in is still the one the action began on. The sign-in is never carried on the caller: it is read from the proof
+only a person, and a pending session only the actions its credential allows. A helper that rests on the sign-in, which
+`renameFactor()` and `setPreferredFactor()` do not, checks again under the identity's lock that the pending credential
+still validates, through the resolver's `revalidate()`, or that the proof store's current sign-in is still the one the
+action began on. The sign-in is never carried on the caller: it is read from the proof
 store, for the identity and the application. The client is optional: when it is left out, the address is unknown and
 the per-address throttle is not applied.
 
@@ -154,8 +155,9 @@ Nobody served is `not_found`, as on `sendCode()` and `removeFactor()`. `cancelEn
 `forgetIdentity()` are operator calls, and answer nothing.
 
 On `generateRecoveryCodes()` and `requestAssertion()`, an `Exceptions\OperationRefusedException` a seam of your own
-throws is not turned into a value: it is yours, and it propagates, with what the call did rolled back. The other helpers
-that answer with a value still report it as their reason: `sendCode()`, `verify()`, `startEnrollment()` and
+throws is not turned into a value: it is yours, and it propagates, with what the call did rolled back. A bound
+`Contracts\FactorChangeGate` refusing is not one of these: `generateRecoveryCodes()` answers it as its reason. The other
+helpers that answer with a value still report it as their reason: `sendCode()`, `verify()`, `startEnrollment()` and
 `confirmEnrollment()`, and `removeFactor()` from its checks, while a revoker or a session transition throwing one rolls
 the removal back and propagates (see [Lifecycle](lifecycle.md)). Any other failure propagates from all of them: a
 resolver's, a gateway's and a database's.

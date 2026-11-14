@@ -57,9 +57,9 @@ separate operations, and all are described here.
   is also an attempt here, counted against the factor, the identity and the address like any other.
 - Only a success resets a durable count: the factor's failures in a row are reset only by a success of that factor, and
   the identity's run only by a success of any. A success resets no other factor's count, lifts no lockout or throttle,
-  and takes no slot of the address's window. It enables the identity's other factors the failure ceiling disabled, since
-  the person has proved another factor, but keeps their failures in a row, so the next failure of one disables it
-  again.
+  and takes no slot of the address's window. A success of a stored factor enables the identity's other factors the
+  failure ceiling disabled, since the person has proved another factor, but keeps their failures in a row, so the next
+  failure of one disables it again. A recovery code's success enables none.
 - A lockout ending forgives nothing: the factor's failures in a row stay at or past the limit, so its next failure locks
   it again, one guess per lockout period, until a success or the failure ceiling.
 - Sending or resending a code resets no count and lifts no lockout: the code service writes only the code's challenge,
@@ -135,8 +135,8 @@ separate operations, and all are described here.
   committed: with a limit of one, one guess reaches a driver and the next is refused. Parallel guesses from one address
   for several identities each take a slot in one statement, so the slots taken never pass `ip_limit`.
 - A verification that throws rolls the transaction back, counting nothing, and the address's slot is given back before
-  the exception propagates; the same holds when recording a success fails, so a code is never used up without its
-  count. A database error is never read as a refusal or a pass.
+  the exception propagates; the same holds when recording a success fails, a model event cancelling one of its saves
+  included, so a code is never used up without its count. A database error is never read as a refusal or a pass.
 - The identity's window is counted with one upsert, never an `UPDATE` that may find no row: inside the transaction,
   such an update holds a gap lock on MySQL until the commit, and two identities recording their first failure in the
   same gap would deadlock on each other's insert.

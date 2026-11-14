@@ -18,8 +18,8 @@ The notes:
 - `operating-modes.md`: the three ways the package runs (alone, with `laravel-authentication`, within `laravel-iam`),
   and the rule that this repository never references a sibling or detects one.
 - `capability-services.md`: how the package is organised by capability, the manager as a one-line delegation to each
-  capability's service, the `*Bindings` class each capability registers its wiring through, and what the services
-  share.
+  capability's service (`authenticationContext()` aside, which resolves the caller, session and proofs itself), the
+  `*Bindings` class each capability registers its wiring through, and what the services share.
 - `assurance-vocabulary.md`: the values assurance is described with (channels, observed properties, proofs,
   levels, requirements and their composition, evaluations, verification results), what each refuses, their serialised
   forms, and the enums whose values are stable names.

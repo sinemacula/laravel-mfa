@@ -46,15 +46,15 @@ through `Contracts\PasskeyGateway`.
 - Removing an associated credential goes through the same checks as every removal (`Lifecycle\RemovalGuard`, see [Factor
   Lifecycle](factor-lifecycle.md)), under the lock only, as the gate is already in its caller's transaction: the factor
   must have been enrolled through the application acting, or it is `not_found` and the caller's removal of the
-  credential rolls back with it; the bound `FreshnessGate` must find the session fresh for `mfa.remove_factor` and,
-  while another confirmed factor remains, what it holds the session to must be met on the proofs made without the
-  factor; and the bound `LastFactorPolicy` must allow it. `Lifecycle\FactorRemoval` then deletes the factor and its
-  association, forgets the factor's proofs on the current session at once, deletes the recovery codes with the last
-  confirmed factor, revokes the identity's other sessions through the bound `SessionRevoker`, evaluates the current
-  session's requirement again on the proofs it kept and hands the removal, with any shortfall, to the bound
-  `SessionTransition` unless the revoker judged the session itself, and reports `FactorRemoved`, then the recovery
-  codes' removal. The locking query names the owner, so another identity's association is never returned or acted on:
-  the unlocked `exists()` finds it, and it is answered `not_found`.
+  credential rolls back with it; the bound `FactorChangeGate` must allow it, which by default means the bound
+  `FreshnessGate` finds the session fresh for `mfa.remove_factor` and, while another confirmed factor remains, what it
+  holds the session to is met on the proofs made without the factor; and the bound `LastFactorPolicy` must allow it.
+  `Lifecycle\FactorRemoval` then deletes the factor and its association, forgets the factor's proofs on the current
+  session at once, deletes the recovery codes with the last confirmed factor, revokes the identity's other sessions
+  through the bound `SessionRevoker`, evaluates the current session's requirement again on the proofs it kept and hands
+  the removal, with any shortfall, to the bound `SessionTransition` unless the revoker judged the session itself, and
+  reports `FactorRemoved`, then the recovery codes' removal. The locking query names the owner, so another identity's
+  association is never returned or acted on: the unlocked `exists()` finds it, and it is answered `not_found`.
 - The default `LastFactorPolicy` (`Lifecycle\RequiredFactorPolicy`) counts a remaining passkey only while its
   association matches it, so an unusable passkey never lets the last usable factor go.
 - `Passkeys\PasskeyAssertions` holds the ceremony's checks for one factor at a time, allowing exactly its associated

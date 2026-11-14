@@ -25,7 +25,7 @@ final class PruneCommand extends Command
     protected $signature = self::NAME;
 
     /** @var string */
-    protected $description = 'Delete abandoned enrolments, expired codes, used or replaced recovery codes and ended throttle windows';
+    protected $description = 'Delete expired enrolments, expired codes, used or replaced recovery codes and ended throttle windows';
 
     /**
      * @param  \SineMacula\Laravel\Mfa\Lifecycle\RecordPruner  $pruner

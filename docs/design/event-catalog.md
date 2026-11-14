@@ -19,9 +19,10 @@ event carries is built, and why every event is dispatched only after the change 
   use, disabled), never the model, a secret, a code, a provisioning URI, a credential reference or a full destination,
   so a queued listener can serialise it. Who took an action on someone else's factors is an `Events\Actor`, a type and
   an id.
-- A factor whose stored state cannot be read (a status the package does not know, or a deadline or disabled time that is
-  not a time) has no honest summary, so no event carries it. The one flow that removes such a factor, a reset, counts it
-  on `FactorsReset::$unreadableFactors` instead, so the audit trail still records it.
+- A factor whose stored state cannot be read (a status the package does not know, or a disabled time that is not a
+  time) has no honest summary, so no event carries it. The one flow that removes such a factor, a reset, counts it on
+  `FactorsReset::$unreadableFactors` instead, so the audit trail still records it; a reset counts a factor whose lockout
+  deadline is not a time there too, though its summary can be built.
 - Verification events carry the purpose and, when the attempt went through a challenge or a passkey's gateway reported
   one, its id, as `CodeSent` does for the challenge it sent. A failure carries the machine-readable
   `Enums\FailureReason`. There is one verification event per attempt, and a check against the whole recovery code set is

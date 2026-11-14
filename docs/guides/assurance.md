@@ -191,7 +191,8 @@ separate answers:
 | Phone code                               | SMS code to the same phone                           | No       | No          | AAL1, from the phone code     |
 | Email code                               | Email code to the same address                       | No       | No          | Unclassified                  |
 | Passkey with observed user verification  | None needed                                          | No       | Yes         | AAL2                          |
-| External provider                        | Any enabled factor                                   | Yes      | No          | The further proof's own level |
+| External provider                        | Passkey with observed user verification              | Yes      | Yes         | AAL2                          |
+| External provider                        | Any other enabled factor                             | Yes      | No          | The further proof's own level |
 | Unknown, or none                         | Any                                                  | No       | No          | Unclassified                  |
 
 The table follows from a few rules. A password is something the person knows; an SMS code, a TOTP code, a recovery code

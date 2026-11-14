@@ -41,8 +41,8 @@ factors starts with.
   `credential_id` in full. A passkey factor's `credential_reference` holds the same id; the two are written and deleted
   together (see [Passkeys](passkeys.md)).
 - No table holds a code, a recovery code or a grant in plaintext; the TOTP secret is encrypted by the model's cast.
-  The factor model hides `secret`, `destination` and `credential_reference` from serialisation; the other models hide
-  their hashes and session ids.
+  The factor model hides `secret`, `destination` and `credential_reference` from serialisation; `Enrollment`, `Code`
+  and `RecoveryCode` hide their hashes and session ids; `PasskeyAssociation` hides none of its columns.
 - Two models may be replaced through configuration: the factor model (`mfa.factor.model`, `Contracts\EloquentFactor`,
   through `Concerns\ActsAsFactor`) and the recovery code model (`mfa.recovery_codes.model`, `Contracts\RecoveryCode`,
   through `Concerns\ActsAsRecoveryCode`), resolved by `Database\ConfiguredModels`. Each exposes its columns through
@@ -65,11 +65,13 @@ factors starts with.
   entry point.
 - `Models\Factor` binds to a route only within the caller's identity (see
   [Factor Route Binding](factor-route-binding.md)).
-- `Factors\OperationGuard` is the first step of every operation on an identity's factors, refusing in this order: a
-  machine (`machine_identity`), an inactive identity (`identity_inactive`), a factor not found within the identity
-  (`not_found`, for another identity's id exactly as for one that does not exist), a pending factor where the
-  operation needs a confirmed one (`not_confirmed`), and a type the application does not enable (`type_not_enabled`). A
-  refusal throws `Exceptions\OperationRefusedException` with the reason. The factor is read from the write connection.
+- `Factors\OperationGuard` is the first step of verifying, sending a code, enrolling and issuing or redeeming recovery
+  codes, refusing in this order: a machine (`machine_identity`), an inactive identity (`identity_inactive`), a factor
+  not found within the identity (`not_found`, for another identity's id exactly as for one that does not exist), a
+  pending factor where the operation needs a confirmed one (`not_confirmed`), and a type the application does not
+  enable (`type_not_enabled`). A refusal throws `Exceptions\OperationRefusedException` with the reason. The factor is
+  read from the write connection. Listing, renaming and preferring factors do not use it, removal has its own
+  (`Lifecycle\RemovalGuard`), and an administrative reset refuses only a machine.
 
 ## Success Path
 

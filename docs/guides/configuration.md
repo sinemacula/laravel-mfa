@@ -7,9 +7,10 @@ php artisan vendor:publish --tag=mfa-config
 ```
 
 Each capability has a block of its own, and each application a block under `applications`. A value that is malformed or
-out of its bounds fails closed with an `InvalidArgumentException` naming the key; it is never clamped or replaced with a
-default. The whole configuration, with the bindings it needs, is checked once the application has booted and again when
-the `mfa` manager is resolved, so a misconfiguration fails before anyone verifies a factor (see
+out of its bounds fails closed: reading it throws an `InvalidArgumentException` naming the key, and it is never clamped
+or replaced with a default. The whole configuration, with the bindings it needs, is checked once the application has
+booted and again when the `mfa` manager is resolved, every problem found failing together as an
+`Exceptions\InvalidConfigurationException`, so a misconfiguration fails before anyone verifies a factor (see
 [Checking the configuration](#checking-the-configuration)). Settings are read each time they are used, never cached
 between requests.
 
@@ -114,7 +115,8 @@ cannot leave a setting at its default unnoticed, and an `applications` value tha
 
 `limits` count only the enrolments made through the application: a factor enrolled through another counts against that
 application's limits, never this one's, and an application never removes, hides or changes a factor enrolled through
-another.
+another, save for the preferred factor: that is the identity's choice, so choosing one moves the preference away from a
+factor enrolled through another application too (see [Enrolment](enrollment.md#labels-and-the-preferred-factor)).
 
 `freshness` names the requirement each operation's step-up must meet. An entry is either a number of seconds, 1 to
 86400, for an additional verification made within that age, or a serialised requirement (see
@@ -330,8 +332,9 @@ hyphens, which normalisation would remove, and no character may appear twice, co
 the same: a repeated character would be drawn more often than the others, so the codes would carry less entropy than the
 measure says. `low_count` is how few unused codes count as running low, from 0 (never) to the set's size; left unset it
 is 3, or the set's size when that is smaller. A redemption that leaves the set at or below it dispatches
-`RecoveryCodesLow`. The settings govern new sets only: a set already issued keeps redeeming after they change. See
-[Recovery codes](recovery-codes.md).
+`RecoveryCodesLow`. `count`, `length` and `alphabet` govern new sets: a set already issued keeps redeeming after they
+change. `low_count` is read at each redemption, so it applies to a set already issued too, and so does `count`, as its
+default and upper bound. See [Recovery codes](recovery-codes.md).
 
 ## Attempts
 
@@ -378,7 +381,7 @@ stops being fresh, whichever is sooner. `max_attempts` wrong or replayed codes, 
 ],
 ```
 
-`prune_after_days` is how long pruning keeps abandoned enrolments, expired codes, and used or replaced recovery codes
+`prune_after_days` is how long pruning keeps expired enrolments and codes, and used or replaced recovery codes
 after they stop being usable (see [Pruning](lifecycle.md#pruning)).
 
 ## Secrets
@@ -401,9 +404,9 @@ The package checks its whole configuration, with the bindings it needs, once the
 service provider, so a binding made in a provider's `boot()` counts) and again when the `mfa` manager is resolved. Any
 problem fails with an `Exceptions\InvalidConfigurationException` whose message, and whose `problems`, list every problem
 found, each as `[<subject>] <message>`. The subjects are `storage`, `factor`, `identity_state`, each capability block
-(`totp`, `codes`, `recovery_codes`, `attempts`, `enrollment`, `lifecycle`), `applications`, and `applications.<name>`
-for each configured application, whose problems include a code type with no delivery binding and a first factor neither
-declared nor resolved.
+(`totp`, `codes`, `recovery_codes`, `attempts`, `enrollment`, `passkeys`, `lifecycle`), `applications`, and
+`applications.<name>` for each configured application, whose problems include a code type with no delivery binding and a
+first factor neither declared nor resolved.
 
 Run the same check from a deploy pipeline or a readiness probe:
 

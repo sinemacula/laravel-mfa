@@ -20,9 +20,9 @@ in [Factor lifecycle](../guides/lifecycle.md).
   captures the sign-in before the lock and compares it under the lock in the same way, so its refusals match: no
   sign-in is `not_fresh`, and one that changed is `not_found`.
 - The check order is fixed: identity inactive, not found (unknown, someone else's, or another application's), not
-  confirmed, not fresh, last factor. An application never deletes a factor enrolled through another, a passkey's
-  included: the credential being identity-level makes no exception, and the refusal rolls authentication's own
-  credential removal back.
+  confirmed, not fresh, last factor. The snapshot check has no not fresh step, so last factor follows not confirmed
+  there. An application never deletes a factor enrolled through another, a passkey's included: the credential being
+  identity-level makes no exception, and the refusal rolls authentication's own credential removal back.
 - `LastFactorPolicy` receives the factors. It may be asked before the identity's lock inside a caller's transaction,
   where taking a factor's lock would break the lock order. `RequiredFactorPolicy` therefore takes no lock, and reads a
   passkey's association without one: an association changes only with its factor under that lock, so a read older than
