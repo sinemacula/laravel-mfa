@@ -375,7 +375,7 @@ final readonly class AttemptService
 
             $state->consecutive_failures = 0;
 
-            $state->save();
+            self::saveState($state, 'the identity\'s failures in a row');
         }
 
         if ($factor === null) {
