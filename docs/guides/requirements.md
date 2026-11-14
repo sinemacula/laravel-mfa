@@ -90,9 +90,10 @@ identity's lock with the change (`Enums\FactorChange`), the sign-in it is made f
 requirement the application configures for the operation. Its default, `Requirements\ConfiguredFactorChangeGate`,
 judges each on this freshness: starting an enrolment for `mfa.add_factor`, and its grant lives no longer than the
 answer (see [Enrolment](enrollment.md)); generating recovery codes for `mfa.generate_recovery_codes`; removing a factor
-for `mfa.remove_factor`, on the proofs made without it (see [Factor lifecycle](lifecycle.md#the-step-up)). An
-identity's first additional factor (`mfa.add_first_additional_factor`) rests instead on its first factor proved again
-through the bound `Reauthenticator`, within five minutes, and no freshness is configured for it.
+for `mfa.remove_factor`, and, while the identity has another confirmed factor, on the proofs made without it too (see
+[Factor lifecycle](lifecycle.md#the-step-up)). An identity's first additional factor (`mfa.add_first_additional_factor`)
+rests instead on its first factor proved again through the bound `Reauthenticator`, within five minutes, and no
+freshness is configured for it.
 
 A caller may pass a requirement of its own; the stricter of it and the configured one applies, either alone when the
 other is absent:
@@ -133,13 +134,25 @@ application's own reports one.
 `Contracts\RequirementCheck` answers whether a session's proofs meet any requirement, the same way at sign-in, for a
 tenant and on step-up. Its default, `Requirements\ProofRequirementCheck`, keeps only the proofs of the sign-in their
 one first factor began and hands them to the combination policy (see
-[Combination policy](assurance.md#combination-policy)):
+[Combination policy](assurance.md#combination-policy)). Without a first factor it keeps none. `Mfa::proofs()` returns
+only the stored proofs, and a sign-in begun through Laravel's `Login` event stores no first factor, so add the one the
+bound `FirstFactorResolver` reports when the list has none:
 
 ```php
+use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
 use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
+use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 
-$evaluation = app(RequirementCheck::class)->check($tenantRequirement, ...Mfa::proofs($caller));
+$proofs = Mfa::proofs($caller);
+
+if ($caller->identity !== null && $caller->pending === null
+    && !in_array(ProofKind::FIRST_FACTOR, array_column($proofs, 'kind'), true)) {
+    $resolved = app(FirstFactorResolver::class)->resolve($caller->identity, $caller->application);
+    $proofs   = $resolved === null ? $proofs : [$resolved, ...$proofs];
+}
+
+$evaluation = app(RequirementCheck::class)->check($tenantRequirement, ...$proofs);
 
 $evaluation->meetsRequirement();
 $evaluation->unmet;   // the parts still to prove
@@ -163,10 +176,11 @@ Each part is a contract with a default, bound in the container; bind your own fr
 requirement. A gate bound in place of the default, such as an adapter over an authentication layer's freshness check,
 must apply the stricter of that and its own setting for the operation, never either alone, answer "not fresh" when it
 has neither, and keep no state between calls. Its `requirement()` says what it holds a session to, which removing a
-factor judges on the proofs made without that factor, so it must ask at least what the caller asks. It is asked with the
-operation's own name (`mfa.add_factor`, never a name of the authentication layer's), so the layer's own setting for that
-name is the one that applies; configure it there. It may be stricter than the package: a setting that takes only an
-additional factor or a recovery code refuses a fresh passkey reauthentication that the package alone would accept.
+factor judges on the proofs made without that factor while the identity has another confirmed factor, so it must ask at
+least what the caller asks. It is asked with the operation's own name (`mfa.add_factor`, never a name of the
+authentication layer's), so the layer's own setting for that name is the one that applies; configure it there. It may be
+stricter than the package: a setting that takes only an additional factor or a recovery code refuses a fresh passkey
+reauthentication that the package alone would accept.
 
 A `FactorChangeGate` bound in place of the default, such as an adapter over an authentication layer's own factor-change
 gate, replaces the package's judgement of those changes rather than adding to it, so the freshness gate is not asked for

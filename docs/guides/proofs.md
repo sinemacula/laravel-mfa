@@ -33,7 +33,7 @@ A recorded proof stops counting, and is left out, when:
 - it was made after now;
 - it was made under another verification generation than the identity's current one (see
   [Invalidating proofs](#invalidating-proofs));
-- the factor it was made with has been disabled on this session;
+- the factor it was made with has been removed on this session;
 - it cannot be read back.
 
 A successful `Mfa::verify()` makes an additional factor proof of the factor on the driver's channel, bound to the
@@ -58,8 +58,9 @@ implements `Contracts\GuardApplicationResolver` too, and its `resolveForGuard()`
 to `admin` begins the sign-in on the application it names for `admin`.
 
 A guard that sets the user without firing `Login` leaves no sign-in, so a verification is refused as `not_found` and
-nothing is sent or recorded, and the `mfa` middleware keeps requiring one. That includes Laravel's `actingAs()` in
-tests: sign the user in with `Auth::login()` when a test needs proofs recorded.
+nothing is sent or recorded, and the `mfa` middleware keeps requiring one wherever the composed requirement asks for
+something. That includes Laravel's `actingAs()` in tests: sign the user in with `Auth::login()` when a test needs proofs
+recorded.
 
 ## Custom guards
 

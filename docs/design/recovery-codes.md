@@ -50,11 +50,12 @@ moment when both work or neither exists, and what a redemption leaves behind.
   transaction has committed.
 - The public path, `Mfa::generateRecoveryCodes()` (`RecoveryCodes\RecoveryCodeIssuance`), serves the signed-in person
   only, never a pending session, and answers with a `RecoveryCodes\RecoveryCodeGeneration`: the codes, or a reason.
-  Nobody served is `not_found`. It captures the binding, and refuses as `not_fresh`, before the draw and again first
-  under the lock, a sign-in that changed and one below `ApplicationSettings::recoveryCodeLevel()`; under the lock only,
-  since one over an authentication layer locks that layer's session row, it asks the bound `FactorChangeGate` for
-  `mfa.generate_recovery_codes` (by default, a session fresh for it). The remedy for each is the same stronger step-up,
-  and a refusal leaves the old set intact. The gate's refusal is a reason, as refusing by throwing is how it answers.
+  Nobody served is `not_found`. It captures the binding, and refuses as `not_fresh`, before the draw and again under
+  the lock, a sign-in that changed and one below `ApplicationSettings::recoveryCodeLevel()`; under the lock only, since
+  one over an authentication layer locks that layer's session row, it asks the bound `FactorChangeGate` for
+  `mfa.generate_recovery_codes` (by default, a session fresh for it), after the sign-in check and before the level. The
+  remedy for each is the same stronger step-up, and a refusal leaves the old set intact. The gate's own refusal is a
+  reason, as refusing by throwing is how it answers: the package marks it as its own.
 - Only the package's own refusals become a reason. `RecoveryCodeService::generate()` keeps its throwing contract for
   its internal callers, and is `replaceSet()`, everything up to the commit, then `reportGenerated()`. The issuance wraps
   only `replaceSet()`, where a refusal `OperationRefusedException::byPackage()` marked becomes the answer and any other
@@ -99,10 +100,12 @@ moment when both work or neither exists, and what a redemption leaves behind.
   outside the set's nested transaction, so it keeps its place among that change's events (see
   [Enrolment](enrollment.md)).
 - A redemption is refused before any attempt, counted nowhere, with one `VerificationFailed` and nothing checked or
-  spent: `machine_identity` or `identity_inactive`; `not_accepted` for an enrolment, which a recovery code cannot
-  confirm; `type_not_enabled` when the application does not accept recovery codes; `no_factor` without a confirmed
-  factor; and `not_accepted` when the session's first factor is not known. An identity with no sign-in the proof store
-  knows of has nothing to bind to, and is `not_found`, with no event, so a single-use code is never spent for no proof.
+  spent: `identity_inactive`; `not_accepted` for an enrolment, which a recovery code cannot confirm; `type_not_enabled`
+  when the application does not accept recovery codes; `no_factor` without a confirmed factor; and `not_accepted` when
+  the session's first factor is not known. `RecoveryCodeService::admission()` refuses a machine as `machine_identity`,
+  but `Mfa::verify()` serves no machine, so there it is `not_found`, with no event. An identity with no sign-in the
+  proof store knows of has nothing to bind to, and is `not_found`, with no event, so a single-use code is never spent
+  for no proof.
 - A lockout of the identity or the IP address refuses the attempt before anything is checked: `locked`, with the time
   it lifts, or none when the identity's run of failures has reached the failure ceiling, which only a success or a
   reset clears.

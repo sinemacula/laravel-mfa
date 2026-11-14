@@ -24,8 +24,9 @@ reporting, so a leak here is a leak everywhere downstream.
 - `FactorSummary` has exactly eight fields: `id`, `type`, `label`, `maskedDestination`, `status`, `preferred`,
   `lastUsedAt` and `disabled`. There is no `secret`, no `code`, no `attempts`, no credential reference and no raw
   `destination`.
-- `FactorSummary::fromFactor()` masks the destination before the summary is built, so no caller can hand it an unmasked
-  one: the mask is applied at the boundary.
+- `FactorSummary::fromFactor()` masks the destination before the summary is built, so a summary built from a factor
+  never holds an unmasked one: the mask is applied at the boundary. The public constructor takes `maskedDestination` as
+  given; the package builds every summary through `fromFactor()`.
 - An email address keeps its domain and the first two characters of its local part, or the first one when the local
   part is three characters or fewer, with at least one `*` after them. Any other destination keeps its last four
   characters and masks the rest; one of four characters or fewer is fully masked.
@@ -41,8 +42,9 @@ reporting, so a leak here is a leak everywhere downstream.
   `mask()`.
 - The summaries are handed to `InsufficientAuthenticationException`. Laravel renders it with its message alone; an
   application that renders `toArray()` sends only the summaries' fields.
-- A full `Factor` record dumped by admin tooling or debug output omits `secret`, `destination` and
-  `credential_reference` by its `$hidden` list, before any summary is involved.
+- A full `Factor` record serialised by admin tooling (`toArray()`, JSON) omits `secret`, `destination` and
+  `credential_reference` by its `$hidden` list, before any summary is involved. `$hidden` does not reach a dump of the
+  model itself, which shows its attributes.
 
 ## Failure / Edge Cases
 

@@ -40,9 +40,10 @@ in the order [Factor lifecycle](lifecycle.md#events) sets out.
 
 The names of the events and of their fields are stable once released. `factor` is a `Factors\FactorSummary` (id, type,
 label, masked destination, status, preferred, last use, disabled), `previous` another; `purpose` is an `Enums\Purpose`
-(`sign_in`, `step_up`, `enrollment` and `reauthenticate`); `reason` an `Enums\FailureReason`; `actor` an `Events\Actor`
-(type and id), set when someone other than the identity took the action; `challengeId` the challenge a code or an
-attempt went through, when it went through one; `type` the type proved or tried (`recovery_code` for a recovery code).
+(`sign_in`, `step_up`, `enrollment` and `reauthenticate`); `reason` an `Enums\FailureReason`, except on `FactorsReset`,
+where it is the string the actor gave; `actor` an `Events\Actor` (type and id), set when someone other than the identity
+took the action; `challengeId` the challenge a code or an attempt went through, when it went through one; `type` the
+type proved or tried (`recovery_code` for a recovery code).
 
 Every event also says what it was for through `$event->purpose()`: the purpose of the attempt, code or proof behind it
 for the events that carry a `purpose` field, `enrollment` for the enrolment events (from `EnrollmentStarted` to

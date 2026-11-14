@@ -23,7 +23,8 @@ cannot interleave.
   `Database\TableNames`. A change that depends on the identity's whole factor state writes several of them in one
   transaction, which two connections cannot commit as one, so a configured model on another connection is refused by the
   configuration check (`Config\ConfigurationValidator`, under its `factor` or `recovery_codes` subject) when the package
-  boots and when the manager is resolved, and again (`ModelOffStorageConnectionException`) before any such change.
+  boots and when the manager is resolved, and the factor model again (`ModelOffStorageConnectionException`) before any
+  such change.
   Connections are compared by name, a model's own or `database.default`, so no connection is opened, and two names for
   one database count as two connections.
 - `Support\FactorStateTransaction` is the one transaction of those changes: confirming an identity's first additional

@@ -27,7 +27,8 @@ leaves the package, and the order of the events listeners and audit sinks attach
   and a recovery code, `Attempts\ChallengeCounters::report()` inside the gateway for a challenge.
 - `AttemptService::throttled()` is the one reservation of the address's window, taken outside any transaction the
   package opens: passes and refusals give it back, counted failures keep it, and anything thrown gives it back.
-- The seam is the last write in the transaction, so only the outer commit can fail after it. A thrown
+- The seam is the last write in the transaction. After it, the event context is resolved, `VerificationPassed` and any
+  recovery code report are queued and the outer commit runs, and each of those can still throw. A thrown
   `OperationRefusedException` rolls back the count, the code's use, the TOTP step and the recovery code's use, and is
   answered as a failed result. Any other throwable propagates.
 - The new proof's own acceptance is checked on its own (`check(Requirement::none(), $firstFactor, $proof)->accepted`),

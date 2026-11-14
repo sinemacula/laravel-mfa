@@ -12,7 +12,8 @@ the provider or another capability.
 - `MfaManager` is the factor driver registry (Laravel's `Manager`, so `Mfa::extend()`, `Mfa::driver()` and
   `getDefaultDriver()` take the names they take on any manager) and the single entry point the `Mfa` facade exposes.
   Every other public method is a one-line delegation to the service of its capability, with its arguments passed
-  through and the service's answer returned unchanged.
+  through and the service's answer returned unchanged, except `authenticationContext()`, which resolves the caller,
+  session and proofs itself and hands them to `Context\AuthenticationContextContributor`.
 - The surface is flat: one method per flow, listed in [Helpers](../guides/helpers.md), with the facade annotating
   exactly those methods and a test holding the two equal. An annotation is documentation, not an allowlist:
   `getDrivers()`, `getContainer()` and `forgetDrivers()` stay callable as inherited infrastructure.
@@ -31,12 +32,14 @@ the provider or another capability.
 - A helper a person can be refused by answers with a value holding the reason, never a plain exception
   (`RecoveryCodes\RecoveryCodeGeneration`, `Passkeys\AssertionRequest`, as `Factors\FactorChange` does). On
   `generateRecoveryCodes()` and `requestAssertion()`, a refusal becomes a value only when marked as the package's own
-  (`OperationRefusedException::byPackage()`): a seam's stays an exception. The mark says who refused, not when, so
-  nothing that runs after a commit is converted. The other helpers do not read it: a seam's refusal inside what they
-  guard is their reason.
-- Services resolve the seams a consumer rebinds (`FreshnessGate`, `ProofStore`, the event dispatcher and the
-  configuration) from the container when they need them, never at construction, so a rebinding (`Event::fake()`, a
-  store bound mid-test, a policy bound by a sibling package) reaches a service that is already resolved.
+  (`OperationRefusedException::byPackage()`): a seam's stays an exception, except the bound `FactorChangeGate`'s own
+  refusal, which the package marks as its own. The mark says who refused, not when, so nothing that runs after a commit
+  is converted. The other helpers do not read it: a seam's refusal inside what they guard is their reason.
+- Services resolve the seams a consumer rebinds (`FreshnessGate`, `ProofStore` and the event dispatcher) from the
+  container when they need them, never at construction, so a rebinding (`Event::fake()`, a store bound mid-test, a
+  policy bound by a sibling package) reaches a service that is already resolved. Several services take the
+  configuration repository at construction and read it on every call, so a value set on it reaches them, while a
+  repository bound in its place reaches only a service resolved after it.
 - Every self-service action has one method, taking the caller first as a `Context\CallerContext` of plain values, and no
   service reads a request, a guard or `Auth`. `CallerContext::fromRequest()` is the one place a caller is read from a
   request; the others are the route gate, factor route binding and the sign-in listeners, through

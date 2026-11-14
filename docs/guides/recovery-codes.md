@@ -116,11 +116,11 @@ These are refused before any attempt is made, so nothing is counted and no code 
 A code that matches nothing fails with `invalid_code`, and an attempt a lockout refuses with `locked`. An identity at
 the failure ceiling is `locked` with no time, while a usable factor can still recover it. Every failure but the last row
 above dispatches one `VerificationFailed` with its reason; a success dispatches `VerificationPassed`, then
-`RecoveryCodeUsed` with how many codes remain unused, then, when that is at or below `recovery_codes.low_count`,
-`RecoveryCodesLow`, so the application can prompt for a new set. Each is dispatched once the change has committed (see
-[Events](events.md)). A refusal by the completion seam rolls the code's use back; with the default seams, the proof is
-handed to the proof store once the change commits, and a store that refuses it then throws `ProofRefusedException`, with
-the code already used.
+`RecoveryCodeUsed` with how many codes remain unused, then, when that is at or below a `recovery_codes.low_count` above
+zero, `RecoveryCodesLow`, so the application can prompt for a new set. Each is dispatched once the change has committed
+(see [Events](events.md)). A refusal by the completion seam rolls the code's use back; with the default seams, the proof
+is handed to the proof store once the change commits, and a store that refuses it then throws `ProofRefusedException`,
+with the code already used.
 
 ## Remaining codes
 
@@ -135,7 +135,8 @@ $status?->generatedAt;  // when the current set was generated, or null
 $status?->exists();     // whether there is a set, used up or not
 ```
 
-It is `null` without a signed-in identity that can hold factors.
+It serves a signed-in identity that can hold factors, and a pending session whose credential allows
+`mfa.list_factors`; any other caller gets `null`.
 
 ## When codes go
 

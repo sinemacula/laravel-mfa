@@ -22,7 +22,7 @@ final readonly class PruneResult
      */
     public function __construct(
 
-        /** Abandoned enrolments. */
+        /** Expired enrolments. */
         public int $enrollments,
 
         /** Expired delivered codes. */

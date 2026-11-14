@@ -92,7 +92,9 @@ it.
   a throwable is scrubbed with the code and the factor's destination given as known values, so they leave every message
   and frame of its chain whether or not PHP recorded arguments, and `Exceptions\CodeDeliveryFailedException` is thrown,
   naming the factor's type and masked destination, carrying its `FactorSummary`, with the scrubbed throwable as its
-  previous one. Rethrowing inside the factor state transaction still rolls it back, so the code is not kept.
+  previous one. A throwable from reading the destination or building the factor's summary, before there is a summary
+  to name the factor by, is rethrown itself, scrubbed. Rethrowing inside the factor state transaction still rolls it
+  back, so the code is not kept.
 - `MfaCodeMessage::send()` catches a throwable from Laravel's `Mailable::send()`, scrubs it with its own code and
   recipients' addresses as known values, and rethrows it. A queue worker runs that method for a queued message, so
   the failure is scrubbed before the worker dispatches `JobExceptionOccurred` or reports it. The values are read from
@@ -163,8 +165,9 @@ it.
   Monolog normalises it, since it refuses JSON encoding.
 - A channel configured after the package boots, and the emergency logger Laravel builds when a channel fails, are not
   tapped. A processor pushed onto a channel's logger after the tap runs before it, so is covered too. A channel whose
-  `tap` is not a list, and a channel that is not an array, are left as they are. Laravel fires `MessageLogged` with
-  the context it was given before Monolog runs any processor, so its listeners see the context unredacted.
+  `tap` is not a list, and a channel that is not an array, are left as they are. Laravel fires `MessageLogged` after
+  Monolog has handled the record, with the context it was given rather than the processed one, so its listeners see
+  the context unredacted.
 - A reporter registered on the exception handler before the package's callback, typically from `bootstrap/app.php`,
   sees the exception before it is scrubbed; the guide shows calling `ExceptionScrubber::scrub()` first there. An
   exception handler other than Laravel's is left as it is.

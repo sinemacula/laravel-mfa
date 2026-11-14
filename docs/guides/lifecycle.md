@@ -26,7 +26,8 @@ another's. A summary holds the id, type, label, masked destination, status, whet
 whether the failure ceiling disabled it, and never a secret. `disabled: false` does not mean the factor is offered: what
 the application accepts, the combination policy and a passkey's availability decide that too (`Mfa::offeredFactors()`
 answers it). Whether a person is set up is whether any of their factors is confirmed; the identity's own
-`isMfaEnabled()` answers the same.
+`isMfaEnabled()` answers the same while every stored status is valid, and also counts one the package does not know
+(see [Identity models](identity-models.md)).
 
 ## Removing a factor
 
@@ -42,14 +43,17 @@ $result->outstanding;  // ?Requirement the session no longer meets, for an RFC 9
 $result->completion(); // ?object the session revoker, or else the session transition, returned, such as a new credential
 ```
 
-A removal serves active sessions only. The refusals, in the order they are made:
+A removal serves active sessions only. Before the identity's lock it is checked on a read of the factors: whether anyone
+is served, then the identity, the id, whether the factor is confirmed and the last factor policy, and last whether the
+session has a sign-in the store knows. Under the lock, on the factors as stored, the checks from the table's second row
+on are made in its order:
 
 | Reason              | When                                                                                  |
 |---------------------|---------------------------------------------------------------------------------------|
 | `not_found`         | Nobody is served, or the session is pending                                           |
+| `not_found`         | The sign-in changed before the lock was held                                          |
 | `identity_inactive` | The identity is not active                                                            |
 | `not_found`         | The id is unknown or someone else's, or the factor came through another application   |
-| `not_found`         | The sign-in changed before the lock was held                                          |
 | `not_confirmed`     | The factor is pending: cancel its enrolment, or let it expire                         |
 | `not_fresh`         | The session is not fresh for `mfa.remove_factor`, or has no sign-in the store knows   |
 | `last_factor`       | The bound `LastFactorPolicy` refuses                                                  |

@@ -47,12 +47,12 @@ final class MfaCodeMessageTest extends TestCase
      */
     public function testHtmlBodyMentionsCodeAndExpiry(): void
     {
-        $message = new MfaCodeMessage('CODEX', 15);
+        $message = new MfaCodeMessage('Q7RM4', 15);
 
         $content = $message->content();
         $html    = (string) $content->htmlString;
 
-        self::assertStringContainsString('CODEX', $html);
+        self::assertStringContainsString('Q7RM4', $html);
         self::assertStringContainsString('15 minute', $html);
     }
 

@@ -76,7 +76,9 @@ meets is in [Seams with an authentication layer](../guides/extending.md#seams-wi
   counters and every helper ask it.
 - `ActiveStateResolver` is bound to `Context\IdentityContractActiveState`: an identity is active when its
   `isMfaActive()` is true. The bound resolver is the authority in the same way: an inactive identity is refused every
-  operation, offered no factor, meets no requirement, is never fresh and gets the neutral authentication context.
+  operation that verifies, sends a code or changes its factors, offered no factor, meets no requirement, is never fresh
+  and gets the neutral authentication context. Reading its factors, proofs and recovery code status, cancelling an
+  enrolment and the administrative operations still serve it.
 - `FirstFactorResolver` is bound to `Applications\DeclaredFirstFactorResolver`: the application's `first_factor`, for
   an identity with a sign-in on it, as a first factor naming no destination or credential, observing nothing, bound to
   the sign-in under the identity's current verification generation and dated at the Unix epoch. When it was made is not
@@ -193,7 +195,8 @@ exception that rolls the caller's change back with it.
 - An adapter, or the application, implements a contract and binds it in the container from a service provider; the
   flow that calls the contract resolves it when it runs, so a binding made before or after the package's provider
   applies.
-- Every self-service helper takes a `Context\CallerContext` first, and no seam is handed a request:
+- Every self-service helper takes a `Context\CallerContext` first, and only the seams that read a request
+  (`PendingSessionResolver::fromRequest()`, `ApplicationResolver` and `GuardApplicationResolver`) are handed one:
   `CallerContext::fromRequest()` is the one place a caller is read from one, through
   `PendingSessionResolver::fromRequest()` and then the guard. The caller is trusted input, never authentication.
   `Context\CallerContextResolver` decides whether it is served: a pending session only for the `PendingAction` the
@@ -210,7 +213,8 @@ exception that rolls the caller's change back with it.
   an existing factor (see [Factor Route Binding](factor-route-binding.md)).
 - A seam may throw an `OperationRefusedException`. It stays an exception on the two helpers that answer refusals as
   values, `generateRecoveryCodes()` and `requestAssertion()`: only a refusal the package marks becomes the reason, so a
-  seam's is never read as the package deciding.
+  seam's is never read as the package deciding. The exception is the bound `FactorChangeGate`'s own refusal, which the
+  package marks as its own.
 - `FreshnessGate::requirement()` answers what the gate holds a session to, so a removal can judge it on the proofs made
   without the factor; `null` refuses that removal while another factor remains. `FreshnessGate::freshUntil()` answers
   how long `isFresh()`'s answer lasts, or `null`, which refuses what depends on it. `PendingContext::$expiresAt` is the
@@ -226,8 +230,9 @@ exception that rolls the caller's change back with it.
 
 ## Failure / Edge Cases
 
-- Resolving `SelfServiceRecovery` or `ApplicationResolver` with nothing bound fails with Laravel's binding error; no
-  shipped flow does so.
+- Resolving `ApplicationResolver` with nothing bound fails with Laravel's binding error; no shipped flow does so.
+  `SelfServiceRecovery` resolves to `Lifecycle\NoSelfServiceRecovery` unless the application binds its own: it offers
+  nothing, and `start()` refuses with `self_service_recovery_unavailable`.
 - A pending credential that does not validate makes the resolver throw, and every helper with it: it is never served as
   the guard's user.
 - Two factor removals in one change leave the current session to verify again: the second finds nothing counting to

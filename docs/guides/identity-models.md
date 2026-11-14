@@ -39,7 +39,9 @@ separately, in the proof store (`Mfa::proofs()`), so keep the two apart.
 ## People and machines
 
 Only a person may hold factors. Override `canHoldFactors()` on a model that also stands for API clients or service
-accounts, so every operation refuses them with the failure reason `machine_identity`:
+accounts. A caller naming one then serves nobody, so a helper answers as it does for nobody (`not_found` where it gives
+a reason); an operation handed the identity itself, such as a reset or the challenge counters, refuses it with the
+failure reason `machine_identity`:
 
 ```php
 public function canHoldFactors(): bool

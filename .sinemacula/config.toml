@@ -4,7 +4,7 @@
 
 [project]
 project_name = "sinemacula/laravel-mfa"
-project_description = "Driver-based multi-factor authentication for Laravel — TOTP, email and SMS codes, and backup codes behind a pluggable factor driver API."
+project_description = "Driver-based multi-factor authentication (TOTP, email, SMS, passkeys and recovery codes) for Laravel 12 and 13."
 copyright = "Sine Macula Limited"
 
 [language]

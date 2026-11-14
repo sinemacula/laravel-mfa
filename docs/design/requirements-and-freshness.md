@@ -33,7 +33,9 @@ nothing is stored in their place.
 - `Mfa::requirement($caller)` is the caller's sign-in requirement on the caller's application, with the active tenant's
   where one applies; it is empty without an MFA-capable identity. The application is the one the caller was built with:
   `CallerContext::fromRequest($request, $guard)` takes it from a bound `ApplicationResolver`, through the guard when it
-  is a `GuardApplicationResolver`, or else the guard's name. The `mfa` middleware enforces nothing when it is empty.
+  is a `GuardApplicationResolver`, or else the guard's name. When it is empty, the `mfa` middleware still refuses a
+  pending session, a caller it does not serve and an inactive identity, and still applies the route's level and
+  operation.
 - The default `Contracts\RequirementPolicy`, `Requirements\ConfiguredRequirementPolicy`, answers with that requirement,
   or with none when the first factor meets all of it on its own, as a passkey whose assertion observed user verification
   meets an additional verification. The first factor is judged by the bound `RequirementCheck` like any proof, so one
@@ -83,7 +85,8 @@ nothing is stored in their place.
 
 ## Success Path
 
-1. The `mfa` middleware asks `Mfa::requirement()`; with an empty requirement the request passes.
+1. The `mfa` middleware asks `Mfa::requirement()`; with an empty requirement, and no level or operation on the route,
+   the request of a served, active identity passes; a pending session is refused either way.
 2. An adapter's sign-in asks `RequirementPolicy::requirementFor($identity, $application, $firstFactor)` and puts `mfa`
    in the pending session's `requires` when the answer is not empty.
 3. Where a tenant becomes active, the adapter names it through `ActiveTenantResolver`; the tenant's requirement is then

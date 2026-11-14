@@ -67,7 +67,7 @@ response if the commit fails.
 
 - A shortfall throws `InsufficientAuthenticationException` with the strictest of the requirement and the gate's
   requirement for the operation (`freshnessRequirement()`, whose name is non-nullable, hence the guard), the session's
-  offers and whether a factor is confirmed. One query, on the failure path only. `Requirements\StepUpRefusal` builds it,
+  offers and whether a factor is confirmed, each read on the failure path only. `Requirements\StepUpRefusal` builds it,
   for the gate and for `Mfa::stepUpRefusal()` alike, taking the requirement as given.
 - An invalid pending credential makes the resolver throw. That propagates: it is not disguised as a refusal.
 - An inactive identity, as the bound `ActiveStateResolver` says, is short-circuited and no gate judges it, though

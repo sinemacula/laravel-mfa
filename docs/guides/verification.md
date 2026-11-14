@@ -232,12 +232,12 @@ order (see [Attempts and lockouts](attempts.md)).
 ## Events
 
 On success, once the transaction commits and in this order: the default seams' proof reaches the store,
-`VerificationPassed`, then for a recovery code `RecoveryCodeUsed` and `RecoveryCodesLow`. A listener reading
-`Mfa::proofs()` sees the new proof, and a rollback dispatches none of them. A failure's `VerificationFailed` is
-dispatched once the transaction has ended. `CodeSent`, `VerificationPassed` and `VerificationFailed` carry the challenge
-id when one was used. A passkey's challenge id is the one its gateway reports with a verified assertion, so it is on
-`VerificationPassed` and on the `VerificationFailed` of a seam's refusal after it, but not on that of a failed
-assertion, which names none.
+`VerificationPassed`, then for a recovery code `RecoveryCodeUsed` and, when the unused codes are at or below a
+`recovery_codes.low_count` above zero, `RecoveryCodesLow`. A listener reading `Mfa::proofs()` sees the new proof, and a
+rollback dispatches none of them. A failure's `VerificationFailed` is dispatched once the transaction has ended.
+`CodeSent`, `VerificationPassed` and `VerificationFailed` carry the challenge id when one was used. A passkey's challenge
+id is the one its gateway reports with a verified assertion, so it is on `VerificationPassed` and on the
+`VerificationFailed` of a seam's refusal after it, but not on that of a failed assertion, which names none.
 
 A listener that throws reaches the caller of `verify()` or `sendCode()`, whatever it throws, and the change has
 committed: it is not reported as a failure. See [Events](events.md).
