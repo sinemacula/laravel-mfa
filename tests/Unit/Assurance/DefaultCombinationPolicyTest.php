@@ -91,6 +91,8 @@ final class DefaultCombinationPolicyTest extends TestCase
         ];
         yield 'another passkey' => [SessionProofs::passkeySignIn(SessionProofs::verified()), new Channel(ChannelKind::PASSKEY, SessionProofs::OTHER_PASSKEY), true];
         yield 'TOTP after an external provider' => [SessionProofs::externalProvider(), new Channel(ChannelKind::AUTHENTICATOR_APP, 'factor-totp'), true];
+        yield 'TOTP after account recovery' => [SessionProofs::accountRecovery(), new Channel(ChannelKind::AUTHENTICATOR_APP, 'factor-totp'), true];
+        yield 'a recovery channel as a factor' => [SessionProofs::password(), new Channel(ChannelKind::RECOVERY), false];
         yield 'TOTP after an unknown first factor' => [SessionProofs::unknownFirstFactor(), new Channel(ChannelKind::AUTHENTICATOR_APP, 'factor-totp'), false];
         yield 'TOTP after a reauthentication with a password' => [
             SessionProofs::reauthentication(new Channel(ChannelKind::PASSWORD)),
@@ -226,6 +228,26 @@ final class DefaultCombinationPolicyTest extends TestCase
             AssuranceLevel::AAL2,
             ['pop', 'user', 'mfa'],
         ];
+        yield 'account recovery, TOTP' => [[SessionProofs::accountRecovery(), SessionProofs::totp()], true, false, false, false, AssuranceLevel::AAL1, ['otp', 'mca']];
+        yield 'account recovery, recovery code' => [
+            [SessionProofs::accountRecovery(), SessionProofs::recoveryCode()],
+            true,
+            false,
+            false,
+            false,
+            AssuranceLevel::AAL1,
+            ['otp', 'mca'],
+        ];
+        yield 'account recovery, passkey with observed verification' => [
+            [SessionProofs::accountRecovery(), SessionProofs::passkey($verified)],
+            true,
+            true,
+            true,
+            false,
+            AssuranceLevel::AAL2,
+            ['pop', 'user', 'mfa'],
+        ];
+        yield 'account recovery, nothing more' => [[SessionProofs::accountRecovery()], false, false, false, false, AssuranceLevel::UNCLASSIFIED, []];
         yield 'unknown first factor, TOTP' => [[SessionProofs::unknownFirstFactor(), SessionProofs::totp()], false, false, false, false, AssuranceLevel::UNCLASSIFIED, []];
         yield 'unknown first factor, passkey with observed verification' => [
             [SessionProofs::unknownFirstFactor(), SessionProofs::passkey($verified)],

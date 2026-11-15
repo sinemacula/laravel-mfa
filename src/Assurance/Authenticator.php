@@ -152,6 +152,7 @@ final readonly class Authenticator
             null                 => self::AMR_ONE_TIME_CODE,
             ChannelKind::PASSKEY => self::AMR_PROOF_OF_POSSESSION,
             ChannelKind::EXTERNAL_PROVIDER,
+            ChannelKind::RECOVERY,
             ChannelKind::UNKNOWN => null,
         };
     }
