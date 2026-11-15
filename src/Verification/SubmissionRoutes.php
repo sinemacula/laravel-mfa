@@ -159,7 +159,7 @@ final readonly class SubmissionRoutes
             new Attempt($caller->identity, $factor, $binding->purpose, $binding->application, $caller->client),
             function () use ($caller, $factor, $binding, $submission, &$assertion): bool {
 
-                $assertion = $this->passkeys->check($caller->identity, $factor, $binding, $submission->response(), $caller->pending);
+                $assertion = $this->passkeys->check($caller->identity, $factor, $binding, $submission->response(), $caller->pending, $caller->client);
 
                 return $assertion instanceof PasskeyAssertion;
             },

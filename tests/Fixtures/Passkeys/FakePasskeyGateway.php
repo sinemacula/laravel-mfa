@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Fixtures\Passkeys;
 
+use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\PasskeyGateway;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
@@ -27,6 +28,9 @@ final class FakePasskeyGateway implements PasskeyGateway
 
     /** @var list<list<string>> Allowlists verified, oldest first. */
     public array $verified = [];
+
+    /** @var list<\SineMacula\Laravel\Mfa\Context\ClientContext> Clients the assertions were requested and verified for, oldest first. */
+    public array $clients = [];
 
     /** @var list<string> Applications the passkeys were listed for, oldest first. */
     public array $listedFor = [];
@@ -90,18 +94,20 @@ final class FakePasskeyGateway implements PasskeyGateway
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  list<string>  $credentialIds
+     * @param  \SineMacula\Laravel\Mfa\Context\ClientContext  $client
      * @return array<string, mixed>
      *
      * @throws \Throwable
      */
     #[\Override]
-    public function requestAssertion(MultiFactorAuthenticatable $identity, ProofBinding $binding, #[\SensitiveParameter] array $credentialIds): array
+    public function requestAssertion(MultiFactorAuthenticatable $identity, ProofBinding $binding, #[\SensitiveParameter] array $credentialIds, ClientContext $client): array
     {
         if ($this->requestRefusal !== null) {
             throw $this->requestRefusal;
         }
 
         $this->requested[] = $credentialIds;
+        $this->clients[]   = $client;
 
         return ['challenge' => 'fake-challenge', 'session' => $binding->sessionId, 'allowCredentials' => $credentialIds];
     }
@@ -111,6 +117,7 @@ final class FakePasskeyGateway implements PasskeyGateway
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  list<string>  $credentialIds
      * @param  array<string, mixed>  $response
+     * @param  \SineMacula\Laravel\Mfa\Context\ClientContext  $client
      * @return \SineMacula\Laravel\Mfa\Enums\FailureReason|\SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
@@ -121,8 +128,10 @@ final class FakePasskeyGateway implements PasskeyGateway
         ProofBinding $binding,
         #[\SensitiveParameter] array $credentialIds,
         #[\SensitiveParameter] array $response,
+        ClientContext $client,
     ): FailureReason|PasskeyAssertion {
         $this->verified[] = $credentialIds;
+        $this->clients[]  = $client;
 
         if ($this->refusal !== null) {
             throw $this->refusal;

@@ -7,6 +7,7 @@ namespace Tests\Unit\Testing\Seams;
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
+use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\PasskeyGateway;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
@@ -47,7 +48,7 @@ final class PasskeyGatewayContractTest extends TestCase
         self::assertSame([], $gateway->credentialIds($this->passkeyIdentity(), $this->passkeyBinding()->application));
 
         try {
-            $gateway->verifyAssertion($this->passkeyIdentity(), $this->passkeyBinding(), ['Y3JlZGVudGlhbC1vbmU'], ['id' => 'x']);
+            $gateway->verifyAssertion($this->passkeyIdentity(), $this->passkeyBinding(), ['Y3JlZGVudGlhbC1vbmU'], ['id' => 'x'], ClientContext::unknown());
 
             self::fail('The default must refuse to verify.');
         } catch (OperationRefusedException $exception) {
@@ -57,7 +58,7 @@ final class PasskeyGatewayContractTest extends TestCase
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage('Passkeys are unavailable: bind a passkey gateway to ' . PasskeyGateway::class . '.');
 
-        $gateway->requestAssertion($this->passkeyIdentity(), $this->passkeyBinding(), ['Y3JlZGVudGlhbC1vbmU']);
+        $gateway->requestAssertion($this->passkeyIdentity(), $this->passkeyBinding(), ['Y3JlZGVudGlhbC1vbmU'], ClientContext::unknown());
     }
 
     /**
@@ -70,8 +71,14 @@ final class PasskeyGatewayContractTest extends TestCase
         $gateway = self::verifying(true);
 
         PasskeyGatewayContract::assertAnUnavailableGatewayListsNothing($gateway, $this->passkeyIdentity(), $this->passkeyBinding()->application);
-        PasskeyGatewayContract::assertNothingVerifiesWithoutAnAllowedCredential($gateway, $this->passkeyIdentity(), $this->passkeyBinding(), ['id' => 'x']);
-        PasskeyGatewayContract::assertAnEmptyResponseNeverVerifies($gateway, $this->passkeyIdentity(), $this->passkeyBinding());
+        PasskeyGatewayContract::assertNothingVerifiesWithoutAnAllowedCredential(
+            $gateway,
+            $this->passkeyIdentity(),
+            $this->passkeyBinding(),
+            ['id' => 'x'],
+            ClientContext::unknown(),
+        );
+        PasskeyGatewayContract::assertAnEmptyResponseNeverVerifies($gateway, $this->passkeyIdentity(), $this->passkeyBinding(), ClientContext::unknown());
     }
 
     /**
@@ -83,8 +90,19 @@ final class PasskeyGatewayContractTest extends TestCase
     {
         $gateway = new FakePasskeyGateway(['Y3JlZGVudGlhbC1vbmU'], refusal: new OperationRefusedException(FailureReason::TYPE_NOT_ENABLED, 'Unavailable.'));
 
-        PasskeyGatewayContract::assertNothingVerifiesWithoutAnAllowedCredential($gateway, $this->passkeyIdentity(), $this->passkeyBinding(), ['id' => 'x']);
-        PasskeyGatewayContract::assertAnEmptyResponseNeverVerifies(new FakePasskeyGateway(['Y3JlZGVudGlhbC1vbmU']), $this->passkeyIdentity(), $this->passkeyBinding());
+        PasskeyGatewayContract::assertNothingVerifiesWithoutAnAllowedCredential(
+            $gateway,
+            $this->passkeyIdentity(),
+            $this->passkeyBinding(),
+            ['id' => 'x'],
+            ClientContext::unknown(),
+        );
+        PasskeyGatewayContract::assertAnEmptyResponseNeverVerifies(
+            new FakePasskeyGateway(['Y3JlZGVudGlhbC1vbmU']),
+            $this->passkeyIdentity(),
+            $this->passkeyBinding(),
+            ClientContext::unknown(),
+        );
     }
 
     /**
@@ -106,7 +124,13 @@ final class PasskeyGatewayContractTest extends TestCase
 
         $this->expectException(AssertionFailedError::class);
 
-        PasskeyGatewayContract::assertNothingVerifiesWithoutAnAllowedCredential($gateway, $this->passkeyIdentity(), $this->passkeyBinding(), ['id' => 'x']);
+        PasskeyGatewayContract::assertNothingVerifiesWithoutAnAllowedCredential(
+            $gateway,
+            $this->passkeyIdentity(),
+            $this->passkeyBinding(),
+            ['id' => 'x'],
+            ClientContext::unknown(),
+        );
     }
 
     /**
@@ -118,7 +142,7 @@ final class PasskeyGatewayContractTest extends TestCase
 
         $this->expectException(AssertionFailedError::class);
 
-        PasskeyGatewayContract::assertAnEmptyResponseNeverVerifies($gateway, $this->passkeyIdentity(), $this->passkeyBinding());
+        PasskeyGatewayContract::assertAnEmptyResponseNeverVerifies($gateway, $this->passkeyIdentity(), $this->passkeyBinding(), ClientContext::unknown());
     }
 
     /**
