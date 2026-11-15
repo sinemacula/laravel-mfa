@@ -16,7 +16,7 @@ enum AbandonmentCause: string
     case RESTARTED = 'restarted';
 
     // The identity cancelled it
-    case CANCELLED = 'cancelled';
+    case CANCELED = 'canceled';
 
     // Its confirmation attempts ran out
     case ATTEMPTS_EXHAUSTED = 'attempts_exhausted';

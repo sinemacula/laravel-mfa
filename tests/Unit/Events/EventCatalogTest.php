@@ -116,7 +116,7 @@ final class EventCatalogTest extends TestCase
         yield 'EnrollmentStarted' => [static fn (FactorSummary $factor): MfaEvent => new EnrollmentStarted($context, $factor), Purpose::ENROLLMENT];
         yield 'FactorConfirmed' => [static fn (FactorSummary $factor): MfaEvent => new FactorConfirmed($context, $factor), Purpose::ENROLLMENT];
         yield 'EnrollmentAbandoned' => [
-            static fn (FactorSummary $factor): MfaEvent => new EnrollmentAbandoned($context, $factor, AbandonmentCause::CANCELLED),
+            static fn (FactorSummary $factor): MfaEvent => new EnrollmentAbandoned($context, $factor, AbandonmentCause::CANCELED),
             Purpose::ENROLLMENT,
         ];
         yield 'EnrollmentExpired' => [static fn (FactorSummary $factor): MfaEvent => new EnrollmentExpired($context, $factor), Purpose::ENROLLMENT];
