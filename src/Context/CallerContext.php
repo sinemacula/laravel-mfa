@@ -105,14 +105,15 @@ final readonly class CallerContext
     public static function fromRequest(Request $request, ?string $guard = null, ?ContainerContract $container = null): self
     {
         $container ??= Container::getInstance();
-        $client  = ClientContext::fromRequest($request);
-        $pending = $container->make(PendingSessionResolver::class)->fromRequest($request);
+        $client = ClientContext::fromRequest($request);
+        $guard ??= $container->make('auth')->getDefaultDriver();
+
+        $pending = $container->make(PendingSessionResolver::class)->fromRequest($request, $guard);
 
         if ($pending !== null) {
             return self::forPending($pending, $client);
         }
 
-        $guard ??= $container->make('auth')->getDefaultDriver();
         $application = RequestApplication::of($container, $request, $guard);
         $identity    = $container->make('auth')->guard($guard)->user();
 

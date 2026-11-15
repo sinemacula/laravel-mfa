@@ -4,14 +4,15 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Config;
 
+use Illuminate\Console\Events\CommandStarting;
+use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Foundation\Application;
-use SineMacula\Laravel\Mfa\Console\CheckConfigurationCommand;
-use Symfony\Component\Console\Input\ArgvInput;
+use Illuminate\Queue\Events\WorkerStarting;
 
 /**
  * Checks the configuration after boot, so bindings made in a provider's
- * `boot()` count. Skipped for `mfa:check` and configuration maintenance
- * commands, so a broken configuration can still be inspected and cleared.
+ * `boot()` count. In the console only workers are checked, so any other
+ * command, a composing package's own check included, can still run.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -20,16 +21,20 @@ use Symfony\Component\Console\Input\ArgvInput;
  */
 final class ConfigurationBindings
 {
-    /** @var list<string> */
-    private const array UNCHECKED_COMMANDS = [
-        CheckConfigurationCommand::NAME,
-        'config:cache',
-        'config:clear',
-        'config:show',
-        'help',
-        'list',
-        'optimize:clear',
-        'package:discover',
+    /** @var list<string> Checked as they start; any other command runs, so a bad configuration can be repaired. */
+    private const array WORKER_COMMANDS = [
+        'queue:work',
+        'queue:listen',
+        'horizon',
+        'horizon:supervisor',
+        'horizon:work',
+        'schedule:run',
+        'schedule:work',
+        'schedule:test',
+        'octane:start',
+        'octane:frankenphp',
+        'octane:roadrunner',
+        'octane:swoole',
     ];
 
     /**
@@ -38,19 +43,34 @@ final class ConfigurationBindings
     private function __construct() {}
 
     /**
+     * Checks once booted for a request, and in the console only as a worker
+     * command or a queue worker starts.
+     *
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public static function boot(Application $app): void
     {
-        $app->booted(static function (Application $app): void {
+        if (!$app->runningInConsole()) {
+            $app->booted(static fn (Application $app) => self::validate($app));
 
-            if (self::isRunningUncheckedCommand($app)) {
+            return;
+        }
+
+        $events = $app->make(Dispatcher::class);
+
+        $events->listen(CommandStarting::class, static function (CommandStarting $event) use ($app): void {
+            if (!in_array($event->command, self::WORKER_COMMANDS, true)) {
                 return;
             }
 
             self::validate($app);
         });
+
+        // A worker started from another command fires no CommandStarting.
+        $events->listen(WorkerStarting::class, static fn () => self::validate($app));
     }
 
     /**
@@ -63,16 +83,5 @@ final class ConfigurationBindings
     public static function validate(Application $app): void
     {
         $app->make(ConfigurationValidator::class)->validate();
-    }
-
-    /**
-     * The first non-option argument, so `artisan -v mfa:check` matches too.
-     *
-     * @param  \Illuminate\Contracts\Foundation\Application  $app
-     * @return bool
-     */
-    private static function isRunningUncheckedCommand(Application $app): bool
-    {
-        return $app->runningInConsole() && in_array((new ArgvInput)->getFirstArgument(), self::UNCHECKED_COMMANDS, true);
     }
 }
