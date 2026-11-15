@@ -18,10 +18,11 @@ final readonly class NoPendingSessionResolver implements PendingSessionResolver
 {
     /**
      * @param  \Illuminate\Http\Request  $request
+     * @param  string  $guard
      * @return null
      */
     #[\Override]
-    public function fromRequest(Request $request): null
+    public function fromRequest(Request $request, string $guard): null // NOSONAR: for another resolver
     {
         return null;
     }

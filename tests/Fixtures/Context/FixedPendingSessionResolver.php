@@ -23,6 +23,7 @@ final readonly class FixedPendingSessionResolver implements PendingSessionResolv
     /**
      * @param  ?\SineMacula\Laravel\Mfa\Context\PendingContext  $pending
      * @param  bool  $invalid
+     * @param  ?string  $guard
      */
     public function __construct(
 
@@ -31,22 +32,26 @@ final readonly class FixedPendingSessionResolver implements PendingSessionResolv
 
         /** Whether every request carries a credential that does not validate. */
         private bool $invalid = false,
+
+        /** The one guard the pending session is on, or `null` for every guard. */
+        private ?string $guard = null,
     ) {}
 
     /**
      * @param  \Illuminate\Http\Request  $request
+     * @param  string  $guard
      * @return ?\SineMacula\Laravel\Mfa\Context\PendingContext
      *
      * @throws \Tests\Fixtures\Exceptions\InvalidPendingCredentialException
      */
     #[\Override]
-    public function fromRequest(Request $request): ?PendingContext
+    public function fromRequest(Request $request, string $guard): ?PendingContext
     {
         if ($this->invalid) {
             throw new InvalidPendingCredentialException('The pending credential does not validate.');
         }
 
-        return $this->pending;
+        return $this->guard === null || $this->guard === $guard ? $this->pending : null;
     }
 
     /**
