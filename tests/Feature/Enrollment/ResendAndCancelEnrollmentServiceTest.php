@@ -348,7 +348,7 @@ final class ResendAndCancelEnrollmentServiceTest extends TestCase
         self::assertTrue($this->mfa()->cancelEnrollment(Callers::current(), $start->grant ?? ''));
         self::assertSame(['EnrollmentAbandoned'], $this->reportedNames());
         self::assertInstanceOf(EnrollmentAbandoned::class, $this->reported[0]);
-        self::assertSame(AbandonmentCause::CANCELLED, $this->reported[0]->cause);
+        self::assertSame(AbandonmentCause::CANCELED, $this->reported[0]->cause);
         self::assertNull($this->reported[0]->actor);
         self::assertSame($start->factor?->id, $this->reported[0]->factor->id);
         self::assertSame(self::APPLICATION, $this->reported[0]->context()['application']);
