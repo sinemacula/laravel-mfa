@@ -4,10 +4,12 @@ declare(strict_types = 1);
 
 namespace Tests\Feature\Console;
 
+use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\Artisan;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Console\PruneCommand;
+use SineMacula\Laravel\Mfa\Exceptions\InvalidConfigurationException;
 use Tests\TestCase;
 
 /**
@@ -44,5 +46,19 @@ final class PruneCommandTest extends TestCase
         foreach (['Enrolments: 0', 'Delivered codes: 0', 'Recovery codes: 0', 'Throttle rows: 0'] as $line) {
             self::assertStringContainsString($line, $output);
         }
+    }
+
+    /**
+     * It deletes without the manager, so it checks the configuration itself.
+     *
+     * @return void
+     */
+    public function testAnInvalidConfigurationStopsIt(): void
+    {
+        $this->container()->make(Repository::class)->set('mfa.totp.window', 9);
+
+        $this->expectException(InvalidConfigurationException::class);
+
+        $this->container()->make(Kernel::class)->call('mfa:prune');
     }
 }
