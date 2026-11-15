@@ -25,8 +25,8 @@ values they report, and which parts of a requirement they meet within each part'
   so does a proof made before the first factor or after the current time.
 - Each proof is classified as an authenticator (`Assurance\Authenticator`): a password is something known; an SMS
   code, a TOTP code, a recovery code and a passkey are something had; a passkey whose assertion observed user
-  verification is a multi-factor authenticator; an email code and an external provider's first factor are neither and
-  establish no level. Only an SMS code is restricted.
+  verification is a multi-factor authenticator; an email code and a first factor from an external provider or account
+  recovery are neither and establish no level. Only an SMS code is restricted.
 - The proofs form combinations (`Assurance\Combination`): the first factor alone, each reauthentication with it alone
   on a known channel, and the first factor followed by each further proof it accepts. A combination is multifactor when
   it holds a multi-factor authenticator, or something known with something had; it then supports AAL2, and otherwise
@@ -38,8 +38,8 @@ values they report, and which parts of a requirement they meet within each part'
 - The level is never AAL3.
 - `amr` holds each counting proof's method value (`pwd`, `sms`, `otp` for TOTP, email and recovery codes, `pop` for a
   passkey), `user` for observed user presence, `hwk` or `swk` for observed key protection, each once in the order first
-  reported, the first factor's first; then `mfa` when multifactor, or `mca` when accepted and not multifactor. An
-  external provider's first factor adds no value.
+  reported, the first factor's first; then `mfa` when multifactor, or `mca` when accepted and not multifactor. A
+  first factor from an external provider or account recovery adds no value.
 - A requirement part is met when one combination provides it on evidence within the part's maximum age at the current
   time: `additional_verification` by an accepted or multifactor combination, `multifactor` by a multifactor one,
   `minimum_level` by one at or above the level, and `phishing_resistance` by a phishing-resistant one. A maximum age is
