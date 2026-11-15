@@ -24,6 +24,7 @@ use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
 use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
 use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
+use SineMacula\Laravel\Mfa\Enums\AbandonmentCause;
 use SineMacula\Laravel\Mfa\Enums\EnrollmentAuthorization;
 use SineMacula\Laravel\Mfa\Enums\FactorChangeMade;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
@@ -459,7 +460,9 @@ final readonly class EnrollmentConfirmer
 
         $this->enrollments->discard($enrollment, $factor);
 
-        $this->events->dispatch(new EnrollmentAbandoned($this->events->context($caller->identity, $binding->application, $caller->client, $binding->sessionId), $summary));
+        $context = $this->events->context($caller->identity, $binding->application, $caller->client, $binding->sessionId);
+
+        $this->events->dispatch(new EnrollmentAbandoned($context, $summary, AbandonmentCause::ATTEMPTS_EXHAUSTED));
 
         return EnrollmentConfirmation::failed($reason, abandoned: true);
     }

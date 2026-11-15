@@ -162,7 +162,7 @@ final readonly class ChallengeRequests
 
         $factor = $this->guard->factor($caller->identity, $factorId, $binding->application);
 
-        return $this->container->make(PasskeyAssertions::class)->options($caller->identity, $factor, $binding, $caller->pending);
+        return $this->container->make(PasskeyAssertions::class)->options($caller->identity, $factor, $binding, $caller->pending, $caller->client);
     }
 
     /**

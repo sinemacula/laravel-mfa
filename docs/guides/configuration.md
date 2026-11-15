@@ -415,8 +415,8 @@ php artisan mfa:check
 ```
 
 It prints `[<subject>] OK` for each subject without a problem and each problem as an error, and exits `1` when there is
-one. The boot check is skipped while `mfa:check` runs, behind any option (`php artisan -v mfa:check`), so the command
-reports the problems rather than failing on the first. It is skipped too while `config:cache`, `config:clear`,
-`config:show`, `optimize:clear`, `package:discover`, `list` or `help` runs, so a bad configuration, a cached one
-included, can still be inspected and cleared; resolving the `mfa` manager checks it whatever command runs. It reads
-configuration and the container only, and opens no database connection.
+one. In the console the boot check runs only as a worker starts (`queue:work`, `horizon`, `schedule:run`,
+`octane:start` and their kin), so `mfa:check` reports every problem rather than failing on the first, and any other
+command can still inspect or clear a bad configuration. Resolving the `mfa` manager checks it whatever command runs,
+and `mfa:prune` checks it before deleting. It reads configuration and the container only, and opens no database
+connection.

@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Testing\Seams;
 
 use PHPUnit\Framework\Assert;
+use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\PasskeyGateway;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
@@ -43,6 +44,7 @@ final class PasskeyGatewayContract
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  array<string, mixed>  $response
+     * @param  \SineMacula\Laravel\Mfa\Context\ClientContext  $client
      * @return void
      */
     public static function assertNothingVerifiesWithoutAnAllowedCredential(
@@ -50,21 +52,26 @@ final class PasskeyGatewayContract
         MultiFactorAuthenticatable $identity,
         ProofBinding $binding,
         array $response,
+        ClientContext $client,
     ): void {
-        self::assertDoesNotVerify(static fn () => $gateway->verifyAssertion($identity, $binding, [], $response), 'An assertion must never verify against an empty allowlist.');
+        self::assertDoesNotVerify(
+            static fn () => $gateway->verifyAssertion($identity, $binding, [], $response, $client),
+            'An assertion must never verify against an empty allowlist.',
+        );
     }
 
     /**
      * @param  \SineMacula\Laravel\Mfa\Contracts\PasskeyGateway  $gateway
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @param  \SineMacula\Laravel\Mfa\Context\ClientContext  $client
      * @return void
      */
-    public static function assertAnEmptyResponseNeverVerifies(PasskeyGateway $gateway, MultiFactorAuthenticatable $identity, ProofBinding $binding): void
+    public static function assertAnEmptyResponseNeverVerifies(PasskeyGateway $gateway, MultiFactorAuthenticatable $identity, ProofBinding $binding, ClientContext $client): void
     {
         $credentialIds = $gateway->credentialIds($identity, $binding->application);
 
-        self::assertDoesNotVerify(static fn () => $gateway->verifyAssertion($identity, $binding, $credentialIds, []), 'An empty response must never verify.');
+        self::assertDoesNotVerify(static fn () => $gateway->verifyAssertion($identity, $binding, $credentialIds, [], $client), 'An empty response must never verify.');
     }
 
     /**
