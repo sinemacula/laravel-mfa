@@ -35,8 +35,8 @@ with `mfa:level=aal2`.
 
 Alone, an application declares `first_factor`, or binds a `Contracts\FirstFactorResolver`, and the configuration check
 refuses one with neither. A declaration describes what the guard does, and nothing checks it against what the guard
-really did, so it must be true. An external provider's first factor establishes no level of its own either: the further
-proof's level applies, unless you rebind the policy to trust what the provider reports.
+really did, so it must be true. A first factor from an external provider or account recovery establishes no level of
+its own either: the further proof's level applies, unless you rebind the policy to trust what the provider reports.
 
 ## Factor types
 

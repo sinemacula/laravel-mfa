@@ -31,12 +31,13 @@ final class ChannelKindTest extends TestCase
             'AUTHENTICATOR_APP' => 'authenticator_app',
             'PASSKEY'           => 'passkey',
             'EXTERNAL_PROVIDER' => 'external_provider',
+            'RECOVERY'          => 'recovery',
             'UNKNOWN'           => 'unknown',
         ], array_column(ChannelKind::cases(), 'value', 'name'));
     }
 
     /**
-     * Every kind but a password and an unknown channel.
+     * Every kind but a password, account recovery and an unknown channel.
      *
      * @return void
      */
@@ -54,8 +55,8 @@ final class ChannelKindTest extends TestCase
     }
 
     /**
-     * Every kind but a password and an unknown channel, which belong to first
-     * factors only.
+     * Every kind but a password, account recovery and an unknown channel, which
+     * belong to first factors only.
      *
      * @return void
      */

@@ -118,6 +118,14 @@ final class SessionProofs
     /**
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
      */
+    public static function accountRecovery(): Proof
+    {
+        return self::firstFactor('recovery', new Channel(ChannelKind::RECOVERY), ObservedProperties::none());
+    }
+
+    /**
+     * @return \SineMacula\Laravel\Mfa\Proofs\Proof
+     */
     public static function unknownFirstFactor(): Proof
     {
         return self::firstFactor('unknown', Channel::unknown(), ObservedProperties::none());

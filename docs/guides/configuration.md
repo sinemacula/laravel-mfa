@@ -144,7 +144,7 @@ generating recovery codes for `mfa.generate_recovery_codes`; `Mfa::removeFactor(
 
 `first_factor` is how the package knows, without an authentication layer, what started the sign-in: its `method` (any
 name, such as `password`) and its `channel`, one of the channel kinds (`password`, `sms`, `email`,
-`authenticator_app`, `passkey`, `external_provider`). An unknown first factor accepts no further factor and establishes
+`authenticator_app`, `passkey`, `external_provider`, `recovery`). An unknown first factor accepts no further factor and establishes
 no level, so every configured application must either declare one or have a `Contracts\FirstFactorResolver` of its own
 bound, which an authentication layer's adapter provides; with neither, the configuration check fails. The default
 resolver reports the declaration as the first factor of the identity's current sign-in, dated at the Unix epoch since

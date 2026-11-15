@@ -186,7 +186,7 @@ final readonly class EnrollmentService
 
                 $context = $this->events->context($still->identity, $binding->application, $still->client, $binding->sessionId);
 
-                $this->events->dispatch(new EnrollmentAbandoned($context, FactorSummary::fromFactor($factor), AbandonmentCause::CANCELLED));
+                $this->events->dispatch(new EnrollmentAbandoned($context, FactorSummary::fromFactor($factor), AbandonmentCause::CANCELED));
 
                 return true;
             },
