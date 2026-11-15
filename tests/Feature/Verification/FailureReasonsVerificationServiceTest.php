@@ -16,6 +16,7 @@ use SineMacula\Laravel\Mfa\Attempts\ChallengeCounters;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeOutcome;
 use SineMacula\Laravel\Mfa\Codes\PackageChallengeGateway;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
+use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
 use SineMacula\Laravel\Mfa\Contracts\PasskeyGateway;
@@ -712,7 +713,7 @@ final class FailureReasonsVerificationServiceTest extends TestCase
         try {
             $binding = new ProofBinding('user', '1', self::APPLICATION, self::SESSION, Purpose::STEP_UP);
 
-            (new UnavailablePasskeyGateway)->verifyAssertion($user, $binding, [self::CREDENTIAL], ['id' => self::CREDENTIAL]);
+            (new UnavailablePasskeyGateway)->verifyAssertion($user, $binding, [self::CREDENTIAL], ['id' => self::CREDENTIAL], ClientContext::unknown());
 
             self::fail('The default gateway must refuse.');
         } catch (OperationRefusedException $exception) {

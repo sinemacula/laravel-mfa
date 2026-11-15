@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Passkeys;
 
+use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\PasskeyGateway;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
@@ -45,12 +46,13 @@ final readonly class UnavailablePasskeyGateway implements PasskeyGateway
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  list<string>  $credentialIds
+     * @param  \SineMacula\Laravel\Mfa\Context\ClientContext  $client
      * @return array<string, mixed>
      *
      * @throws \LogicException
      */
     #[\Override]
-    public function requestAssertion(MultiFactorAuthenticatable $identity, ProofBinding $binding, #[\SensitiveParameter] array $credentialIds): array
+    public function requestAssertion(MultiFactorAuthenticatable $identity, ProofBinding $binding, #[\SensitiveParameter] array $credentialIds, ClientContext $client): array
     {
         throw new \LogicException(sprintf('Passkeys are unavailable: bind a passkey gateway to %s.', PasskeyGateway::class));
     }
@@ -62,6 +64,7 @@ final readonly class UnavailablePasskeyGateway implements PasskeyGateway
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  list<string>  $credentialIds
      * @param  array<string, mixed>  $response
+     * @param  \SineMacula\Laravel\Mfa\Context\ClientContext  $client
      * @return \SineMacula\Laravel\Mfa\Enums\FailureReason|\SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion
      *
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
@@ -72,6 +75,7 @@ final readonly class UnavailablePasskeyGateway implements PasskeyGateway
         ProofBinding $binding,
         #[\SensitiveParameter] array $credentialIds,
         #[\SensitiveParameter] array $response,
+        ClientContext $client,
     ): FailureReason|PasskeyAssertion {
         throw new OperationRefusedException(FailureReason::TYPE_NOT_ENABLED, 'Passkeys are unavailable: no passkey gateway is bound.');
     }
