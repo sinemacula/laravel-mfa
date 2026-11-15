@@ -9,6 +9,7 @@ use Illuminate\Contracts\Support\Arrayable;
 use SineMacula\Laravel\Mfa\Assurance\Authenticator;
 use SineMacula\Laravel\Mfa\Assurance\Channel;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
+use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Support\SerializedFields;
@@ -37,6 +38,7 @@ final readonly class Proof implements \JsonSerializable, Arrayable
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  int  $generation
      * @param  ?string  $challengeId
+     * @param  ?\SineMacula\Laravel\Mfa\Proofs\ProviderEvidence  $evidence
      *
      * @throws \InvalidArgumentException
      */
@@ -68,6 +70,9 @@ final readonly class Proof implements \JsonSerializable, Arrayable
 
         /** The challenge the proof answered, when one was used. */
         public ?string $challengeId = null,
+
+        /** What an external provider reported, on an external provider's proof only. */
+        public ?ProviderEvidence $evidence = null,
     ) {
         if (trim($method) === '') {
             throw new \InvalidArgumentException('The method of a proof must not be blank.');
@@ -84,6 +89,10 @@ final readonly class Proof implements \JsonSerializable, Arrayable
         if ($challengeId !== null && trim($challengeId) === '') {
             throw new \InvalidArgumentException('The challenge id of a proof must not be blank.');
         }
+
+        if ($evidence !== null && $channel?->kind !== ChannelKind::EXTERNAL_PROVIDER) {
+            throw new \InvalidArgumentException('Only an external provider\'s proof carries its evidence.');
+        }
     }
 
     /**
@@ -96,9 +105,10 @@ final readonly class Proof implements \JsonSerializable, Arrayable
     {
         $fields = new SerializedFields($data, 'a serialised proof');
 
-        $fields->refuseUnknown('kind', 'method', 'channel', 'reference', 'properties', 'proved_at', 'binding', 'generation', 'challenge_id');
+        $fields->refuseUnknown('kind', 'method', 'channel', 'reference', 'properties', 'proved_at', 'binding', 'generation', 'challenge_id', 'evidence');
 
-        $channel = $fields->nullableArray('channel');
+        $channel  = $fields->nullableArray('channel');
+        $evidence = $fields->nullableArray('evidence');
 
         return new self(
             $fields->enum('kind', ProofKind::class),
@@ -110,6 +120,7 @@ final readonly class Proof implements \JsonSerializable, Arrayable
             ProofBinding::fromArray($fields->array('binding')),
             $fields->int('generation'),
             $fields->nullableString('challenge_id'),
+            $evidence === null ? null : ProviderEvidence::fromArray($evidence),
         );
     }
 
@@ -132,7 +143,18 @@ final readonly class Proof implements \JsonSerializable, Arrayable
      */
     public function withGeneration(int $generation): self
     {
-        return new self($this->kind, $this->method, $this->channel, $this->reference, $this->properties, $this->provedAt, $this->binding, $generation, $this->challengeId);
+        return new self(
+            $this->kind,
+            $this->method,
+            $this->channel,
+            $this->reference,
+            $this->properties,
+            $this->provedAt,
+            $this->binding,
+            $generation,
+            $this->challengeId,
+            $this->evidence,
+        );
     }
 
     /**
@@ -151,6 +173,7 @@ final readonly class Proof implements \JsonSerializable, Arrayable
             'binding'      => $this->binding->toArray(),
             'generation'   => $this->generation,
             'challenge_id' => $this->challengeId,
+            'evidence'     => $this->evidence?->toArray(),
         ];
     }
 

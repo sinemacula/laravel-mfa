@@ -16,6 +16,7 @@ use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
+use SineMacula\Laravel\Mfa\Proofs\ProviderEvidence;
 use Tests\Unit\Concerns\BuildsProofs;
 
 /**
@@ -82,6 +83,47 @@ final class ProofTest extends TestCase
         $proof   = new Proof(ProofKind::FIRST_FACTOR, 'method', $channel, null, $properties, CarbonImmutable::now(), $binding, 0);
 
         self::assertSame($amr, $proof->amr());
+    }
+
+    /**
+     * An external provider's proof carries what it reported, through a copy and
+     * a round trip; a stored proof from before it still reads.
+     *
+     * @return void
+     */
+    public function testAnExternalProvidersProofCarriesItsEvidence(): void
+    {
+        $evidence = new ProviderEvidence(['pwd', 'mfa'], 'urn:example:acr:2');
+        $proof    = self::proof([
+            'kind'      => ProofKind::FIRST_FACTOR,
+            'method'    => 'sso',
+            'channel'   => new Channel(ChannelKind::EXTERNAL_PROVIDER, 'connection-1'),
+            'reference' => null,
+            'binding'   => new ProofBinding('user', '42', 'admin', 'session-1', Purpose::SIGN_IN),
+            'evidence'  => $evidence,
+        ]);
+
+        self::assertSame(['methods' => ['pwd', 'mfa'], 'context' => 'urn:example:acr:2'], $proof->toArray()['evidence']);
+        self::assertSame($evidence, $proof->withGeneration(4)->evidence);
+        self::assertSame([], $proof->amr());
+        self::assertSame($proof->toArray(), Proof::fromArray($proof->toArray())->toArray());
+
+        $stored = $proof->toArray();
+
+        unset($stored['evidence']);
+
+        self::assertNull(Proof::fromArray($stored)->evidence);
+    }
+
+    /**
+     * @return void
+     */
+    public function testOnlyAnExternalProvidersProofCarriesEvidence(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Only an external provider\'s proof carries its evidence.');
+
+        self::proof(['evidence' => new ProviderEvidence(['otp'])]);
     }
 
     /**
@@ -267,6 +309,7 @@ final class ProofTest extends TestCase
             ],
             'generation'   => 3,
             'challenge_id' => 'challenge-9',
+            'evidence'     => null,
         ];
 
         self::assertSame($expected, $proof->toArray());
