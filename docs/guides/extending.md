@@ -255,17 +255,17 @@ example, and returns a `first_factor_reauthentication` proof bound to their curr
 
 Every helper that acts for a person takes a `Context\CallerContext` first (see [The caller](helpers.md#the-caller)), and
 no helper or seam is handed a request: `CallerContext::fromRequest()` asks the bound `PendingSessionResolver`'s
-`fromRequest()`, and the actions ask its `revalidate()` under the identity's lock, with the pending session the caller
-was served. A resolver that must read the credential again keeps it on the `PendingContext` it returns, as
-`credential()`, which no dump or log of the context shows. On a pending session a helper serves only the action it needs
-(`mfa.list_factors` for `factors()`, `factor()`, `offeredFactors()` and `recoveryCodeStatus()`, `mfa.send_code` for
-`sendCode()`, `mfa.verify` for `verify()` and `requestAssertion()`), as the pending session's own identity; anything
-else gets nothing, never the guard's user in its place. Starting, resending and cancelling an enrolment need
-`mfa.start_bootstrap_enrollment`, and confirming one `mfa.confirm_bootstrap_enrollment`. Generating recovery codes,
-renaming, preferring or removing a factor and `proofs()` serve active sessions only. A code is sent or checked only for
-a binding that is exactly the caller's own, on its application and its session. A resolver reports a pending credential
-that does not validate by throwing from `fromRequest()`, and a session that no longer stands by answering `null` from
-`revalidate()`.
+`fromRequest()` for the guard it reads the caller from, and the actions ask its `revalidate()` under the identity's
+lock, with the pending session the caller was served. A resolver that must read the credential again keeps it on the
+`PendingContext` it returns, as `credential()`, which no dump or log of the context shows. On a pending session a helper
+serves only the action it needs (`mfa.list_factors` for `factors()`, `factor()`, `offeredFactors()` and
+`recoveryCodeStatus()`, `mfa.send_code` for `sendCode()`, `mfa.verify` for `verify()` and `requestAssertion()`), as the
+pending session's own identity; anything else gets nothing, never the guard's user in its place. Starting, resending and
+cancelling an enrolment need `mfa.start_bootstrap_enrollment`, and confirming one `mfa.confirm_bootstrap_enrollment`.
+Generating recovery codes, renaming, preferring or removing a factor and `proofs()` serve active sessions only. A code
+is sent or checked only for a binding that is exactly the caller's own, on its application and its session. A resolver
+reports a pending credential that does not validate by throwing from `fromRequest()`, and a session that no longer
+stands by answering `null` from `revalidate()`.
 
 ## Seams with an authentication layer
 

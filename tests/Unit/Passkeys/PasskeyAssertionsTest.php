@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Auth;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Assurance\Channel;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
+use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\CombinationPolicy;
 use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
@@ -20,6 +22,7 @@ use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
+use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
 use SineMacula\Laravel\Mfa\Passkeys\AssertionRequest;
@@ -30,6 +33,7 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Verification\ChallengeRequests;
+use SineMacula\Laravel\Mfa\Verification\Submission;
 use Tests\Fixtures\Assurance\RefusingCombinationPolicy;
 use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Context\FixedPendingSessionResolver;
@@ -94,6 +98,27 @@ final class PasskeyAssertionsTest extends TestCase
         self::assertSame([[self::CREDENTIAL]], $this->gateway->requested);
         self::assertSame([self::APPLICATION], $this->gateway->listedFor);
         self::assertSame(self::SESSION, $request->options['session']);
+    }
+
+    /**
+     * The caller's own client reaches the gateway, for the request and for the
+     * check.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testTheCallersClientReachesTheGateway(): void
+    {
+        $client = new ClientContext('203.0.113.7', 'Agent/2.0', 'https://app.example.test');
+        $caller = CallerContext::forIdentity($this->user, self::APPLICATION, $client);
+
+        $this->requests()->requestAssertion($caller, $this->passkey->id, Purpose::STEP_UP);
+        Mfa::verify($caller, Submission::assertion($this->passkey->id, ['id' => self::CREDENTIAL]), Purpose::STEP_UP);
+
+        self::assertCount(2, $this->gateway->clients);
+        self::assertSame($client, $this->gateway->clients[0]);
+        self::assertSame($client, $this->gateway->clients[1]);
     }
 
     /**
@@ -218,7 +243,8 @@ final class PasskeyAssertionsTest extends TestCase
         $properties               = new ObservedProperties(userPresence: true, userVerification: true);
         $this->gateway->assertion = new PasskeyAssertion(self::CREDENTIAL, $properties, 'challenge-1');
 
-        $assertion = $this->assertions()->check($this->user, $this->passkey, $this->bindingOf($this->user, Purpose::STEP_UP), ['id' => self::CREDENTIAL], null);
+        $binding   = $this->bindingOf($this->user, Purpose::STEP_UP);
+        $assertion = $this->assertions()->check($this->user, $this->passkey, $binding, ['id' => self::CREDENTIAL], null, ClientContext::unknown());
 
         self::assertInstanceOf(PasskeyAssertion::class, $assertion);
         self::assertSame($properties, $assertion->properties);
@@ -238,11 +264,14 @@ final class PasskeyAssertionsTest extends TestCase
 
         $this->gateway->assertion = new PasskeyAssertion(self::OTHER_CREDENTIAL, new ObservedProperties(userPresence: true));
 
-        self::assertSame(FailureReason::INVALID_CODE, $this->assertions()->check($this->user, $this->passkey, $binding, ['id' => self::OTHER_CREDENTIAL], null));
+        self::assertSame(
+            FailureReason::INVALID_CODE,
+            $this->assertions()->check($this->user, $this->passkey, $binding, ['id' => self::OTHER_CREDENTIAL], null, ClientContext::unknown()),
+        );
 
         $this->gateway->assertion = FailureReason::EXPIRED;
 
-        self::assertSame(FailureReason::EXPIRED, $this->assertions()->check($this->user, $this->passkey, $binding, ['id' => self::CREDENTIAL], null));
+        self::assertSame(FailureReason::EXPIRED, $this->assertions()->check($this->user, $this->passkey, $binding, ['id' => self::CREDENTIAL], null, ClientContext::unknown()));
     }
 
     /**
@@ -396,7 +425,7 @@ final class PasskeyAssertionsTest extends TestCase
     private function assertOptionsRefused(FailureReason $reason, ProofBinding $binding): void
     {
         try {
-            $this->assertions()->options($this->user, $this->passkey, $binding, null);
+            $this->assertions()->options($this->user, $this->passkey, $binding, null, ClientContext::unknown());
 
             self::fail('The options must be refused.');
         } catch (OperationRefusedException $exception) {

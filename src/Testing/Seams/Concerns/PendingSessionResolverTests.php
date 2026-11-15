@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Testing\Seams\Concerns;
 
+use Illuminate\Container\Container;
 use Illuminate\Http\Request;
 use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 use SineMacula\Laravel\Mfa\Testing\Seams\PendingSessionResolverContract;
@@ -26,7 +27,9 @@ trait PendingSessionResolverTests
      */
     public function testPendingSessionResolverFindsNoneWithoutACredential(): void
     {
-        PendingSessionResolverContract::assertNoCredentialMeansNoPendingSession($this->pendingSessionResolver(), $this->requestWithoutPendingCredential());
+        $request = $this->requestWithoutPendingCredential();
+
+        PendingSessionResolverContract::assertNoCredentialMeansNoPendingSession($this->pendingSessionResolver(), $request, $this->pendingSessionGuard());
     }
 
     /**
@@ -34,7 +37,19 @@ trait PendingSessionResolverTests
      */
     public function testPendingSessionResolverRefusesAnInvalidCredential(): void
     {
-        PendingSessionResolverContract::assertAnInvalidCredentialIsRefused($this->pendingSessionResolver(), $this->requestWithInvalidPendingCredential());
+        $request = $this->requestWithInvalidPendingCredential();
+
+        PendingSessionResolverContract::assertAnInvalidCredentialIsRefused($this->pendingSessionResolver(), $request, $this->pendingSessionGuard());
+    }
+
+    /**
+     * The guard the requests are for; by default the default guard.
+     *
+     * @return string
+     */
+    protected function pendingSessionGuard(): string
+    {
+        return Container::getInstance()->make('auth')->getDefaultDriver();
     }
 
     /**

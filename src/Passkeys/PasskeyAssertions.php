@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
 use SineMacula\Laravel\Mfa\Assurance\Channel;
 use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
+use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
 use SineMacula\Laravel\Mfa\Contracts\CombinationPolicy;
@@ -60,14 +61,15 @@ final readonly class PasskeyAssertions
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  ?\SineMacula\Laravel\Mfa\Context\PendingContext  $pending
+     * @param  \SineMacula\Laravel\Mfa\Context\ClientContext  $client
      * @return array<string, mixed>
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
      */
-    public function options(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor, ProofBinding $binding, ?PendingContext $pending): array
+    public function options(MultiFactorAuthenticatable $identity, EloquentFactor&Model $factor, ProofBinding $binding, ?PendingContext $pending, ClientContext $client): array
     {
-        return $this->gateway()->requestAssertion($identity, $binding, [$this->credential($identity, $factor, $binding, $pending)]);
+        return $this->gateway()->requestAssertion($identity, $binding, [$this->credential($identity, $factor, $binding, $pending)], $client);
     }
 
     /**
@@ -79,6 +81,7 @@ final readonly class PasskeyAssertions
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  array<string, mixed>  $response
      * @param  ?\SineMacula\Laravel\Mfa\Context\PendingContext  $pending
+     * @param  \SineMacula\Laravel\Mfa\Context\ClientContext  $client
      * @return \SineMacula\Laravel\Mfa\Enums\FailureReason|\SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -90,9 +93,10 @@ final readonly class PasskeyAssertions
         ProofBinding $binding,
         #[\SensitiveParameter] array $response,
         ?PendingContext $pending,
+        ClientContext $client,
     ): FailureReason|PasskeyAssertion {
         $credential = $this->credential($identity, $factor, $binding, $pending);
-        $assertion  = $this->gateway()->verifyAssertion($identity, $binding, [$credential], $response);
+        $assertion  = $this->gateway()->verifyAssertion($identity, $binding, [$credential], $response, $client);
 
         if ($assertion instanceof FailureReason) {
             return $assertion;

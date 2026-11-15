@@ -87,6 +87,7 @@ through `Contracts\PasskeyGateway`.
 - To verify a passkey factor, `Mfa::requestAssertion()` asks `PasskeyAssertions` for the options of a ceremony, and
   `Mfa::verify($caller, Submission::assertion(...))` hands the client's response back under the identity's lock and
   makes a proof of what the returned assertion observed, with the challenge it answered when the gateway reports one.
+  Both hand the gateway the caller's `ClientContext`.
 
 ## Failure / Edge Cases
 

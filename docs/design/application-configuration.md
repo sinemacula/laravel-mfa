@@ -59,10 +59,9 @@ before anything relies on it.
   of the subject that needs it, not an escape from the report. It reads configuration and the container only and opens
   no database connection. The storage checks (the connection, and the factor model on it) are part of it, so
   `mfa:check` reports them like any other problem.
-- The boot check is skipped while `mfa:check` runs, found as the console finds a command (the first argument that is
-  not an option), and while `config:cache`, `config:clear`, `config:show`, `optimize:clear`, `package:discover`,
-  `list` or `help` runs, so a bad configuration, a cached one included, can be inspected and cleared. The manager's
-  factory checks whatever runs.
+- In the console the boot check runs only as a worker starts (queue, Horizon, scheduler or Octane), matched by the
+  name Artisan resolved, so any other command, `mfa:check` or a composing package's own check included, can run on a
+  bad configuration. The manager's factory checks whatever resolves it, and `mfa:prune` checks before it deletes.
 - The drivers take their settings as given: the shipped ones are built from the settings classes, so their
   constructors check nothing themselves.
 
@@ -71,9 +70,8 @@ before anything relies on it.
 - The shipped configuration has no problem: every block takes its defaults and no application is configured.
 - An application is configured under its name with the types it enables and its first factor; the boot check passes,
   and every later read of its settings returns what it configures.
-- `php artisan mfa:check` prints `[<subject>] OK` for each subject and exits `0`. The boot check is skipped while it
-  runs, so a misconfigured deployment, a broken factor model included, can still run the command to see every
-  problem.
+- `php artisan mfa:check` prints `[<subject>] OK` for each subject and exits `0`. The boot check does not run for it,
+  so a misconfigured deployment, a broken factor model included, can still run the command to see every problem.
 
 ## Failure / Edge Cases
 

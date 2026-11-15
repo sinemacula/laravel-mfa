@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Testing\Seams\Concerns;
 
+use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\PasskeyGateway;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
@@ -35,7 +36,13 @@ trait PasskeyGatewayTests
      */
     public function testPasskeyGatewayVerifiesNothingWithoutAnAllowedCredential(): void
     {
-        PasskeyGatewayContract::assertNothingVerifiesWithoutAnAllowedCredential($this->passkeyGateway(), $this->passkeyIdentity(), $this->passkeyBinding(), ['id' => 'contract']);
+        PasskeyGatewayContract::assertNothingVerifiesWithoutAnAllowedCredential(
+            $this->passkeyGateway(),
+            $this->passkeyIdentity(),
+            $this->passkeyBinding(),
+            ['id' => 'contract'],
+            $this->passkeyClient(),
+        );
     }
 
     /**
@@ -43,7 +50,17 @@ trait PasskeyGatewayTests
      */
     public function testPasskeyGatewayNeverVerifiesAnEmptyResponse(): void
     {
-        PasskeyGatewayContract::assertAnEmptyResponseNeverVerifies($this->passkeyGateway(), $this->passkeyIdentity(), $this->passkeyBinding());
+        PasskeyGatewayContract::assertAnEmptyResponseNeverVerifies($this->passkeyGateway(), $this->passkeyIdentity(), $this->passkeyBinding(), $this->passkeyClient());
+    }
+
+    /**
+     * The client the ceremonies are for; by default an unknown one.
+     *
+     * @return \SineMacula\Laravel\Mfa\Context\ClientContext
+     */
+    protected function passkeyClient(): ClientContext
+    {
+        return ClientContext::unknown();
     }
 
     /**
