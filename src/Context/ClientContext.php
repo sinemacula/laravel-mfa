@@ -103,9 +103,9 @@ final readonly class ClientContext
      */
     private static function headerNames(array $names): array
     {
-        $normalised = array_map(self::headerName(...), $names);
+        $normalized = array_map(self::headerName(...), $names);
 
-        return array_values(array_unique(array_filter($normalised, static fn (string $name): bool => preg_match(self::TOKEN_PATTERN, $name) === 1)));
+        return array_values(array_unique(array_filter($normalized, static fn (string $name): bool => preg_match(self::TOKEN_PATTERN, $name) === 1)));
     }
 
     /**

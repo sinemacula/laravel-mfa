@@ -49,6 +49,7 @@ final class AuthenticatorTest extends TestCase
             ['pop', 'swk'],
         ];
         yield 'an external provider' => [SessionProofs::externalProvider(), false, false, false, false, false, []];
+        yield 'account recovery' => [SessionProofs::accountRecovery(), false, false, false, false, false, []];
         yield 'an unknown first factor' => [SessionProofs::unknownFirstFactor(), false, false, false, false, false, []];
     }
 

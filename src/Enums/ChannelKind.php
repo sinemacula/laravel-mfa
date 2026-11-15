@@ -31,6 +31,9 @@ enum ChannelKind: string
     // An external identity provider's verified result
     case EXTERNAL_PROVIDER = 'external_provider';
 
+    // The application's own account recovery
+    case RECOVERY = 'recovery';
+
     // Not known, or not supplied by a trusted source
     case UNKNOWN = 'unknown';
 
@@ -43,13 +46,15 @@ enum ChannelKind: string
     {
         return match ($this) {
             self::PASSWORD,
+            self::RECOVERY,
             self::UNKNOWN => false,
             default       => true,
         };
     }
 
     /**
-     * A password and an unknown channel belong to first factors only.
+     * A password, account recovery and an unknown channel belong to first
+     * factors only.
      *
      * @return bool
      */
@@ -57,6 +62,7 @@ enum ChannelKind: string
     {
         return match ($this) {
             self::PASSWORD,
+            self::RECOVERY,
             self::UNKNOWN => false,
             default       => true,
         };

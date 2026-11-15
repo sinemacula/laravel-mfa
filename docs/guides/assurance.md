@@ -20,8 +20,9 @@ $password = new Channel(ChannelKind::PASSWORD);
 $unknown  = Channel::unknown();
 ```
 
-A reference is never blank, and a password or an unknown channel takes none (`ChannelKind::takesReference()`). Those
-two belong to first factors only: an enrolled factor always travels on a real channel (`ChannelKind::carriesFactor()`).
+A reference is never blank, and a password, account recovery or an unknown channel takes none
+(`ChannelKind::takesReference()`). Those three belong to first factors only: an enrolled factor always travels on a real
+channel (`ChannelKind::carriesFactor()`).
 
 ## Observed properties
 
@@ -161,8 +162,8 @@ shares the first factor's channel is not independent of it, and is neither offer
   cannot then be shown.
 
 A first factor whose channel is unknown, a proof that is not a first factor or a reauthentication with one, and a
-channel that cannot carry a factor (a password or an unknown one) accept nothing. A recovery code has no channel, so it
-follows any known first factor.
+channel that cannot carry a factor (a password, account recovery or an unknown one) accept nothing. A recovery code has
+no channel, so it follows any known first factor.
 
 ```php
 use SineMacula\Laravel\Mfa\Assurance\Channel;
@@ -192,19 +193,19 @@ separate answers:
 | Phone code                               | SMS code to the same phone                           | No       | No          | AAL1, from the phone code     |
 | Email code                               | Email code to the same address                       | No       | No          | Unclassified                  |
 | Passkey with observed user verification  | None needed                                          | No       | Yes         | AAL2                          |
-| External provider                        | Passkey with observed user verification              | Yes      | Yes         | AAL2                          |
-| External provider                        | Any other enabled factor                             | Yes      | No          | The further proof's own level |
+| External provider or account recovery    | Passkey with observed user verification              | Yes      | Yes         | AAL2                          |
+| External provider or account recovery    | Any other enabled factor                             | Yes      | No          | The further proof's own level |
 | Unknown, or none                         | Any                                                  | No       | No          | Unclassified                  |
 
 The table follows from a few rules. A password is something the person knows; an SMS code, a TOTP code, a recovery code
 and a passkey are something they have; a passkey whose assertion observed user verification is a multi-factor
 authenticator on its own. Something known with something had, or a multi-factor authenticator, is multifactor
-authentication and supports AAL2; anything else that is known or had supports AAL1. An email code is not an
-out-of-band authenticator in NIST SP 800-63B-4 and establishes no level of its own, and an external provider's first
-factor adds none, so the further proof's level applies (a passkey with observed user verification still reaches AAL2).
-The default never reports AAL3, which needs hardware-bound keys it cannot see without attestation. What a level does not
-say about a deployment, and what an application must add to claim one, is in
-[the compliance profile](compliance.md).
+authentication and supports AAL2; anything else that is known or had supports AAL1. An email code is not an out-of-band
+authenticator in NIST SP 800-63B-4 and establishes no level of its own, and a first factor from an external provider or
+account recovery adds none, so the further proof's level applies (a passkey with observed user verification still
+reaches AAL2). The default never reports AAL3, which needs hardware-bound keys it cannot see without attestation. What a
+level does not say about a deployment, and what an application must add to claim one, is in [the compliance
+profile](compliance.md).
 
 A combination is phishing-resistant when one of its proofs observed phishing resistance, as a passkey assertion does.
 It is restricted when it relies on an SMS code, a restricted authenticator in NIST SP 800-63B-4: a phone code followed
@@ -213,12 +214,12 @@ session that also reaches its level without the SMS code.
 
 ### `amr` values
 
-The evaluation's `amr` values (RFC 8176) state only what happened. Each proof that counts adds its method's value,
-first factor first: `pwd` for a password, `sms` for an SMS code, `otp` for a TOTP, email or recovery code, and `pop`
-for a passkey; then `user` when it observed user presence, and `hwk` or `swk` when it observed how its key was
-protected. `mfa` is added when the combination is multifactor, and `mca` when it is an accepted additional verification
-that is not. An external provider's own methods are not repeated: an application that trusts them rebinds the policy. A
-single proof's own values are `$proof->amr()`.
+The evaluation's `amr` values (RFC 8176) state only what happened. Each proof that counts adds its method's value, first
+factor first: `pwd` for a password, `sms` for an SMS code, `otp` for a TOTP, email or recovery code, and `pop` for a
+passkey; then `user` when it observed user presence, and `hwk` or `swk` when it observed how its key was protected.
+`mfa` is added when the combination is multifactor, and `mca` when it is an accepted additional verification that is
+not. Account recovery adds no value, and an external provider's own methods are not repeated: an application that trusts
+them rebinds the policy. A single proof's own values are `$proof->amr()`.
 
 ### Requirements and maximum ages
 
@@ -334,7 +335,7 @@ context keys are in [Events](events.md), and the configuration keys in [Configur
 | Enum                            | Values                                                                                                                                                                                                                                                                                                                                                 |
 |---------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `Enums\FailureReason`           | `invalid_code`, `expired`, `replayed`, `locked`, `not_confirmed`, `not_accepted`, `type_not_enabled`, `no_factor`, `not_found`, `sending_capped`, `mfa_enrollment_required`, `identity_inactive`, `machine_identity`, `not_fresh`, `last_factor`, `limit_reached`, `credential_associated`, `invalid_destination`, `self_service_recovery_unavailable` |
-| `Enums\ChannelKind`             | `password`, `sms`, `email`, `authenticator_app`, `passkey`, `external_provider`, `unknown`                                                                                                                                                                                                                                                             |
+| `Enums\ChannelKind`             | `password`, `sms`, `email`, `authenticator_app`, `passkey`, `external_provider`, `recovery`, `unknown`                                                                                                                                                                                                                                                 |
 | `Enums\ProofKind`               | `first_factor`, `first_factor_reauthentication`, `additional_factor`, `recovery_code`                                                                                                                                                                                                                                                                  |
 | `Enums\Purpose`                 | `sign_in`, `reauthenticate`, `step_up`, `enrollment`                                                                                                                                                                                                                                                                                                   |
 | `Enums\KeyProtection`           | `hardware`, `software`                                                                                                                                                                                                                                                                                                                                 |
@@ -350,7 +351,7 @@ context keys are in [Events](events.md), and the configuration keys in [Configur
 | `Enums\PendingAction`           | `mfa.list_factors`, `mfa.send_code`, `mfa.verify`, `mfa.start_bootstrap_enrollment`, `mfa.confirm_bootstrap_enrollment`                                                                                                                                                                                                                                |
 | `Enums\FactorChange`            | `mfa.add_first_additional_factor`, `mfa.add_factor`, `mfa.remove_factor`, `mfa.generate_recovery_codes`                                                                                                                                                                                                                                                |
 | `Enums\FactorChangeMade`        | `factor_confirmed`, `passkey_factor_registered`, `factor_removed`                                                                                                                                                                                                                                                                                      |
-| `Enums\AbandonmentCause`        | `restarted`, `cancelled`, `attempts_exhausted`, `reset`                                                                                                                                                                                                                                                                                                |
+| `Enums\AbandonmentCause`        | `restarted`, `canceled`, `attempts_exhausted`, `reset`                                                                                                                                                                                                                                                                                                 |
 
 A failure reason says what a caller may be told, not why in detail: a factor that does not exist and one that belongs
 to someone else both answer `not_found`. Operations name the package's own step-up checks (adding a further factor,
