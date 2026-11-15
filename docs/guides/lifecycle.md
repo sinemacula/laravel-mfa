@@ -142,9 +142,9 @@ Resetting your own identity, from a request signed in as it, invalidates that re
 Without an authentication layer the Laravel login itself goes on, and its next protected request finds no proof.
 
 Once it commits the events follow, in this order: `LockoutLifted` for each live lockout, naming the actor; in id order,
-`FactorRemoved` naming the actor for a confirmed factor and `EnrollmentAbandoned` for a pending one;
-`RecoveryCodesRemoved` when there was a set; and `FactorsReset`, with the actor, the reason, whether re-enrolment is
-required and `unreadableFactors`.
+`FactorRemoved` naming the actor for a confirmed factor and `EnrollmentAbandoned`, with the cause `reset` and the actor,
+for a pending one; `RecoveryCodesRemoved` when there was a set; and `FactorsReset`, with the actor, the reason, whether
+re-enrolment is required and `unreadableFactors`.
 
 A reset is the remedy for a factor whose stored state cannot be read: a status the package does not know, or a deadline
 or disabled time that is not a time. Such a factor makes verifying, listing and removing it throw, so the person cannot

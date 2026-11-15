@@ -33,11 +33,13 @@ use SineMacula\Laravel\Mfa\Enrollment\EnrollmentStart;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentStarter;
 use SineMacula\Laravel\Mfa\Enrollment\GrantAuthority;
 use SineMacula\Laravel\Mfa\Enrollment\PendingEnrollments;
+use SineMacula\Laravel\Mfa\Enums\AbandonmentCause;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\Enums\CodeCheck;
 use SineMacula\Laravel\Mfa\Enums\EnrollmentAuthorization;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
+use SineMacula\Laravel\Mfa\Events\EnrollmentAbandoned;
 use SineMacula\Laravel\Mfa\Exceptions\CodeNotSentException;
 use SineMacula\Laravel\Mfa\Exceptions\InvalidModelException;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
@@ -671,6 +673,8 @@ final class GatesEnrollmentStarterTest extends TestCase
         $next = $this->startedTotp();
 
         self::assertSame(['EnrollmentAbandoned', 'EnrollmentStarted'], $this->reportedNames());
+        self::assertInstanceOf(EnrollmentAbandoned::class, $this->reported[0]);
+        self::assertSame(AbandonmentCause::RESTARTED, $this->reported[0]->cause);
         self::assertSame(1, Enrollment::query()->count());
         self::assertNotSame($other->factor?->id, $next->factor?->id);
 

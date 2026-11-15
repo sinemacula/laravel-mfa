@@ -15,6 +15,8 @@ use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
+use SineMacula\Laravel\Mfa\Enums\ContextKey;
+use SineMacula\Laravel\Mfa\Enums\ContextValueType;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
@@ -106,6 +108,9 @@ final class AuthenticationContextContributorTest extends TestCase
             'last_verification_age_seconds' => 90,
             'has_confirmed_factor'          => true,
         ], $this->context());
+
+        self::assertTypedAsTheKeysSay($this->context());
+        self::assertTypedAsTheKeysSay(AuthenticationContextContributor::neutral());
     }
 
     /**
@@ -749,5 +754,31 @@ final class AuthenticationContextContributorTest extends TestCase
         $owner = ProofOwner::of($user);
 
         return new ProofBinding($owner->type, $owner->key, self::APPLICATION, self::SESSION, $purpose);
+    }
+
+    /**
+     * Each value has the type its `Enums\ContextKey` gives, or is a null age.
+     *
+     * @param  array<string, mixed>  $context
+     * @return void
+     */
+    private static function assertTypedAsTheKeysSay(array $context): void
+    {
+        foreach (ContextKey::cases() as $key) {
+            $value = $context[substr($key->value, strlen(AuthenticationContextContributor::NAMESPACE) + 1)];
+
+            if ($value === null) {
+                self::assertSame(ContextKey::LAST_VERIFICATION_AGE_SECONDS, $key);
+
+                continue;
+            }
+
+            self::assertTrue(match ($key->type()) {
+                ContextValueType::BOOL   => is_bool($value),
+                ContextValueType::LIST   => is_array($value) && array_is_list($value) && array_filter($value, is_string(...)) === $value,
+                ContextValueType::STRING => is_string($value),
+                ContextValueType::NUMBER => is_int($value),
+            }, $key->value);
+        }
     }
 }

@@ -25,6 +25,7 @@ use SineMacula\Laravel\Mfa\Enrollment\EnrollmentStart;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentStarter;
 use SineMacula\Laravel\Mfa\Enrollment\GrantAuthority;
 use SineMacula\Laravel\Mfa\Enrollment\PendingEnrollments;
+use SineMacula\Laravel\Mfa\Enums\AbandonmentCause;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Events\EnrollmentAbandoned;
 use SineMacula\Laravel\Mfa\Exceptions\CodeNotSentException;
@@ -166,7 +167,10 @@ final class AttemptsEnrollmentConfirmerTest extends TestCase
         self::assertSame(0, Factor::query()->count());
         self::assertSame(0, Enrollment::query()->count());
         self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment(Callers::current(), $grant, $wrong)->reason);
-        self::assertCount(1, array_filter($this->reported, static fn (object $event): bool => $event instanceof EnrollmentAbandoned));
+        $abandoned = array_values(array_filter($this->reported, static fn (object $event): bool => $event instanceof EnrollmentAbandoned));
+
+        self::assertCount(1, $abandoned);
+        self::assertSame(AbandonmentCause::ATTEMPTS_EXHAUSTED, $abandoned[0]->cause);
     }
 
     /**

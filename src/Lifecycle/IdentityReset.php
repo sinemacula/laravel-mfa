@@ -18,6 +18,7 @@ use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
 use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
 use SineMacula\Laravel\Mfa\Enrollment\PendingEnrollments;
+use SineMacula\Laravel\Mfa\Enums\AbandonmentCause;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Events\Actor;
 use SineMacula\Laravel\Mfa\Events\EnrollmentAbandoned;
@@ -212,7 +213,7 @@ final readonly class IdentityReset
 
             $this->removal->erase($identity, $factor);
 
-            $this->events->dispatch($confirmed ? new FactorRemoved($context, $summary, $actor) : new EnrollmentAbandoned($context, $summary));
+            $this->events->dispatch($confirmed ? new FactorRemoved($context, $summary, $actor) : new EnrollmentAbandoned($context, $summary, AbandonmentCause::RESET, $actor));
         }
     }
 }

@@ -9,6 +9,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Contracts\MfaEvent;
+use SineMacula\Laravel\Mfa\Enums\AbandonmentCause;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\Actor;
@@ -114,7 +115,10 @@ final class EventCatalogTest extends TestCase
 
         yield 'EnrollmentStarted' => [static fn (FactorSummary $factor): MfaEvent => new EnrollmentStarted($context, $factor), Purpose::ENROLLMENT];
         yield 'FactorConfirmed' => [static fn (FactorSummary $factor): MfaEvent => new FactorConfirmed($context, $factor), Purpose::ENROLLMENT];
-        yield 'EnrollmentAbandoned' => [static fn (FactorSummary $factor): MfaEvent => new EnrollmentAbandoned($context, $factor), Purpose::ENROLLMENT];
+        yield 'EnrollmentAbandoned' => [
+            static fn (FactorSummary $factor): MfaEvent => new EnrollmentAbandoned($context, $factor, AbandonmentCause::CANCELLED),
+            Purpose::ENROLLMENT,
+        ];
         yield 'EnrollmentExpired' => [static fn (FactorSummary $factor): MfaEvent => new EnrollmentExpired($context, $factor), Purpose::ENROLLMENT];
         yield 'BootstrapEnrollmentCompleted' => [static fn (FactorSummary $factor): MfaEvent => new BootstrapEnrollmentCompleted($context, $factor), Purpose::ENROLLMENT];
         yield 'PasskeyAssociated' => [static fn (FactorSummary $factor): MfaEvent => new PasskeyAssociated($context, $factor), Purpose::ENROLLMENT];

@@ -33,10 +33,11 @@ final class RecordingPendingSessionResolver implements PendingSessionResolver
 
     /**
      * @param  \Illuminate\Http\Request  $request
+     * @param  string  $guard
      * @return \SineMacula\Laravel\Mfa\Context\PendingContext
      */
     #[\Override]
-    public function fromRequest(Request $request): PendingContext
+    public function fromRequest(Request $request, string $guard): PendingContext
     {
         return $this->pending;
     }

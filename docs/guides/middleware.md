@@ -186,6 +186,11 @@ session the neutral context itself:
 | `last_verification_age_seconds` | `?int`         | Whole seconds since the newest evidence, `null` without any                  |
 | `has_confirmed_factor`          | `bool`         | Whether the identity has a factor whose stored status is exactly `confirmed` |
 
+`Enums\ContextKey` names each key with its namespace (`mfa.accepted`, `mfa.multifactor`, `mfa.factor_types`,
+`mfa.level`, `mfa.phishing_resistant`, `mfa.user_verification`, `mfa.last_verification_age_seconds`,
+`mfa.has_confirmed_factor`), and its `type()` gives the type of a value that is not null as an `Enums\ContextValueType`:
+`bool`, `list`, `string` or `number`.
+
 `has_confirmed_factor`, here and on a refusal, is a fact about the identity's stored factors, read from the write
 connection: a factor whose status is exactly `confirmed`. A status the package does not know is no confirmed factor, so
 an identity whose only factor is corrupt reports `false`. The requirement is a separate and conservative question:
