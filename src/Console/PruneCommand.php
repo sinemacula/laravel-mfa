@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Console;
 
 use Illuminate\Console\Command;
+use SineMacula\Laravel\Mfa\Config\ConfigurationValidator;
 use SineMacula\Laravel\Mfa\Lifecycle\RecordPruner;
 use Symfony\Component\Console\Attribute\AsCommand;
 
@@ -28,13 +29,17 @@ final class PruneCommand extends Command
     protected $description = 'Delete expired enrolments, expired codes, used or replaced recovery codes and ended throttle windows';
 
     /**
+     * @param  \SineMacula\Laravel\Mfa\Config\ConfigurationValidator  $validator
      * @param  \SineMacula\Laravel\Mfa\Lifecycle\RecordPruner  $pruner
      * @return int
      *
      * @throws \Throwable
      */
-    public function handle(RecordPruner $pruner): int
+    public function handle(ConfigurationValidator $validator, RecordPruner $pruner): int
     {
+        // It deletes without the manager, whose factory would otherwise check.
+        $validator->validate();
+
         $result = $pruner();
 
         $this->info("Enrolments: {$result->enrollments}");
