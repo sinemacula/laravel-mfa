@@ -8,6 +8,8 @@ use Illuminate\Config\Repository;
 use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Queue\Events\WorkerStarting;
+use Illuminate\Queue\WorkerOptions;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Config\ConfigurationBindings;
@@ -87,6 +89,22 @@ final class ConfigurationBindingsTest extends TestCase
         $this->expectExceptionMessage('[totp] mfa.totp.window must be an integer from 0 to 3.');
 
         $this->start($command);
+    }
+
+    /**
+     * A queue worker started through another command's call() is checked too.
+     *
+     * @return void
+     */
+    public function testAQueueWorkerIsCheckedAsItStarts(): void
+    {
+        $this->container()->make(Repository::class)->set('mfa.totp.window', 9);
+
+        ConfigurationBindings::boot($this->container());
+
+        $this->expectException(InvalidConfigurationException::class);
+
+        $this->container()->make(Dispatcher::class)->dispatch(new WorkerStarting('sync', 'default', new WorkerOptions));
     }
 
     /**

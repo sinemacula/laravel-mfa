@@ -7,6 +7,7 @@ namespace SineMacula\Laravel\Mfa\Config;
 use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Queue\Events\WorkerStarting;
 
 /**
  * Checks the configuration after boot, so bindings made in a provider's
@@ -43,7 +44,7 @@ final class ConfigurationBindings
 
     /**
      * Checks once booted for a request, and in the console only as a worker
-     * command starts, matched by the name Artisan resolved.
+     * command or a queue worker starts.
      *
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @return void
@@ -58,13 +59,18 @@ final class ConfigurationBindings
             return;
         }
 
-        $app->make(Dispatcher::class)->listen(CommandStarting::class, static function (CommandStarting $event) use ($app): void {
+        $events = $app->make(Dispatcher::class);
+
+        $events->listen(CommandStarting::class, static function (CommandStarting $event) use ($app): void {
             if (!in_array($event->command, self::WORKER_COMMANDS, true)) {
                 return;
             }
 
             self::validate($app);
         });
+
+        // A worker started from another command fires no CommandStarting.
+        $events->listen(WorkerStarting::class, static fn () => self::validate($app));
     }
 
     /**
