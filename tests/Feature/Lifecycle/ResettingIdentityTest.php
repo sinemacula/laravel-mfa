@@ -18,6 +18,7 @@ use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
 use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentRequest;
 use SineMacula\Laravel\Mfa\Enrollment\PendingEnrollments;
+use SineMacula\Laravel\Mfa\Enums\AbandonmentCause;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Events\EnrollmentAbandoned;
 use SineMacula\Laravel\Mfa\Events\FactorRemoved;
@@ -271,6 +272,8 @@ final class ResettingIdentityTest extends TestCase
         self::assertSame($ended->id, $second->factor->id);
         self::assertInstanceOf(EnrollmentAbandoned::class, $abandoned);
         self::assertSame($pending->id, $abandoned->factor->id);
+        self::assertSame(AbandonmentCause::RESET, $abandoned->cause);
+        self::assertSame($actor, $abandoned->actor);
         self::assertInstanceOf(RecoveryCodesRemoved::class, $codes);
         self::assertSame($actor, $codes->actor);
         self::assertInstanceOf(FactorsReset::class, $reset);

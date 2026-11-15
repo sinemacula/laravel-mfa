@@ -21,6 +21,7 @@ use SineMacula\Laravel\Mfa\Contracts\CodeDeliveryDriver;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
+use SineMacula\Laravel\Mfa\Enums\AbandonmentCause;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
@@ -185,7 +186,7 @@ final readonly class EnrollmentService
 
                 $context = $this->events->context($still->identity, $binding->application, $still->client, $binding->sessionId);
 
-                $this->events->dispatch(new EnrollmentAbandoned($context, FactorSummary::fromFactor($factor)));
+                $this->events->dispatch(new EnrollmentAbandoned($context, FactorSummary::fromFactor($factor), AbandonmentCause::CANCELLED));
 
                 return true;
             },

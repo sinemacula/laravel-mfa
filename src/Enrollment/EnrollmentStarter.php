@@ -28,6 +28,7 @@ use SineMacula\Laravel\Mfa\Contracts\ProvisioningDriver;
 use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
 use SineMacula\Laravel\Mfa\Drivers\TotpSettings;
+use SineMacula\Laravel\Mfa\Enums\AbandonmentCause;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
@@ -467,7 +468,7 @@ final readonly class EnrollmentStarter
 
         $summary = FactorSummary::fromFactor($factor);
 
-        $this->events->dispatch($replaced ? new EnrollmentAbandoned($context, $summary) : new EnrollmentExpired($context, $summary));
+        $this->events->dispatch($replaced ? new EnrollmentAbandoned($context, $summary, AbandonmentCause::RESTARTED) : new EnrollmentExpired($context, $summary));
     }
 
     /**

@@ -8,7 +8,7 @@ Every event the package dispatches is a class in `SineMacula\Laravel\Mfa\Events`
 |--------------------------------|-----------------------------------------------------------------------------|----------------------------------------------------------------|
 | `EnrollmentStarted`            | An enrolment starts: a pending factor awaits confirmation                   | `factor`                                                       |
 | `FactorConfirmed`              | A pending factor is confirmed, and so becomes usable                        | `factor`                                                       |
-| `EnrollmentAbandoned`          | An enrolment is restarted, cancelled or out of confirmation attempts        | `factor`                                                       |
+| `EnrollmentAbandoned`          | An enrolment is restarted, cancelled, out of confirmation attempts or reset | `factor`, `cause`, `actor`                                     |
 | `EnrollmentExpired`            | An enrolment's grant expires before it was confirmed                        | `factor`                                                       |
 | `BootstrapEnrollmentCompleted` | A factor is confirmed during a pending sign-in by an identity that had none | `factor`                                                       |
 | `PasskeyAssociated`            | A passkey is associated with the identity as a factor                       | `factor`                                                       |
