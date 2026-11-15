@@ -47,6 +47,7 @@ A proof (`Proofs\Proof`) is one verified authentication event:
 | `binding`     | A `Proofs\ProofBinding`: the identity's type and key, the application, the session and the purpose     |
 | `generation`  | The identity's verification generation when it was made                                                |
 | `challengeId` | The challenge it answered, when one was used                                                           |
+| `evidence`    | A `Proofs\ProviderEvidence` of what an external provider reported, on its proof only, else `null`      |
 
 The purpose (`Enums\Purpose`: `sign_in`, `reauthenticate`, `step_up`, `enrollment`) must suit the kind: a first factor
 is proved at sign-in and a reauthentication with it carries `reauthenticate`. An additional factor may serve any
@@ -75,11 +76,11 @@ $proof = new Proof(
 ```
 
 `toArray()` (and JSON) gives the proof with snake_case keys, its parts nested and its time as ISO-8601 to the
-microsecond with its offset; `Proof::fromArray()` reads that form back. It refuses a required field that is missing
-or of another type, and any field it does not know, so a mistyped key is never read as a missing one; a nullable
-field (`channel`, `reference`, `challenge_id`, a channel's `reference`) may be left out and reads as `null`, and a
-missing observed property reads as not observed. The serialised form holds the channel's full destination, so it is
-for storing a proof, never for an event, a log or a response.
+microsecond with its offset; `Proof::fromArray()` reads that form back. It refuses a required field that is missing or
+of another type, and any field it does not know, so a mistyped key is never read as a missing one; a nullable field
+(`channel`, `reference`, `challenge_id`, `evidence`, a channel's `reference`) may be left out and reads as `null`, and a
+missing observed property reads as not observed. The serialised form holds the channel's full destination, so it is for
+storing a proof, never for an event, a log or a response.
 
 ## Assurance levels
 
@@ -262,7 +263,10 @@ which an earlier sign-in left, or dated after the current time.
 ### Rebinding the policy
 
 An application may bind its own policy, to be stricter than the default or to trust an external provider's reported
-methods, in its own service provider. Decorating the default keeps its classification:
+methods, in its own service provider. An external provider's proof carries what the provider reported as
+`$proof->evidence`, a `Proofs\ProviderEvidence` with its `methods` (RFC 8176 `amr`) and its raw `context` (`acr` or
+`AuthnContextClassRef`), which the default ignores; trust it only for the provider connection the proof's channel names.
+Decorating the default keeps its classification:
 
 ```php
 use SineMacula\Laravel\Mfa\Assurance\Channel;
