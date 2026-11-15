@@ -39,7 +39,7 @@ final class PendingSessionResolverContractTest extends TestCase
      */
     public function testAcceptsAResolverThatRefusesAnInvalidCredential(): void
     {
-        PendingSessionResolverContract::assertAnInvalidCredentialIsRefused(new FixedPendingSessionResolver(invalid: true), Request::create('/'));
+        PendingSessionResolverContract::assertAnInvalidCredentialIsRefused(new FixedPendingSessionResolver(invalid: true), Request::create('/'), 'web');
     }
 
     /**
@@ -60,7 +60,33 @@ final class PendingSessionResolverContractTest extends TestCase
 
         $this->expectException(AssertionFailedError::class);
 
-        PendingSessionResolverContract::assertNoCredentialMeansNoPendingSession(new FixedPendingSessionResolver($pending), Request::create('/'));
+        PendingSessionResolverContract::assertNoCredentialMeansNoPendingSession(new FixedPendingSessionResolver($pending), Request::create('/'), 'web');
+    }
+
+    /**
+     * The check asks for the guard it is given.
+     *
+     * @return void
+     */
+    public function testTheCheckAsksForTheGuardGiven(): void
+    {
+        $identity = new NonEloquentIdentity;
+        $pending  = new PendingContext(
+            $identity,
+            'admin',
+            'pending-1',
+            SignInProofs::of($identity)->onApplication('admin')->inSession('pending-1')->password(),
+            Requirement::none(),
+            [PendingAction::VERIFY],
+            CarbonImmutable::now()->addMinutes(10),
+        );
+        $resolver = new FixedPendingSessionResolver($pending, guard: 'admin');
+
+        PendingSessionResolverContract::assertNoCredentialMeansNoPendingSession($resolver, Request::create('/'), 'web');
+
+        $this->expectException(AssertionFailedError::class);
+
+        PendingSessionResolverContract::assertNoCredentialMeansNoPendingSession($resolver, Request::create('/'), 'admin');
     }
 
     /**
@@ -70,7 +96,7 @@ final class PendingSessionResolverContractTest extends TestCase
     {
         $this->expectException(AssertionFailedError::class);
 
-        PendingSessionResolverContract::assertAnInvalidCredentialIsRefused(new FixedPendingSessionResolver, Request::create('/'));
+        PendingSessionResolverContract::assertAnInvalidCredentialIsRefused(new FixedPendingSessionResolver, Request::create('/'), 'web');
     }
 
     /**
@@ -91,7 +117,7 @@ final class PendingSessionResolverContractTest extends TestCase
 
         $this->expectException(AssertionFailedError::class);
 
-        PendingSessionResolverContract::assertAnInvalidCredentialIsRefused(new FixedPendingSessionResolver($pending), null);
+        PendingSessionResolverContract::assertAnInvalidCredentialIsRefused(new FixedPendingSessionResolver($pending), null, 'web');
     }
 
     /**

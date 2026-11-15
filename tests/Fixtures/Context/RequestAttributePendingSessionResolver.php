@@ -25,10 +25,11 @@ final readonly class RequestAttributePendingSessionResolver implements PendingSe
 
     /**
      * @param  \Illuminate\Http\Request  $request
+     * @param  string  $guard
      * @return ?\SineMacula\Laravel\Mfa\Context\PendingContext
      */
     #[\Override]
-    public function fromRequest(Request $request): ?PendingContext
+    public function fromRequest(Request $request, string $guard): ?PendingContext
     {
         $pending = $request->attributes->get(self::ATTRIBUTE);
 

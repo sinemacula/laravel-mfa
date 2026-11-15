@@ -105,6 +105,28 @@ final class CallerContextTest extends TestCase
     }
 
     /**
+     * The resolver is asked for the guard the caller is read from, the default
+     * one when none is given, so a pending session on one guard is not read for
+     * another.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testThePendingSessionIsReadForTheGuard(): void
+    {
+        $pending = self::pending();
+
+        config()->set('auth.guards.admin', ['driver' => 'session', 'provider' => 'users']);
+
+        $this->container()->instance(PendingSessionResolver::class, new FixedPendingSessionResolver($pending, guard: 'admin'));
+
+        self::assertSame($pending, CallerContext::fromRequest(self::request(), 'admin')->pending);
+        self::assertNull(CallerContext::fromRequest(self::request())->pending);
+        self::assertNull(CallerContext::fromRequest(self::request(), 'web')->pending);
+    }
+
+    /**
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException

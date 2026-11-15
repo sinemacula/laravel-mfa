@@ -198,19 +198,20 @@ exception that rolls the caller's change back with it.
 - Every self-service helper takes a `Context\CallerContext` first, and only the seams that read a request
   (`PendingSessionResolver::fromRequest()`, `ApplicationResolver` and `GuardApplicationResolver`) are handed one:
   `CallerContext::fromRequest()` is the one place a caller is read from one, through
-  `PendingSessionResolver::fromRequest()` and then the guard. The caller is trusted input, never authentication.
-  `Context\CallerContextResolver` decides whether it is served: a pending session only for the `PendingAction` the
-  helper needs, as its own identity, and otherwise the identity it names; only a person either way. Under the identity's
-  lock, `CallerContextResolver::still()` asks `PendingSessionResolver::revalidate()` for a pending session, or the proof
-  store for an active one's sign-in, and compares the binding; a pending session that no longer stands is refused. A
-  resolver that must read the credential again keeps it on the `PendingContext`, as `credential()`, which is held as a
-  `\SensitiveParameterValue` so no dump shows it. The seams handed the caller are `ChallengeGateway`, `StepUp` and
-  `FreshnessGate`; `ChallengeCounters` and `PasskeyChangeGate` take one as well, and `SessionRevoker` is handed the
-  application. Starting, resending and cancelling an enrolment need `mfa.start_bootstrap_enrollment`, and confirming one
-  `mfa.confirm_bootstrap_enrollment`. A helper that names no action (generating recovery codes, renaming, preferring or
-  removing a factor and `proofs()`) serves active sessions only; `recoveryCodeStatus()` needs `mfa.list_factors`, as
-  `factors()` and `factor()` do. A bound factor route parameter serves a pending session allowing any action that names
-  an existing factor (see [Factor Route Binding](factor-route-binding.md)).
+  `PendingSessionResolver::fromRequest()`, for the guard the caller is read from, and then that guard's user. The caller
+  is trusted input, never authentication. `Context\CallerContextResolver` decides whether it is served: a pending
+  session only for the `PendingAction` the helper needs, as its own identity, and otherwise the identity it names; only
+  a person either way. Under the identity's lock, `CallerContextResolver::still()` asks
+  `PendingSessionResolver::revalidate()` for a pending session, or the proof store for an active one's sign-in, and
+  compares the binding; a pending session that no longer stands is refused. A resolver that must read the credential
+  again keeps it on the `PendingContext`, as `credential()`, which is held as a `\SensitiveParameterValue` so no dump
+  shows it. The seams handed the caller are `ChallengeGateway`, `StepUp` and `FreshnessGate`; `ChallengeCounters` and
+  `PasskeyChangeGate` take one as well, and `SessionRevoker` is handed the application. Starting, resending and
+  cancelling an enrolment need `mfa.start_bootstrap_enrollment`, and confirming one `mfa.confirm_bootstrap_enrollment`.
+  A helper that names no action (generating recovery codes, renaming, preferring or removing a factor and `proofs()`)
+  serves active sessions only; `recoveryCodeStatus()` needs `mfa.list_factors`, as `factors()` and `factor()` do. A
+  bound factor route parameter serves a pending session allowing any action that names an existing factor (see [Factor
+  Route Binding](factor-route-binding.md)).
 - A seam may throw an `OperationRefusedException`. It stays an exception on the two helpers that answer refusals as
   values, `generateRecoveryCodes()` and `requestAssertion()`: only a refusal the package marks becomes the reason, so a
   seam's is never read as the package deciding. The exception is the bound `FactorChangeGate`'s own refusal, which the

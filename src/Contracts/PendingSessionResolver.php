@@ -19,15 +19,17 @@ use SineMacula\Laravel\Mfa\Context\PendingContext;
 interface PendingSessionResolver
 {
     /**
-     * `null` only when the request carries no pending credential; an invalid
-     * one throws so the request is refused.
+     * The pending session the request carries for the guard; `null` only when
+     * it carries no pending credential, and an invalid one throws so the
+     * request is refused.
      *
      * @param  \Illuminate\Http\Request  $request
+     * @param  string  $guard
      * @return ?\SineMacula\Laravel\Mfa\Context\PendingContext
      *
      * @throws \RuntimeException
      */
-    public function fromRequest(Request $request): ?PendingContext;
+    public function fromRequest(Request $request, string $guard): ?PendingContext;
 
     /**
      * The pending session as it stands now, or `null` when it no longer stands
