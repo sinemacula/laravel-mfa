@@ -6,6 +6,7 @@ namespace Tests\Unit;
 
 use Illuminate\Config\Repository;
 use Illuminate\Console\Application as ConsoleApplication;
+use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Container\Container;
 use Illuminate\Events\Dispatcher;
 use Illuminate\Foundation\Application;
@@ -71,6 +72,8 @@ use SineMacula\Laravel\Mfa\Secrets\NoStore;
 use SineMacula\Laravel\Mfa\Secrets\RedactSecretsInLogs;
 use SineMacula\Laravel\Mfa\Support\PackageDefault;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\NullOutput;
 use Tests\Fixtures\Factors\SecondaryConnectionFactor;
 use Tests\TestCase;
 
@@ -203,14 +206,14 @@ final class MfaServiceProviderTest extends TestCase
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testBootRefusesAFactorModelOffTheStorageConnection(): void
+    public function testAWorkerRefusesAFactorModelOffTheStorageConnection(): void
     {
         $this->container()->make(Repository::class)->set('mfa.factor.model', SecondaryConnectionFactor::class);
 
         $this->expectException(InvalidConfigurationException::class);
         $this->expectExceptionMessage('[factor] mfa.factor.model class [' . SecondaryConnectionFactor::class . '] must be on the storage connection');
 
-        (new MfaServiceProvider($this->container()))->boot();
+        $this->bootAndStartAWorker();
     }
 
     /**
@@ -479,14 +482,14 @@ final class MfaServiceProviderTest extends TestCase
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testBootRefusesAnInvalidConfiguration(): void
+    public function testAWorkerRefusesAnInvalidConfiguration(): void
     {
         $this->container()->make(Repository::class)->set('mfa.recovery_codes.count', 0);
 
         $this->expectException(InvalidConfigurationException::class);
         $this->expectExceptionMessage('[recovery_codes] mfa.recovery_codes.count must be an integer from 1 to 50.');
 
-        (new MfaServiceProvider($this->container()))->boot();
+        $this->bootAndStartAWorker();
     }
 
     /**
@@ -664,5 +667,19 @@ final class MfaServiceProviderTest extends TestCase
         $container->bind(MiddlewareSessionTransition::class, static fn (): \stdClass => $override);
 
         self::assertSame($override, $container->make('contract'));
+    }
+
+    /**
+     * In the console the boot check runs as a worker starts.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function bootAndStartAWorker(): void
+    {
+        (new MfaServiceProvider($this->container()))->boot();
+
+        $this->container()->make(Dispatcher::class)->dispatch(new CommandStarting('queue:work', new ArrayInput([]), new NullOutput));
     }
 }
