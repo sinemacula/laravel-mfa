@@ -7,7 +7,9 @@ namespace Tests\Unit\Lifecycle;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
 use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Contracts\ActiveTenantResolver;
 use SineMacula\Laravel\Mfa\Contracts\IdentityRequirement;
+use SineMacula\Laravel\Mfa\Contracts\TenantRequirement;
 use SineMacula\Laravel\Mfa\Lifecycle\RequiredFactorPolicy;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
@@ -16,6 +18,7 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use Tests\Fixtures\Factors\FactorSets;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Passkeys\Concerns\ArrangesPasskeys;
+use Tests\Fixtures\Requirements\FixedActiveTenant;
 use Tests\TestCase;
 
 /**
@@ -165,6 +168,73 @@ final class RequiredFactorPolicyTest extends TestCase
         $this->container()->instance(IdentityRequirement::class, $seam);
 
         self::assertFalse($this->policy()->allowsRemoval($user, self::APPLICATION, $totp, $this->factorsOf($user)));
+
+        \Mockery::close();
+    }
+
+    /**
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testTheActiveTenantsRequirementKeepsTheLastFactor(): void
+    {
+        $this->enablePasskeys();
+
+        $user = $this->signedInPerson();
+        $totp = $this->confirmedFactor($user);
+
+        $tenants = \Mockery::mock(TenantRequirement::class);
+        $tenants->shouldReceive('requirementFor')->with($user, self::APPLICATION, 'tenant-1')->andReturn(Requirement::none()->withAdditionalVerification());
+
+        $this->container()->instance(ActiveTenantResolver::class, new FixedActiveTenant('tenant-1'));
+        $this->container()->instance(TenantRequirement::class, $tenants);
+
+        self::assertFalse($this->policy()->allowsRemoval($user, self::APPLICATION, $totp, $this->factorsOf($user)));
+
+        \Mockery::close();
+    }
+
+    /**
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testATenantRequiringNothingLetsTheLastFactorGo(): void
+    {
+        $this->enablePasskeys();
+
+        $user = $this->signedInPerson();
+
+        $tenants = \Mockery::mock(TenantRequirement::class);
+        $tenants->shouldReceive('requirementFor')->andReturn(Requirement::none());
+
+        $this->container()->instance(ActiveTenantResolver::class, new FixedActiveTenant('tenant-1'));
+        $this->container()->instance(TenantRequirement::class, $tenants);
+
+        self::assertTrue($this->policy()->allowsRemoval($user, self::APPLICATION, $this->confirmedFactor($user), $this->factorsOf($user)));
+
+        \Mockery::close();
+    }
+
+    /**
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testWithoutAnActiveTenantNoTenantRequirementIsAsked(): void
+    {
+        $this->enablePasskeys();
+
+        $user = $this->signedInPerson();
+
+        $tenants = \Mockery::mock(TenantRequirement::class);
+        $tenants->shouldNotReceive('requirementFor');
+
+        $this->container()->instance(ActiveTenantResolver::class, new FixedActiveTenant(null));
+        $this->container()->instance(TenantRequirement::class, $tenants);
+
+        self::assertTrue($this->policy()->allowsRemoval($user, self::APPLICATION, $this->confirmedFactor($user), $this->factorsOf($user)));
 
         \Mockery::close();
     }

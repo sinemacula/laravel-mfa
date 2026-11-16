@@ -114,10 +114,11 @@ meets is in [Seams with an authentication layer](../guides/extending.md#seams-wi
 - `PasskeyGateway` is bound to `Passkeys\UnavailablePasskeyGateway`: no passkey is registered, verifying is refused with
   an `OperationRefusedException` that counts nothing, and starting a ceremony is a `LogicException`. The configuration
   check refuses an application that enables `passkey` while it is bound (see [Passkeys](passkeys.md)).
-- `LastFactorPolicy` is bound to `Lifecycle\RequiredFactorPolicy`: while the bound `IdentityRequirement`, or any
-  configured application set to `always`, requires a factor, the last factor some configured application accepts
-  (confirmed, not disabled at the ceiling, of a type an application enables) may not be removed. The caller hands it the
-  factor state, so it takes no factor lock of its own (see [Factor Lifecycle](factor-lifecycle.md)).
+- `LastFactorPolicy` is bound to `Lifecycle\RequiredFactorPolicy`: while the bound `IdentityRequirement`, the active
+  tenant's `TenantRequirement`, or any configured application set to `always`, requires a factor, the last factor some
+  configured application accepts (confirmed, not disabled at the ceiling, of a type an application enables) may not be
+  removed. The caller hands it the factor state, so it takes no factor lock of its own (see
+  [Factor Lifecycle](factor-lifecycle.md)).
 - Authentication's activation fires Laravel's `Login`, on which `Proofs\BeginSignInOnLogin` calls
   `ProofStore::begin()`. An adapter over authoritative session rows makes `begin()` a no-op for them: activation
   preserves that row's sign-in and proofs, and an actual new sign-in uses a new row. Its transaction order is the
