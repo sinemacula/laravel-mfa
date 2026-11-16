@@ -151,9 +151,10 @@ extend Laravel's `Authenticatable`, so one class satisfies both. An adapter of y
 with that package's, and binds them in a service provider, so proofs live on the authentication session through a
 rebound `Contracts\ProofStore`, a sign-in waits pending with `mfa` outstanding, and a step-up returns a new access
 token. [Seams with an authentication layer](extending.md#seams-with-an-authentication-layer) names what each contract
-meets and what a seam still needs from the layer, and warns against enabling `passkey` without it.
+meets, and warns against enabling `passkey` without it.
 
 ### Within `laravel-iam`
 
-`sinemacula/laravel-iam` installs the suite and provides those adapters, with its own requirement seams and the audit
-listeners, so you configure the applications and bind the senders. This package knows nothing of it.
+`sinemacula/laravel-iam` installs the suite and provides those adapters, with its own requirement seams, the audit
+mappers and this package's senders, so you configure the applications and bind `laravel-authentication`'s
+`OneTimeCodeSender`. This package knows nothing of it.

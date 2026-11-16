@@ -116,7 +116,7 @@ before anything relies on it.
 - `tests/Unit/Config/ConfigurationValidatorTest.php`
 - `tests/Unit/Config/ConfigurationBindingsTest.php`
 - `tests/Feature/Console/CheckConfigurationCommandTest.php`, `testTheCommandReportsAFactorModelProblemPresentAtBoot`
-- `tests/Unit/MfaServiceProviderTest.php` `testBootRefusesAnInvalidConfiguration`,
+- `tests/Unit/MfaServiceProviderTest.php` `testAWorkerRefusesAnInvalidConfiguration`,
   `testResolvingTheManagerRefusesAnInvalidConfiguration`
 
 ## Change Triggers
