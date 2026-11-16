@@ -13,8 +13,9 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 
 /**
- * The default `RequirementPolicy`: the composed sign-in requirement, or none
- * when the first factor meets all of it, as a user-verified passkey does.
+ * The default `RequirementPolicy`: the composed sign-in requirement without any
+ * tenant's, or none when the first factor meets all of it, as a user-verified
+ * passkey does.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -46,7 +47,7 @@ final readonly class ConfiguredRequirementPolicy implements RequirementPolicy
     #[\Override]
     public function requirementFor(MultiFactorAuthenticatable $identity, string $application, Proof $firstFactor): Requirement
     {
-        $requirement = $this->container->make(RequirementService::class)->requirementFor($identity, $application);
+        $requirement = $this->container->make(RequirementService::class)->identityRequirementFor($identity, $application);
 
         if (!self::isFirstFactorOf($firstFactor, $identity, $application)) {
             return $requirement;

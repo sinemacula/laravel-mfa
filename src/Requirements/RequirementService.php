@@ -59,8 +59,7 @@ final readonly class RequirementService
     }
 
     /**
-     * The strictest of the application's mode, the identity's own, the
-     * re-enrolment obligation's and the active tenant's.
+     * The identity's requirement with the active tenant's.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -72,19 +71,35 @@ final readonly class RequirementService
      */
     public function requirementFor(MultiFactorAuthenticatable $identity, string $application): Requirement
     {
-        $parts = [
+        $requirement = $this->identityRequirementFor($identity, $application);
+        $tenant      = $this->container->make(ActiveTenantResolver::class)->activeTenant($identity, $application);
+
+        if ($tenant === null) {
+            return $requirement;
+        }
+
+        return Requirement::strictest($requirement, $this->container->make(TenantRequirement::class)->requirementFor($identity, $application, $tenant));
+    }
+
+    /**
+     * The strictest of the application's mode, the identity's own and the
+     * re-enrolment obligation's, without any tenant's.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  string  $application
+     * @return \SineMacula\Laravel\Mfa\Requirements\Requirement
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     */
+    public function identityRequirementFor(MultiFactorAuthenticatable $identity, string $application): Requirement
+    {
+        return Requirement::strictest(
             $this->applicationPart($identity, $application),
             $this->container->make(IdentityRequirement::class)->requirementFor($identity, $application),
             self::additionalVerificationWhen(ReenrollmentObligation::isRequired($identity)),
-        ];
-
-        $tenant = $this->container->make(ActiveTenantResolver::class)->activeTenant($identity, $application);
-
-        if ($tenant !== null) {
-            $parts[] = $this->container->make(TenantRequirement::class)->requirementFor($identity, $application, $tenant);
-        }
-
-        return Requirement::strictest(...$parts);
+        );
     }
 
     /**

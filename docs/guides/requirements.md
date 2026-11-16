@@ -54,10 +54,11 @@ a factor change evaluates the session again. The package never sees a tenant tre
 ### A multi-factor first factor
 
 After the first factor, `Contracts\RequirementPolicy` answers what the sign-in must still prove. Its default,
-`Requirements\ConfiguredRequirementPolicy`, answers with the composed requirement, or with none when the first factor
-meets all of it on its own: a passkey whose assertion verified the person meets an additional verification and
-multifactor authentication, so it is asked for no further factor. Its level and age are judged like any proof's, so
-the same passkey under a requirement for AAL3 leaves the whole requirement standing.
+`Requirements\ConfiguredRequirementPolicy`, answers with the composed requirement without any tenant's, which the
+authentication layer judges with its tenant, or with none when the first factor meets all of it on its own: a passkey
+whose assertion verified the person meets an additional verification and multifactor authentication, so it is asked for
+no further factor. Its level and age are judged like any proof's, so the same passkey under a requirement for AAL3
+leaves the whole requirement standing.
 
 ```php
 use SineMacula\Laravel\Mfa\Contracts\RequirementPolicy;
