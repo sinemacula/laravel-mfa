@@ -114,6 +114,23 @@ final class RequirementServiceTest extends TestCase
     }
 
     /**
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testTheIdentitysRequirementLeavesOutTheActiveTenants(): void
+    {
+        config()->set('mfa.applications.' . self::APPLICATION, ['requirement' => 'always']);
+
+        $this->container()->instance(TenantRequirement::class, self::tenantRequiring(Requirement::none()->withMinimumLevel(AssuranceLevel::AAL2)));
+        $this->activate(self::TENANT);
+
+        $identity = new NonEloquentIdentity(self::IDENTITY);
+
+        self::assertSame(['additional_verification' => ['max_age' => null]], $this->service()->identityRequirementFor($identity, self::APPLICATION)->toArray());
+    }
+
+    /**
      * So the order the sources are asked in never changes the answer.
      *
      * @return void
