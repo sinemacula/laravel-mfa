@@ -92,6 +92,11 @@ and a pending credential that does not validate still throws through your resolv
 | Active, and the identity has none               | The gate allowing `mfa.add_first_additional_factor`: by default, the first factor proved again within five minutes through `Contracts\Reauthenticator`   |
 | Pending                                         | The bootstrap path: the credential allows the action, `bootstrap.enabled` and `bootstrap.types` allow the type, and the identity has no confirmed factor |
 
+With bootstrap off, a pending session whose identity has no confirmed factor and owes one cannot complete. This package
+does not run the sign-in, so it does not refuse it: a request through `mfa` is refused with no offers and
+`has_confirmed_factor` false, and a start with `mfa_enrollment_required`. The application offers a sign-out, or the
+pending session expires as the authentication layer sets. Refusing the sign-in itself is that layer's decision.
+
 Then the application's limits apply (see [Applications](configuration.md#applications)). They count only factors
 enrolled through this application: `limits.confirmed`, `limits.confirmed_per_type` and `limits.pending`.
 

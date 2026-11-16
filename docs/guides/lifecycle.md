@@ -168,7 +168,8 @@ An enrolment grant from before a reset confirms nothing after it, as its row is 
 A reset states whether the identity must enrol again at its next sign-in, by default yes. The obligation is durable,
 held on the identity's state row, requires an additional verification in every application whatever its own setting, and
 ends when a factor is confirmed (see [Requirements](requirements.md) and [Enrolment](enrollment.md)). The next sign-in
-therefore enrols through the bootstrap path where it is enabled, or is refused. Without an obligation it proceeds as for
+therefore enrols through the bootstrap path where it is enabled, or stays pending until it ends (see
+[What authorises a start](enrollment.md#what-authorises-a-start)). Without an obligation it proceeds as for
 an identity with no factor.
 
 ### Self-service recovery
