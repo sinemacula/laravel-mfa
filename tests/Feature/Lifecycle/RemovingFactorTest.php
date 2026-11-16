@@ -836,7 +836,10 @@ final class RemovingFactorTest extends TestCase
         $transition = new RecordingSessionTransition;
         $tenants    = $this->createMock(TenantRequirement::class);
 
-        $tenants->expects(self::once())->method('requirementFor')->with(self::anything(), self::APPLICATION, 'tenant-1')->willReturn(Requirement::none()->withPhishingResistance());
+        $tenants->expects(self::atLeastOnce())
+            ->method('requirementFor')
+            ->with(self::anything(), self::APPLICATION, 'tenant-1')
+            ->willReturn(Requirement::none()->withPhishingResistance());
 
         $this->container()->instance(SessionTransition::class, $transition);
         $this->container()->instance(TenantRequirement::class, $tenants);

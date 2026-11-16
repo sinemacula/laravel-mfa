@@ -84,12 +84,11 @@ The bound `Contracts\LastFactorPolicy` decides whether the factor may go, on the
 before the lock on a read of them, and again under the lock on the factors as stored, so two removals cannot each see
 the other factor. A policy decides on what it is given and takes no factor lock of its own.
 
-The default, `Lifecycle\RequiredFactorPolicy`, refuses while the bound `IdentityRequirement` requires something of the
-identity, or any configured application sets `requirement` to `always`, unless another factor remains that some
-configured application accepts: confirmed, not disabled at the failure ceiling, of a type an application enables, and,
-for a passkey, with an association that matches it. An identity's only factor stays even when it is itself unusable, as
-required MFA could otherwise be turned off with a recovery code. It knows nothing of tenants; bind your own to consult a
-tenant's policy too.
+The default, `Lifecycle\RequiredFactorPolicy`, refuses while the bound `IdentityRequirement` or the active tenant's
+`TenantRequirement` requires something of the identity, or any configured application sets `requirement` to `always`,
+unless another factor remains that some configured application accepts: confirmed, not disabled at the failure ceiling,
+of a type an application enables, and, for a passkey, with an association that matches it. An identity's only factor
+stays even when it is itself unusable, as required MFA could otherwise be turned off with a recovery code.
 
 ### What a removal does
 
@@ -250,7 +249,7 @@ Every one goes through `Events\EventDispatcher`, once its change commits, and no
 
 | Contract               | Default                                | Bind your own to                                          |
 |------------------------|----------------------------------------|-----------------------------------------------------------|
-| `LastFactorPolicy`     | `Lifecycle\RequiredFactorPolicy`       | Consult a tenant's policy as well                         |
+| `LastFactorPolicy`     | `Lifecycle\RequiredFactorPolicy`       | Keep or release the last factor by your own rule          |
 | `SelfServiceRecovery`  | `Lifecycle\NoSelfServiceRecovery`      | Offer a recovery of your own                              |
 | `SessionRevoker`       | `Proofs\GenerationSessionRevoker`      | End real sessions, throwing when one cannot be ended      |
 | `SessionTransition`    | `Http\MiddlewareSessionTransition`     | Judge an active session again after a factor change       |

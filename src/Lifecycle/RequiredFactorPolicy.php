@@ -10,15 +10,18 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use SineMacula\Laravel\Mfa\Applications\ApplicationSettings;
 use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
+use SineMacula\Laravel\Mfa\Contracts\ActiveTenantResolver;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\IdentityRequirement;
 use SineMacula\Laravel\Mfa\Contracts\LastFactorPolicy;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
+use SineMacula\Laravel\Mfa\Contracts\TenantRequirement;
 use SineMacula\Laravel\Mfa\Enums\RequirementMode;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertions;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociations;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
+use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
 /**
  * While a factor is required, refuses removing the last one some application
@@ -40,7 +43,7 @@ final readonly class RequiredFactorPolicy implements LastFactorPolicy
         /** Read on every call so a changed application applies. */
         private Repository $config,
 
-        /** The identity requirement is resolved on every call. */
+        /** The identity and tenant seams are resolved on every call. */
         private Container $container,
 
         /** A passkey factor is usable only with its association. */
@@ -96,8 +99,8 @@ final readonly class RequiredFactorPolicy implements LastFactorPolicy
     }
 
     /**
-     * Required by the bound identity requirement or any application that always
-     * requires a factor.
+     * Required by the bound identity requirement, the active tenant's, or any
+     * application that always requires a factor.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application
@@ -108,7 +111,14 @@ final readonly class RequiredFactorPolicy implements LastFactorPolicy
      */
     private function isRequired(MultiFactorAuthenticatable $identity, string $application): bool
     {
-        if (!$this->container->make(IdentityRequirement::class)->requirementFor($identity, $application)->isEmpty()) {
+        $parts  = [$this->container->make(IdentityRequirement::class)->requirementFor($identity, $application)];
+        $tenant = $this->container->make(ActiveTenantResolver::class)->activeTenant($identity, $application);
+
+        if ($tenant !== null) {
+            $parts[] = $this->container->make(TenantRequirement::class)->requirementFor($identity, $application, $tenant);
+        }
+
+        if (!Requirement::strictest(...$parts)->isEmpty()) {
             return true;
         }
 
