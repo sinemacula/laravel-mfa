@@ -295,17 +295,15 @@ structured values, never reduced to `amr`. What each seam meets:
 | `Contracts\PasskeyGateway`                                                            | `Auth::passkeys()->passkeys()`, `factorOptions()` and `verifyFactor()`                                                                                                                                                               |
 | `Contracts\SmsSender`, `Contracts\EmailSender`                                        | `Contracts\OneTimeCodeSender`, bound to the same gateway: map `Codes\CodeMessage` and its `Enums\Purpose` into the gateway's own message                                                                                             |
 | `Secrets\RevealedSecret`, `Secrets\SecretResponse`                                    | Nothing to bind: a secret it reveals is its own, so check its documentation for how it sends one uncached                                                                                                                            |
-| `Contracts\ProofStore`, `Contracts\FirstFactorResolver`                               | `Requirements\RequirementSubject::proofs()` and `$firstFactor`, passed to `Contracts\RequirementCheck::evaluate()`, and `Contracts\FreshnessPolicy::freshProof()`. Needs a read of the session's proofs outside `evaluate()` as well |
+| `Contracts\ProofStore`, `Contracts\FirstFactorResolver`                               | `Requirements\RequirementSubject::proofs()` and `$firstFactor`, passed to `Contracts\RequirementCheck::evaluate()`, `Contracts\FreshnessPolicy::freshProof()`, and `Auth::sessions()->proofs()` and `firstFactor()`                  |
 | `Contracts\ChallengeGateway`, `Attempts\ChallengeCounters`                            | `Codes\CodeService::sendFactorCode()` and `verifyFactorCode()`; `Contracts\FactorCodeCounters`, answered with `isUsable()` and `report()`                                                                                            |
 | `Contracts\SessionTransition`                                                         | `Auth::sessions()->factorChanged()` with the guard's current session, throwing when its id is not the change's `session`                                                                                                             |
 | `Passkeys\PasskeyChangeGate`                                                          | `Contracts\PasskeyFactorGate::registering()` and `removing()`, answered with this gate inside its passkey transaction                                                                                                                |
 | `Context\AuthenticationContextContributor`                                            | `Contracts\AuthenticationContextContributor::contribute()`, answered with `contributeFor()` from its `Context\ContributionSubject`                                                                                                   |
 | `CombinationPolicy`, `IdentityRequirement`, `LastFactorPolicy`, `SelfServiceRecovery` | Nothing: these are this package's own                                                                                                                                                                                                |
 
-A row that says what a seam needs names no method, as there is no public name to give here: check that package's own
-documentation for it. Until the layer provides it, `Contracts\ProofStore` must still be rebound. The default keeps
-proofs in the Laravel session, which a stateless layer does not have, so there is no sign-in and every verification
-answers `not_found`.
+`Contracts\ProofStore` must be rebound: the default keeps proofs in the Laravel session, which a stateless layer does
+not have, so there is no sign-in and every verification answers `not_found`.
 
 An adapter can reuse three of this package's helpers. `MfaServiceProvider::isPackageDefault($container, $contract)` says
 whether a contract is still bound to this package's own default, so the adapter replaces the default and keeps a binding
