@@ -159,10 +159,12 @@ nothing is stored in their place.
 ## Authoritative Tests
 
 - `tests/Unit/Requirements/RequirementServiceTest.php`: the composition table, every mode crossed with the identity's
-  requirement, the obligation and a tenant; the order of the parts; `isFresh()` handing the gate this package's setting.
+  requirement, the obligation and a tenant; the order of the parts; the identity's requirement leaving out the tenant's;
+  `isFresh()` handing the gate this package's setting.
 - `tests/Unit/Requirements/ProofRequirementCheckTest.php`: the newest proof meeting each part, another sign-in's proofs,
   an external reauthentication.
-- `tests/Unit/Requirements/ConfiguredRequirementPolicyTest.php`: a multi-factor first factor meeting the requirement.
+- `tests/Unit/Requirements/ConfiguredRequirementPolicyTest.php`: a multi-factor first factor meeting the requirement,
+  and the active tenant's requirement left out.
 - `tests/Unit/Requirements/ConfiguredFreshnessGateTest.php`: an unknown operation, the stricter setting both ways, a
   session with no record, a fresh weaker proof, a fresh first factor, a refreshed session, a resolved first factor.
 - `tests/Unit/Requirements/OperationRequirementsTest.php`, `FreshnessBoundsTest.php`,
