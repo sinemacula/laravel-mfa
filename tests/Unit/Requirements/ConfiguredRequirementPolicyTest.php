@@ -8,13 +8,16 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Assurance\Evaluation;
+use SineMacula\Laravel\Mfa\Contracts\ActiveTenantResolver;
 use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
 use SineMacula\Laravel\Mfa\Contracts\RequirementPolicy;
+use SineMacula\Laravel\Mfa\Contracts\TenantRequirement;
 use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Requirements\ConfiguredRequirementPolicy;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
+use Tests\Fixtures\Requirements\FixedActiveTenant;
 use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\TestCase;
 
@@ -107,6 +110,30 @@ final class ConfiguredRequirementPolicyTest extends TestCase
 
         self::assertFalse($this->policy()->requirementFor($identity, SignInProofs::APPLICATION, $signIn->passkeyReauthentication())->isEmpty());
         self::assertTrue($this->policy()->requirementFor($identity, SignInProofs::APPLICATION, $signIn->password())->isEmpty());
+    }
+
+    /**
+     * The authentication layer judges a tenant's requirement with its tenant.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testLeavesOutTheActiveTenantsRequirement(): void
+    {
+        $this->configureApplication('never');
+
+        $tenants = \Mockery::mock(TenantRequirement::class);
+        $tenants->shouldNotReceive('requirementFor');
+
+        $this->container()->instance(ActiveTenantResolver::class, new FixedActiveTenant('tenant-1'));
+        $this->container()->instance(TenantRequirement::class, $tenants);
+
+        $identity = new NonEloquentIdentity('plain-1');
+
+        self::assertTrue($this->policy()->requirementFor($identity, SignInProofs::APPLICATION, SignInProofs::of($identity)->password())->isEmpty());
+
+        \Mockery::close();
     }
 
     /**

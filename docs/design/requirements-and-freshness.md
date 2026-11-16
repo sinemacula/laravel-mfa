@@ -36,11 +36,11 @@ nothing is stored in their place.
   is a `GuardApplicationResolver`, or else the guard's name. When it is empty, the `mfa` middleware still refuses a
   pending session, a caller it does not serve and an inactive identity, and still applies the route's level and
   operation.
-- The default `Contracts\RequirementPolicy`, `Requirements\ConfiguredRequirementPolicy`, answers with that requirement,
-  or with none when the first factor meets all of it on its own, as a passkey whose assertion observed user verification
-  meets an additional verification. The first factor is judged by the bound `RequirementCheck` like any proof, so one
-  too old for a part, or below a minimum level, leaves the whole requirement standing; a proof that is not a first
-  factor of the identity on the application suppresses nothing.
+- The default `Contracts\RequirementPolicy`, `Requirements\ConfiguredRequirementPolicy`, answers with that requirement
+  without the tenant's, or with none when the first factor meets all of it on its own, as a passkey whose assertion
+  observed user verification meets an additional verification. The first factor is judged by the bound
+  `RequirementCheck` like any proof, so one too old for a part, or below a minimum level, leaves the whole requirement
+  standing; a proof that is not a first factor of the identity on the application suppresses nothing.
 - The default `Contracts\RequirementCheck`, `Requirements\ProofRequirementCheck`, hands the bound `CombinationPolicy`
   only the proofs of one sign-in: those bound to the same session as the proofs' one first factor. With no first factor,
   or more than one, it hands none, so nothing but an empty requirement is met. The policy meets a part when one

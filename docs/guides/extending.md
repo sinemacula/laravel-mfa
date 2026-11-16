@@ -214,7 +214,7 @@ service provider:
 |--------------------------|--------------------------------------------|-----------------------------------------------------------------------------|
 | `CombinationPolicy`      | `Assurance\DefaultCombinationPolicy`       | The classification of [Combination policy](assurance.md#combination-policy) |
 | `ProofStore`             | `Proofs\SessionProofStore`                 | Proofs live in the Laravel session                                          |
-| `RequirementPolicy`      | `Requirements\ConfiguredRequirementPolicy` | The composed requirement, or none when the first factor meets it all        |
+| `RequirementPolicy`      | `Requirements\ConfiguredRequirementPolicy` | Composed without a tenant's, or none when the first factor meets it all     |
 | `IdentityRequirement`    | `Requirements\IdentityContractRequirement` | What the identity's `requiresAdditionalFactor()` returns                    |
 | `TenantRequirement`      | `Requirements\NoTenantRequirement`         | A tenant asks for nothing                                                   |
 | `ActiveTenantResolver`   | `Requirements\NoActiveTenant`              | No session has an active tenant                                             |

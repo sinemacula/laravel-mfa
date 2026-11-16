@@ -8,8 +8,9 @@ use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 
 /**
- * What a sign-in must prove after its first factor, judged before any tenant is
- * active; empty when nothing further is needed.
+ * What a sign-in must prove after its first factor for the identity and
+ * application, without any tenant's requirement; empty when nothing further is
+ * needed.
  *
  * @api
  *
