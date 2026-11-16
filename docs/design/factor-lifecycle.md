@@ -79,9 +79,10 @@ in [Factor lifecycle](../guides/lifecycle.md).
 - Saves of the identity's state that a model event cancels throw (`WriteCanceledException`), so a reset cannot commit
   with its lockout or failures intact, and an unlock cannot report a lockout lifted that stays in force.
 - `ActiveTenantResolver` is authoritative: it is what requirements are composed with, read from validated session
-  context, and `RequirementService::requirementFor()` is the one place that asks it, so re-evaluation after any factor
-  change (removal, enrolment, a passkey's registration) and enforcement agree. `EventContextResolver` promises
-  descriptive metadata only, so omitted audit data must never drop a tenant requirement. Its default names no tenant.
+  context. `RequirementService::requirementFor()` and `RequiredFactorPolicy` both ask the bound one, so re-evaluation
+  after any factor change (removal, enrolment, a passkey's registration), enforcement and the last-factor check use the
+  same tenant. `EventContextResolver` promises descriptive metadata only, so omitted audit data must never drop a tenant
+  requirement. Its default names no tenant.
 - Pruning deletes only what cannot matter: retention's floor is a day and the longest send window a day, so no send cap
   is shortened; a throttle row whose window has ended counts nothing, so no lockout is lifted. Expiry and window
   predicates are on the deleting statement itself, so a row a concurrent attempt has just renewed stays. It holds no

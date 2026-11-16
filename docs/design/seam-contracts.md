@@ -161,7 +161,7 @@ meets is in [Seams with an authentication layer](../guides/extending.md#seams-wi
 | `SessionRevoker`         | Ends the identity's other sessions, or all of them, inside a factor change   | Logging out everywhere, optionally but the current |
 | `FactorChangeGate`       | Whether an active session may change the identity's factors now              | Its factor-change gate                             |
 | `SessionTransition`      | Judges the current session again after a factor change                       | Judging a session after a factor change            |
-| `LastFactorPolicy`       | Whether the identity's last factor may be removed                            | Nothing, or a tenant-aware policy of the iam layer |
+| `LastFactorPolicy`       | Whether the identity's last factor may be removed                            | Nothing: the default asks the tenant's requirement |
 | `SelfServiceRecovery`    | Whether an application offers its own recovery, and starting it              | Nothing: the application's own                     |
 | `SubjectTypeResolver`    | Whether an identity is a person                                              | Its subject type                                   |
 | `ActiveStateResolver`    | Whether an identity is active                                                | Its identity's active state                        |
