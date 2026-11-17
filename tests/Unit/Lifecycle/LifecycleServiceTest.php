@@ -13,6 +13,7 @@ use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Lifecycle\LifecycleService;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use Tests\Fixtures\Lifecycle\Concerns\ArrangesLifecycle;
 use Tests\TestCase;
 
@@ -50,8 +51,12 @@ final class LifecycleServiceTest extends TestCase
         $user   = $this->signedInPerson();
         $factor = $this->confirmedFactor($user);
         $types  = self::createStub(SubjectTypeResolver::class);
+        $until  = CarbonImmutable::now()->addHour();
+        $owner  = ProofOwner::of($user);
 
-        $factor->update(['disabled_at' => CarbonImmutable::now(), 'locked_until' => CarbonImmutable::now()->addHour()]);
+        $factor->update(['disabled_at' => CarbonImmutable::now(), 'locked_until' => $until]);
+
+        IdentityState::query()->create(['authenticatable_type' => $owner->type, 'authenticatable_id' => $owner->key, 'consecutive_failures' => 7, 'locked_until' => $until]);
 
         $types->method('isPerson')->willReturn(false);
 
@@ -73,10 +78,12 @@ final class LifecycleServiceTest extends TestCase
         }
 
         $stored = Factor::query()->whereKey($factor->id)->sole();
+        $state  = IdentityState::query()->sole();
 
         self::assertNotNull($stored->getDisabledAt());
         self::assertNotNull($stored->getLockedUntil());
-        self::assertSame(0, IdentityState::query()->count());
+        self::assertSame(7, $state->consecutive_failures);
+        self::assertSame($until->getTimestamp(), $state->locked_until?->getTimestamp());
         self::assertSame([], $this->reportedNames());
     }
 }

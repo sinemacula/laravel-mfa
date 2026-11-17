@@ -165,8 +165,6 @@ final readonly class LifecycleService
      */
     public function unlockIdentity(MultiFactorAuthenticatable $identity, Actor $actor, ?ClientContext $client = null): bool
     {
-        $this->refuseMachine($identity);
-
         return $this->attempts->liftLockout($identity, null, $actor, null, $client);
     }
 

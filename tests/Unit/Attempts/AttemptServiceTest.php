@@ -19,13 +19,16 @@ use SineMacula\Laravel\Mfa\Attempts\AttemptOutcome;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Attempts\AttemptStore;
 use SineMacula\Laravel\Mfa\Contracts\Factor as FactorContract;
+use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 use SineMacula\Laravel\Mfa\Enums\AttemptScope;
+use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\Actor;
 use SineMacula\Laravel\Mfa\Events\FactorDisabled;
 use SineMacula\Laravel\Mfa\Events\LockoutApplied;
 use SineMacula\Laravel\Mfa\Events\LockoutLifted;
 use SineMacula\Laravel\Mfa\Exceptions\InvalidModelException;
+use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Models\Factor;
@@ -1051,6 +1054,34 @@ final class AttemptServiceTest extends TestCase
         self::assertFalse($this->service()->liftLockout($user));
         Event::assertDispatchedTimes(LockoutLifted::class, 1);
         Event::assertDispatched(LockoutLifted::class, static fn (LockoutLifted $event): bool => $event->factor === null && $event->actor === null);
+    }
+
+    /**
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testLiftingAMachinesLockoutIsRefused(): void
+    {
+        config()->set('mfa.attempts.identity_limit', 1);
+
+        $user  = $this->user();
+        $types = self::createStub(SubjectTypeResolver::class);
+
+        $this->attempt($user, null, false);
+
+        $types->method('isPerson')->willReturn(false);
+
+        $this->container()->instance(SubjectTypeResolver::class, $types);
+
+        try {
+            $this->service()->liftLockout($user);
+            self::fail('A machine was expected to be refused.');
+        } catch (OperationRefusedException $exception) {
+            self::assertSame(FailureReason::MACHINE_IDENTITY, $exception->reason);
+        }
+
+        self::assertSame(AttemptScope::IDENTITY, $this->service()->lockout($user)?->scope);
     }
 
     /**

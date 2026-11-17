@@ -113,7 +113,7 @@ $attempts->resetIdentityFailures($user);                  // clear the identity'
   keeps the factor's failures in a row and the identity's, so the next failure locks again, and leaves a disabled
   factor disabled. A factor that is not the identity's lifts nothing. It dispatches `LockoutLifted`, naming the actor,
   when a live lockout was lifted, and answers whether one was: a deadline that has already passed is cleared without
-  either.
+  either. A machine identity is refused as `machine_identity`.
 - `enableFactor($factor)` enables a factor the failure ceiling disabled and clears its failures in a row, leaving any
   lockout to end on its own.
 - `resetIdentityFailures($identity)` clears the identity's failures in a row, so attempts that name no factor of its
@@ -123,8 +123,8 @@ $attempts->resetIdentityFailures($user);                  // clear the identity'
 disabled factor for one, keeping its failures in a row, unlike `enableFactor($factor)` here, with the factor found by
 its id under the identity's lock, and `Mfa::resetIdentity()` clears the lot (see [Factor lifecycle](lifecycle.md)).
 
-Who may call these, and what they report, is the application's to decide; the package checks only that the factor is
-the identity's.
+Who may call these, and what they report, is the application's to decide; the package checks only that the identity is
+a person and the factor is its own.
 
 ## Events
 
