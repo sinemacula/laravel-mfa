@@ -327,6 +327,7 @@ final readonly class AttemptService
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
+     * @throws \LogicException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      */
@@ -417,7 +418,7 @@ final readonly class AttemptService
      *
      * @param  \SineMacula\Laravel\Mfa\Attempts\Attempt  $attempt
      * @param  array{0: string, 1: string}  $subject
-     * @param  ?\SineMacula\Laravel\Mfa\Models\IdentityState  $state
+     * @param  \SineMacula\Laravel\Mfa\Models\IdentityState  $state
      * @param  \SineMacula\Laravel\Mfa\Attempts\AttemptSettings  $settings
      * @param  \Carbon\CarbonImmutable  $now
      * @param  list<\SineMacula\Laravel\Mfa\Contracts\MfaEvent>  $events
