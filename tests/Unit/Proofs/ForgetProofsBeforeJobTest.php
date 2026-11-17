@@ -4,10 +4,14 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Proofs;
 
+use Illuminate\Container\Container;
+use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Session\Session;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Queue\Jobs\FakeJob;
 use Illuminate\Queue\Jobs\SyncJob;
+use Illuminate\Session\ArraySessionHandler;
+use Illuminate\Session\Store;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Proofs\ForgetProofsBeforeJob;
@@ -113,6 +117,36 @@ final class ForgetProofsBeforeJobTest extends TestCase
         (new ForgetProofsBeforeJob)(new JobProcessing('database', new FakeJob));
 
         self::assertFalse($session->has(SessionProofStore::SESSION_KEY));
+    }
+
+    /**
+     * Under Octane the listener is registered once, at boot, and each job runs
+     * in the current container.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testForgetsTheProofsOfTheCurrentContainer(): void
+    {
+        $boot    = $this->container()->make(Session::class);
+        $current = new Store('worker', new ArraySessionHandler(10));
+        $other   = new Container;
+
+        $boot->put(SessionProofStore::SESSION_KEY, ['4:user|7' => []]);
+        $current->put(SessionProofStore::SESSION_KEY, ['4:user|8' => []]);
+        $other->instance(Session::class, $current);
+
+        Container::setInstance($other);
+
+        try {
+            $this->container()->make(Dispatcher::class)->dispatch(new JobProcessing('database', new FakeJob));
+        } finally {
+            Container::setInstance($this->container());
+        }
+
+        self::assertFalse($current->has(SessionProofStore::SESSION_KEY));
+        self::assertTrue($boot->has(SessionProofStore::SESSION_KEY));
     }
 
     /**

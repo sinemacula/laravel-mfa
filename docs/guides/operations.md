@@ -45,11 +45,12 @@ would sign that request out.
 
 ```php
 use Illuminate\Queue\Events\JobProcessing;
+use Illuminate\Queue\Jobs\SyncJob;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Queue;
 
 Queue::before(static function (JobProcessing $event): void {
-    if ($event->connectionName !== 'sync') {
+    if (! $event->job instanceof SyncJob) {
         Auth::forgetGuards();
     }
 });
