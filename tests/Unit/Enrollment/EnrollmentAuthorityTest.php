@@ -191,7 +191,7 @@ final class EnrollmentAuthorityTest extends TestCase
      *
      * @throws \Throwable
      */
-    public function testAnActiveSessionsEnrolmentIsTheBoundGatesToAuthorize(): void
+    public function testAnActiveSessionsEnrollmentIsTheBoundGatesToAuthorize(): void
     {
         $this->enablePasskeys(['bootstrap' => ['enabled' => true, 'types' => ['totp']]]);
 
