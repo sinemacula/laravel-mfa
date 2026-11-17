@@ -186,7 +186,8 @@ Mfa::unlockIdentity($user, Actor::of($agent));
 ```
 
 Each answers whether a live temporary lockout was lifted, and reports `LockoutLifted`, naming the actor, when one was.
-An id that is not one of the identity's factors answers `false`, reporting nothing. `false` from `unlockIdentity()` does
+An id that is not one of the identity's factors answers `false`, reporting nothing. A machine identity is refused as
+`machine_identity` before anything is read, here and by `enableFactor()`. `false` from `unlockIdentity()` does
 not mean nothing changed: the identity's count within the current window is cleared even with no lockout live.
 
 Only temporary lockouts lift. Failures in a row are kept, since only a success resets them, so the next failure locks
