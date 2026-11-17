@@ -657,7 +657,7 @@ final class MfaServiceProviderTest extends TestCase
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testADefaultHonoursABindingOfItsClass(): void
+    public function testADefaultHonorsABindingOfItsClass(): void
     {
         $container = new Container;
         $override  = new \stdClass;
