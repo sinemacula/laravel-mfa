@@ -23,11 +23,6 @@ use Illuminate\Routing\Router;
 final class SecretBindings
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  \Illuminate\Contracts\Container\Container  $app
      * @return void
      *

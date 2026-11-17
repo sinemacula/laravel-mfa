@@ -21,11 +21,6 @@ use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 final class StepUpContract
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * Another session, identity, application or purpose than the active one's.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\StepUp  $stepUp

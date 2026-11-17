@@ -19,11 +19,6 @@ use SineMacula\Laravel\Mfa\Enums\Purpose;
 final class PurposeRule
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * A pending session only signs in; an active one steps up unless it asks
      * for `sign_in`. `null` refuses the request.
      *

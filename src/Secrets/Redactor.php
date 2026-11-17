@@ -59,11 +59,6 @@ final class Redactor
     private const string PROVISIONING_URI = '~otpauth(?:-migration)?://\S*~i';
 
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * Expects values already passed through `normalize()`.
      *
      * @param  array<array-key, mixed>  $values

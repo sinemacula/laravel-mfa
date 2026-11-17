@@ -21,11 +21,6 @@ use SineMacula\Laravel\Mfa\Models\IdentityState;
 final class HeldLockouts
 {
     /**
-     * Disallow instantiation.
-     */
-    private function __construct() {}
-
-    /**
      * The identity's failure ceiling applies only to an attempt with no factor.
      *
      * @param  ?\SineMacula\Laravel\Mfa\Models\IdentityState  $state

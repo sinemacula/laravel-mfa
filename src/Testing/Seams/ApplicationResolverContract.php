@@ -20,11 +20,6 @@ use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
 final class ApplicationResolverContract
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  \SineMacula\Laravel\Mfa\Contracts\ApplicationResolver  $resolver
      * @param  \Illuminate\Http\Request  $request
      * @return void

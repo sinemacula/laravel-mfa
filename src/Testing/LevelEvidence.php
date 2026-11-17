@@ -45,11 +45,6 @@ final class LevelEvidence
     private const string EMAIL_ADDRESS = 'verified@example.test';
 
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * The synthetic factor a proof of the level names.
      *
      * @param  \SineMacula\Laravel\Mfa\Enums\AssuranceLevel  $level

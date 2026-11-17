@@ -18,11 +18,6 @@ use Illuminate\Contracts\Foundation\Application;
 final class VerificationBindings
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @return void
      */

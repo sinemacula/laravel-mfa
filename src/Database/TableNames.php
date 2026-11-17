@@ -51,11 +51,6 @@ final class TableNames
     ];
 
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  string  $block
      * @return string
      *

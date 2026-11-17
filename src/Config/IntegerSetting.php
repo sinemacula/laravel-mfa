@@ -18,11 +18,6 @@ use Illuminate\Contracts\Config\Repository;
 final class IntegerSetting
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @param  string  $key
      * @param  int  $default

@@ -24,11 +24,6 @@ use SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest;
 final class FactorChangeGateContract
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * The grant must end in the future.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\FactorChangeGate  $gate

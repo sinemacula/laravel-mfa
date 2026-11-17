@@ -21,11 +21,6 @@ use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 final class PendingSessionResolverContract
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  \SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver  $resolver
      * @param  \Illuminate\Http\Request  $request
      * @param  string  $guard

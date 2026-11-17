@@ -19,11 +19,6 @@ final class Base32
     public const string ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  string  $bytes
      * @return string
      */

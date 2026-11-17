@@ -42,11 +42,6 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 final class ChallengeCountersContract
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * Refuses a confirmed factor and a pending one with no live enrolment, and
      * no outcome changes a count. Counts start above zero so a reset shows.
      *

@@ -22,11 +22,6 @@ use SineMacula\Laravel\Mfa\Secrets\QueryExceptionMask;
 final class StorageTransaction
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @template TReturn
      *
      * @param  \Closure(): TReturn  $callback

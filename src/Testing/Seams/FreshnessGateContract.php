@@ -25,11 +25,6 @@ final class FreshnessGateContract
     public const string UNCONFIGURED = 'contract.unconfigured_operation';
 
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  \SineMacula\Laravel\Mfa\Contracts\FreshnessGate  $gate
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @return void

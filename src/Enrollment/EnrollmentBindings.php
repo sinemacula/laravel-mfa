@@ -17,11 +17,6 @@ use Illuminate\Contracts\Foundation\Application;
 final class EnrollmentBindings
 {
     /**
-     * Disallow instantiation.
-     */
-    private function __construct() {}
-
-    /**
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @return void
      */

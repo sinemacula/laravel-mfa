@@ -21,11 +21,6 @@ final class RecoveryCodeMatcher
     public const string PLACEHOLDER = 'malformed-recovery-code';
 
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  \Illuminate\Contracts\Hashing\Hasher  $hasher
      * @param  array<int, string>  $hashes
      * @param  ?string  $normalized

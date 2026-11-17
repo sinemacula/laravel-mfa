@@ -18,11 +18,6 @@ use PHPUnit\Framework\Assert;
 final class RequirementSeamContract
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * `$ask` must answer the same again at once and after `$askAnother`.
      *
      * @param  \Closure(): \SineMacula\Laravel\Mfa\Requirements\Requirement  $ask

@@ -20,11 +20,6 @@ use SineMacula\Laravel\Mfa\Support\PackageDefault;
 final class PasskeyBindings
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @return void
      */

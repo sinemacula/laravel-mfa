@@ -21,11 +21,6 @@ final class BoundedDelete
     public const int LIMIT = 1000;
 
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  \Illuminate\Database\Query\Builder  $query
      * @return int
      *

@@ -17,11 +17,6 @@ use Illuminate\Contracts\Foundation\Application;
 final class FactorBindings
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @return void
      */

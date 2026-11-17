@@ -24,11 +24,6 @@ use SineMacula\Laravel\Mfa\Requirements\ConfiguredFactorChangeGate;
 final class ReauthenticatorContract
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * Made within the last five minutes and not after now.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Reauthenticator  $reauthenticator

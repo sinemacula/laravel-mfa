@@ -37,11 +37,6 @@ final class AuthenticatorApp
     ];
 
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * Code the app shows `$steps` time steps from now.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor

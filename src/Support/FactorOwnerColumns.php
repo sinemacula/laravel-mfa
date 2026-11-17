@@ -19,11 +19,6 @@ use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 final class FactorOwnerColumns
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @return array{0: string, 1: string}
      */

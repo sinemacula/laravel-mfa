@@ -21,11 +21,6 @@ final class EnrollmentGrant
     private const int BYTES = 32;
 
     /**
-     * Disallow instantiation.
-     */
-    private function __construct() {}
-
-    /**
      * @return \SineMacula\Laravel\Mfa\Secrets\RevealedSecret
      *
      * @throws \Random\RandomException

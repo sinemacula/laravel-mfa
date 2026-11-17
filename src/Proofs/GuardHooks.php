@@ -21,11 +21,6 @@ use SineMacula\Laravel\Mfa\Enums\ProofKind;
 final class GuardHooks
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * Begin a sign-in on the first factor's application and session, forgetting
      * the previous one there, and record the first factor.
      *

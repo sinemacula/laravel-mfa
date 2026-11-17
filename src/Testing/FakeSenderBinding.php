@@ -18,11 +18,6 @@ use Illuminate\Contracts\Container\Container as ContainerContract;
 final class FakeSenderBinding
 {
     /**
-     * Prevent instantiation.
-     */
-    private function __construct() {}
-
-    /**
      * Bind into the given container, or the application's when null.
      *
      * @param  ?\Illuminate\Contracts\Container\Container  $container

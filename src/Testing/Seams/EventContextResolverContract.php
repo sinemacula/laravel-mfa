@@ -23,11 +23,6 @@ use SineMacula\Laravel\Mfa\Events\EventSubject;
 final class EventContextResolverContract
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  \SineMacula\Laravel\Mfa\Contracts\EventContextResolver  $resolver
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return void

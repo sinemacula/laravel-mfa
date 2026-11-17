@@ -24,11 +24,6 @@ final class StorageConnection
     private const string SETTING = 'mfa.storage.connection';
 
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * Null for the default connection.
      *
      * @return ?string

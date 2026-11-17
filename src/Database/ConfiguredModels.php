@@ -30,11 +30,6 @@ final class ConfiguredModels
     public const string RECOVERY_CODE = 'mfa.recovery_codes.model';
 
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  \Illuminate\Contracts\Config\Repository  $config
      * @return class-string<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>
      *

@@ -20,11 +20,6 @@ use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 final class SubjectTypeResolverContract
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  \SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver  $resolver
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $person
      * @return void

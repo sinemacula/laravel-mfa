@@ -20,11 +20,6 @@ final class CredentialId
     public const int MAX_BYTES = 1023;
 
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  string  $credentialId
      * @return string
      *
