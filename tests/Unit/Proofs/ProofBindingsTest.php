@@ -8,6 +8,8 @@ use Illuminate\Auth\Events\CurrentDeviceLogout;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Queue\Events\JobProcessing;
+use Illuminate\Queue\Jobs\FakeJob;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
@@ -71,7 +73,8 @@ final class ProofBindingsTest extends TestCase
     }
 
     /**
-     * `Login` begins a sign-in; `Logout` and `CurrentDeviceLogout` forget it.
+     * `Login` begins a sign-in; `Logout`, `CurrentDeviceLogout` and a queued
+     * job forget it.
      *
      * @return void
      *
@@ -94,6 +97,11 @@ final class ProofBindingsTest extends TestCase
 
         $events->dispatch(new Login('web', $user, false));
         $events->dispatch(new CurrentDeviceLogout('web', $user));
+
+        self::assertNull($this->container()->make(ProofStore::class)->currentSession($user, 'web'));
+
+        $events->dispatch(new Login('web', $user, false));
+        $events->dispatch(new JobProcessing('database', new FakeJob));
 
         self::assertNull($this->container()->make(ProofStore::class)->currentSession($user, 'web'));
     }

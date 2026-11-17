@@ -12,14 +12,17 @@ use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
+use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Enums\AttemptScope;
+use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Events\Actor;
 use SineMacula\Laravel\Mfa\Events\EventDispatcher;
 use SineMacula\Laravel\Mfa\Events\FactorDisabled;
 use SineMacula\Laravel\Mfa\Events\LockoutApplied;
 use SineMacula\Laravel\Mfa\Events\LockoutLifted;
+use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
@@ -46,6 +49,7 @@ final readonly class AttemptService
      * @param  \SineMacula\Laravel\Mfa\Attempts\AttemptKeys  $keys
      * @param  \SineMacula\Laravel\Mfa\Attempts\IpThrottle  $ipThrottle
      * @param  \SineMacula\Laravel\Mfa\Events\EventDispatcher  $events
+     * @param  \SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver  $types
      */
     public function __construct(
 
@@ -63,6 +67,9 @@ final readonly class AttemptService
 
         /** Lockout and failure ceiling events. */
         private EventDispatcher $events,
+
+        /** Tells a person from a machine. */
+        private SubjectTypeResolver $types,
     ) {}
 
     /**
@@ -213,6 +220,8 @@ final readonly class AttemptService
         ?string $application = null,
         ?ClientContext $client = null,
     ): bool {
+        OperationRefusedException::unless($this->types->isPerson($identity), FailureReason::MACHINE_IDENTITY, 'The identity is not a person, so it has no lockout to lift.');
+
         $subject = $this->subject($identity);
 
         $lifted = FactorStateTransaction::forIdentity($identity, $this->factorModel($factor), function (Collection $factors) use ($subject, $factor): bool {

@@ -175,6 +175,10 @@ final readonly class FactorService
             return FactorChange::refused(FailureReason::NOT_FOUND);
         }
 
+        if (!$factor->isConfirmed()) {
+            return FactorChange::refused(FailureReason::NOT_CONFIRMED);
+        }
+
         $previous = $factor->getLabel();
 
         $factor->setAttribute($factor->getLabelName(), $label);
