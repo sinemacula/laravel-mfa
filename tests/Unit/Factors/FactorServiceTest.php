@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Enums\FactorStatus;
+use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Exceptions\InvalidModelException;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
@@ -106,6 +107,21 @@ final class FactorServiceTest extends TestCase
         self::assertNull($this->service()->factor(Callers::current(), 'missing'));
         self::assertNull($this->service()->factor(Callers::current(), strtoupper($factor->id)));
         self::assertNull($this->service()->factor(Callers::current(), ['id' => $factor->id]));
+    }
+
+    /**
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAPendingFactorIsNotRenamed(): void
+    {
+        $pending = $this->addFactor($this->signIn(), ['status' => 'pending', 'application' => 'web', 'label' => 'Phone']);
+
+        $change = $this->service()->rename(Callers::current(), $pending->id, 'Work phone');
+
+        self::assertSame(FailureReason::NOT_CONFIRMED, $change->reason);
+        self::assertSame('Phone', $pending->refresh()->getLabel());
     }
 
     /**
