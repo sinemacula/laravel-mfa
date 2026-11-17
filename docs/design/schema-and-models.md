@@ -71,7 +71,7 @@ factors starts with.
   pending factor where the operation needs a confirmed one (`not_confirmed`), and a type the application does not
   enable (`type_not_enabled`). A refusal throws `Exceptions\OperationRefusedException` with the reason. The factor is
   read from the write connection. Listing, renaming and preferring factors do not use it, removal has its own
-  (`Lifecycle\RemovalGuard`), and an administrative reset refuses only a machine.
+  (`Lifecycle\RemovalGuard`), and an administrative reset, unlock or enabling refuses only a machine.
 
 ## Success Path
 

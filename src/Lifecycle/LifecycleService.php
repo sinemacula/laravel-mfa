@@ -15,6 +15,7 @@ use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
 use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
+use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
@@ -49,6 +50,7 @@ final readonly class LifecycleService
      * @param  \SineMacula\Laravel\Mfa\Lifecycle\FactorRemoval  $removal
      * @param  \SineMacula\Laravel\Mfa\Attempts\AttemptService  $attempts
      * @param  \SineMacula\Laravel\Mfa\Events\EventDispatcher  $events
+     * @param  \SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver  $types
      */
     public function __construct(
 
@@ -69,6 +71,9 @@ final readonly class LifecycleService
 
         /** Dispatches the enabling event. */
         private EventDispatcher $events,
+
+        /** Tells a person from a machine. */
+        private SubjectTypeResolver $types,
     ) {}
 
     /**
@@ -100,6 +105,8 @@ final readonly class LifecycleService
      */
     public function unlockFactor(MultiFactorAuthenticatable $identity, mixed $factorId, Actor $actor, ?ClientContext $client = null): bool
     {
+        $this->refuseMachine($identity);
+
         return FactorStateTransaction::forIdentity($identity, $this->factorModel(), function (Collection $factors) use ($identity, $factorId, $actor, $client): bool {
 
             $factor = LockedFactors::withId($factorId, $factors);
@@ -124,6 +131,8 @@ final readonly class LifecycleService
      */
     public function enableFactor(MultiFactorAuthenticatable $identity, mixed $factorId, Actor $actor, ?ClientContext $client = null): bool
     {
+        $this->refuseMachine($identity);
+
         return FactorStateTransaction::forIdentity($identity, $this->factorModel(), function (Collection $factors) use ($identity, $factorId, $actor, $client): bool {
 
             $factor = LockedFactors::withId($factorId, $factors);
@@ -156,6 +165,8 @@ final readonly class LifecycleService
      */
     public function unlockIdentity(MultiFactorAuthenticatable $identity, Actor $actor, ?ClientContext $client = null): bool
     {
+        $this->refuseMachine($identity);
+
         return $this->attempts->liftLockout($identity, null, $actor, null, $client);
     }
 
@@ -258,5 +269,16 @@ final readonly class LifecycleService
         $model = ConfiguredModels::factor($this->config);
 
         return new $model;
+    }
+
+    /**
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException
+     */
+    private function refuseMachine(MultiFactorAuthenticatable $identity): void
+    {
+        OperationRefusedException::unless($this->types->isPerson($identity), FailureReason::MACHINE_IDENTITY, 'The identity is not a person, so it holds no factors.');
     }
 }
