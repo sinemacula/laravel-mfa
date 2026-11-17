@@ -152,7 +152,8 @@ return response()->json($assertion->options);
 ```
 
 Nobody served is `not_found`, as on `sendCode()` and `removeFactor()`. `cancelEnrollment()`, `unlockFactor()`,
-`enableFactor()` and `unlockIdentity()` answer a `bool`, having no reason worth telling. `resetIdentity()` and
+`enableFactor()` and `unlockIdentity()` answer a `bool`, having no reason worth telling, though the last three throw
+`Exceptions\OperationRefusedException` with `machine_identity` for a machine identity. `resetIdentity()` and
 `forgetIdentity()` are operator calls, and answer nothing.
 
 On `generateRecoveryCodes()` and `requestAssertion()`, an `Exceptions\OperationRefusedException` a seam of your own

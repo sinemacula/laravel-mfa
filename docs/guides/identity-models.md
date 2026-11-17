@@ -40,8 +40,8 @@ separately, in the proof store (`Mfa::proofs()`), so keep the two apart.
 
 Only a person may hold factors. Override `canHoldFactors()` on a model that also stands for API clients or service
 accounts. A caller naming one then serves nobody, so a helper answers as it does for nobody (`not_found` where it gives
-a reason); an operation handed the identity itself, such as a reset or the challenge counters, refuses it with the
-failure reason `machine_identity`:
+a reason); an operation handed the identity itself, such as a reset, an unlock or the challenge counters, refuses it
+with the failure reason `machine_identity`:
 
 ```php
 public function canHoldFactors(): bool
