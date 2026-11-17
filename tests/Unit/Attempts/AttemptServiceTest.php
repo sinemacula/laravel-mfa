@@ -1086,8 +1086,7 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * Counting nothing for the identity would let its guesses run past the
-     * cap, so a state row the locked read cannot see is an error.
+     * A hidden state row is an error, not an uncounted failure.
      *
      * @return void
      *
