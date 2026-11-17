@@ -195,7 +195,8 @@ stays until the new one is confirmed. Leave headroom in the limits for one more,
 ## Labels and the preferred factor
 
 Neither changes what a factor proves, so neither needs a step-up; both serve active sessions only. A label is what the
-application it was enrolled through shows, so `renameFactor()` answers `not_found` for another application's factor.
+application it was enrolled through shows, so `renameFactor()` answers `not_found` for another application's factor, and
+`not_confirmed` for a pending one, which keeps the label its enrolment started with.
 `setPreferredFactor()` takes any confirmed factor of a type this application enables. The preference is the identity's
 choice, kept on its factors' rows, so it moves away from a factor enrolled through another application too.
 
