@@ -228,7 +228,7 @@ final class ActsAsFactorTest extends TestCase
      *
      * @return void
      */
-    public function testTheInitialiserKeepsACastAlreadyOnTheColumn(): void
+    public function testTheInitializerKeepsACastAlreadyOnTheColumn(): void
     {
         $factor = new RemappedLockoutFactor;
 

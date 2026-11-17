@@ -223,6 +223,6 @@ final class ProofStoreLayerHooksTest extends TestCase
     {
         $this->asked[] = 'enrol';
 
-        return $this->store->enrol();
+        return $this->store->enroll();
     }
 }
