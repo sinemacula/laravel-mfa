@@ -29,11 +29,6 @@ final class EventContext
     ];
 
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  array<array-key, mixed>  $values
      * @return array<string, int|string|null>
      */

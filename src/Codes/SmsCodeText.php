@@ -19,11 +19,6 @@ use SineMacula\Laravel\Mfa\Support\ConsumerMessages;
 final class SmsCodeText
 {
     /**
-     * Disallow instantiation.
-     */
-    private function __construct() {}
-
-    /**
      * @param  \SineMacula\Laravel\Mfa\Codes\CodeMessage  $message
      * @return string
      */

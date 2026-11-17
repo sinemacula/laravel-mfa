@@ -19,11 +19,6 @@ final class IndexName
     private const int LONGEST = 63;
 
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  string  $table
      * @param  string  $suffix
      * @return string

@@ -6,6 +6,7 @@ namespace Tests\Unit\Testing\Seams;
 
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\CoversTrait;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Applications\DeclaredFirstFactorResolver;
 use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
@@ -27,6 +28,7 @@ use Tests\TestCase;
  */
 #[CoversClass(FirstFactorResolverContract::class)]
 #[CoversClass(DeclaredFirstFactorResolver::class)]
+#[CoversTrait(FirstFactorResolverTests::class)]
 final class FirstFactorResolverContractTest extends TestCase
 {
     use FirstFactorResolverTests;
@@ -54,6 +56,16 @@ final class FirstFactorResolverContractTest extends TestCase
         $this->expectException(AssertionFailedError::class);
 
         FirstFactorResolverContract::assertAnswersOnlyTheIdentitysFirstFactor($resolver, $this->signedInIdentity(), 'web');
+    }
+
+    /**
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAcceptsAResolverThatAnswersNothing(): void
+    {
+        FirstFactorResolverContract::assertAnswersOnlyTheIdentitysFirstFactor(new FixedFirstFactorResolver(null), $this->signedInIdentity(), 'web');
     }
 
     /**

@@ -6,6 +6,7 @@ namespace Tests\Unit\Testing\Seams;
 
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\CoversTrait;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeOutcome;
 use SineMacula\Laravel\Mfa\Codes\PackageChallengeGateway;
@@ -34,6 +35,7 @@ use Tests\TestCase;
  */
 #[CoversClass(ChallengeGatewayContract::class)]
 #[CoversClass(PackageChallengeGateway::class)]
+#[CoversTrait(ChallengeGatewayTests::class)]
 final class ChallengeGatewayContractTest extends TestCase
 {
     use ArrangesEmailChallenges, ChallengeGatewayTests;

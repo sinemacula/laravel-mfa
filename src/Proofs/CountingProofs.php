@@ -19,11 +19,6 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 final class CountingProofs
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * Oldest first, keeping the given order for proofs made at the same
      * instant.
      *

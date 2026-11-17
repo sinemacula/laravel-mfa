@@ -22,11 +22,6 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 final class IdentityStateRow
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * Defaults to the storage connection.
      *
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofOwner  $owner

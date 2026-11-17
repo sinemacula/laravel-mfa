@@ -25,11 +25,6 @@ final class ExceptionScrubber
     private const string PACKAGE_NAMESPACE = 'SineMacula\Laravel\Mfa\\';
 
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * Known values the caller handed down are redacted whatever their length.
      *
      * @param  \Throwable  $throwable

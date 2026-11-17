@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\CoversTrait;
 use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
@@ -37,6 +38,8 @@ use Tests\TestCase;
  * @internal
  */
 #[CoversClass(ProofStoreCompletion::class)]
+#[CoversTrait(PendingCompletionTests::class)]
+#[CoversTrait(StepUpTests::class)]
 final class ProofStoreCompletionTest extends TestCase
 {
     use PendingCompletionTests, StepUpTests;

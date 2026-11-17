@@ -21,11 +21,6 @@ use Illuminate\Support\Facades\DB;
 final class AfterStorageCommit
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @param  \Closure(): mixed  $callback
      * @return void

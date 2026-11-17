@@ -28,11 +28,6 @@ final class VerificationGeneration
     private const string COLUMN = 'verification_generation';
 
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * 0 for an identity with no row.
      *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity

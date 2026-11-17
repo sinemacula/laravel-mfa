@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Drivers;
 
+use Illuminate\Container\Container;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Drivers\DriverResolver;
 use SineMacula\Laravel\Mfa\Drivers\TotpDriver;
@@ -72,6 +73,37 @@ final class DriverResolverTest extends TestCase
         $this->expectExceptionMessage('Driver [other] must implement SineMacula\Laravel\Mfa\Contracts\FactorDriver.');
 
         $this->resolver()->resolve($this->manager(), 'other');
+    }
+
+    /**
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testResolvesFromTheContainersManager(): void
+    {
+        $custom = new NoopFactorDriver;
+
+        $this->manager()->extend('custom', fn (): NoopFactorDriver => $custom);
+
+        self::assertSame($custom, $this->resolver()->fromContainer($this->container(), 'custom'));
+    }
+
+    /**
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testRefusesAContainerWhoseMfaBindingIsNoManager(): void
+    {
+        $container = new Container;
+
+        $container->instance('mfa', new \stdClass);
+
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('The [mfa] binding must be the MFA manager.');
+
+        $this->resolver()->fromContainer($container, 'totp');
     }
 
     /**

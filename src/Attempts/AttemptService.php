@@ -327,6 +327,7 @@ final readonly class AttemptService
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      * @throws \InvalidArgumentException
+     * @throws \LogicException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      */
@@ -355,7 +356,7 @@ final readonly class AttemptService
             return AttemptOutcome::pass();
         }
 
-        $run = $this->countIdentityFailure($attempt, $subject, $state, $settings, $now, $events);
+        $run = $this->countIdentityFailure($attempt, $subject, $state ?? throw new \LogicException('The identity state row is missing under its lock.'), $settings, $now, $events);
 
         if ($factor !== null) {
             $this->countFactorFailure($attempt, $factor, $settings, $now, $run >= $settings->failureCeiling(), $events);
@@ -417,7 +418,7 @@ final readonly class AttemptService
      *
      * @param  \SineMacula\Laravel\Mfa\Attempts\Attempt  $attempt
      * @param  array{0: string, 1: string}  $subject
-     * @param  ?\SineMacula\Laravel\Mfa\Models\IdentityState  $state
+     * @param  \SineMacula\Laravel\Mfa\Models\IdentityState  $state
      * @param  \SineMacula\Laravel\Mfa\Attempts\AttemptSettings  $settings
      * @param  \Carbon\CarbonImmutable  $now
      * @param  list<\SineMacula\Laravel\Mfa\Contracts\MfaEvent>  $events
@@ -427,15 +428,11 @@ final readonly class AttemptService
      * @throws \InvalidArgumentException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      */
-    private function countIdentityFailure(Attempt $attempt, array $subject, ?IdentityState $state, AttemptSettings $settings, CarbonImmutable $now, array &$events): int
+    private function countIdentityFailure(Attempt $attempt, array $subject, IdentityState $state, AttemptSettings $settings, CarbonImmutable $now, array &$events): int
     {
         $key = $this->keys->identity($subject[0], $subject[1]);
 
         $this->store->record($key, AttemptScope::IDENTITY, $now->getTimestamp(), $now->getTimestamp() + $settings->windowSeconds());
-
-        if ($state === null) {
-            return 0;
-        }
 
         $state->consecutive_failures++;
 

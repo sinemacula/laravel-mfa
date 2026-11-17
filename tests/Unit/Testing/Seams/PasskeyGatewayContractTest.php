@@ -6,6 +6,7 @@ namespace Tests\Unit\Testing\Seams;
 
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\CoversTrait;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
@@ -30,6 +31,7 @@ use Tests\TestCase;
  */
 #[CoversClass(PasskeyGatewayContract::class)]
 #[CoversClass(UnavailablePasskeyGateway::class)]
+#[CoversTrait(PasskeyGatewayTests::class)]
 final class PasskeyGatewayContractTest extends TestCase
 {
     use PasskeyGatewayTests;

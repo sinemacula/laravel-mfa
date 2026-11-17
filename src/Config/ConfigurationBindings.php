@@ -38,11 +38,6 @@ final class ConfigurationBindings
     ];
 
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * Checks once booted for a request, and in the console only as a worker
      * command or a queue worker starts.
      *

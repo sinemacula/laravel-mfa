@@ -18,11 +18,6 @@ use Illuminate\Database\Eloquent\Model;
 final class IdentityType
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * The morph class for an Eloquent identity, so a morph map is honoured.
      *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity

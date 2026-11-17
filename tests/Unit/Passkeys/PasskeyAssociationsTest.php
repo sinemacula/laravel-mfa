@@ -79,6 +79,23 @@ final class PasskeyAssociationsTest extends TestCase
     }
 
     /**
+     * Read from the stored association; nothing associates a factor without an
+     * identifier.
+     *
+     * @return void
+     */
+    public function testAStoredAssociationAssociatesItsFactor(): void
+    {
+        $this->association('factor-1')->save();
+
+        $associations = new PasskeyAssociations;
+
+        self::assertTrue($associations->associates($this->factor('factor-1'), $this->owner()));
+        self::assertFalse($associations->associates($this->factor('factor-2'), $this->owner()));
+        self::assertFalse($associations->associates($this->factor(null), $this->owner()));
+    }
+
+    /**
      * @return void
      */
     public function testAnOwnedCredentialIsOnlyTheOwnersOwn(): void

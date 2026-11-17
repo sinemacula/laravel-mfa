@@ -53,11 +53,6 @@ final class ProofStoreContract
     public const string FACTOR = 'contract-factor';
 
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * The current sign-in and the proof `$arrange` put in it stay as they were.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ProofStore  $store

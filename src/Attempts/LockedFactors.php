@@ -21,11 +21,6 @@ use SineMacula\Laravel\Mfa\Contracts\Factor;
 final class LockedFactors
 {
     /**
-     * Disallow instantiation.
-     */
-    private function __construct() {}
-
-    /**
      * @param  ?\SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @return bool
      *

@@ -21,11 +21,6 @@ use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 final class FactorChannel
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
      * @param  \SineMacula\Laravel\Mfa\Enums\ChannelKind  $kind
      * @return ?\SineMacula\Laravel\Mfa\Assurance\Channel

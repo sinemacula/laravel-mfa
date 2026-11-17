@@ -26,11 +26,6 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 final class ChallengeGatewayContract
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  \SineMacula\Laravel\Mfa\Contracts\ChallengeGateway  $gateway
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor

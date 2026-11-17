@@ -26,11 +26,6 @@ use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 final class ConfirmedFactors
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor  $factor
      * @return bool
      */

@@ -18,11 +18,6 @@ use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 final class SeamAssert
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * The call throws a `RuntimeException` and nothing else, never returns.
      *
      * @param  \Closure(): mixed  $call

@@ -7,6 +7,7 @@ namespace Tests\Unit\Testing\Seams;
 use Carbon\CarbonImmutable;
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\CoversTrait;
 use SineMacula\Laravel\Mfa\Contracts\FactorChangeGate;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\Reauthenticator;
@@ -29,6 +30,7 @@ use Tests\TestCase;
  * @internal
  */
 #[CoversClass(FactorChangeGateContract::class)]
+#[CoversTrait(FactorChangeGateTests::class)]
 final class FactorChangeGateContractTest extends TestCase
 {
     use ArrangesFactorChanges, FactorChangeGateTests;

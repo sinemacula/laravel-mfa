@@ -25,11 +25,6 @@ final class RecoveryCodeNormalizer
     private const array REMOVED = [' ', "\t", "\r", "\n", "\v", "\f", '-'];
 
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * Null when the input is too long to be a code.
      *
      * @param  string  $input

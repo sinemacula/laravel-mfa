@@ -24,11 +24,6 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 final class PasskeyGatewayContract
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  \SineMacula\Laravel\Mfa\Contracts\PasskeyGateway  $gateway
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $application

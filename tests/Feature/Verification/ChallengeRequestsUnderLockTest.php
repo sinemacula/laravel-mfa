@@ -14,6 +14,8 @@ use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
+use SineMacula\Laravel\Mfa\Events\CodeSent;
+use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Verification\ChallengeRequests;
@@ -83,6 +85,30 @@ final class ChallengeRequestsUnderLockTest extends TestCase
 
         self::assertSame(FailureReason::LOCKED, $result->reason);
         self::assertSame(0, $this->gateway->sends);
+    }
+
+    /**
+     * As a refused send, with no code sent.
+     *
+     * @return void
+     */
+    public function testAGatewaysRefusalUnderTheLockIsARefusedSend(): void
+    {
+        $user    = $this->signedInPerson();
+        $factor  = $this->emailFactor($user);
+        $gateway = \Mockery::mock(ChallengeGateway::class);
+
+        $gateway->shouldReceive('send')->once()->andThrow(new OperationRefusedException(FailureReason::NOT_ACCEPTED, 'The gateway refused.'));
+
+        $this->container()->instance(ChallengeGateway::class, $gateway);
+
+        Event::fake([CodeSent::class]);
+
+        $result = $this->mfa()->sendCode(Callers::current(), $factor->id);
+
+        self::assertFalse($result->wasSent());
+        self::assertSame(FailureReason::NOT_ACCEPTED, $result->reason);
+        Event::assertNotDispatched(CodeSent::class);
     }
 
     /**

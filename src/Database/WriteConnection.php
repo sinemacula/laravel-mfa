@@ -22,11 +22,6 @@ use SineMacula\Laravel\Mfa\Secrets\QueryExceptionMask;
 final class WriteConnection
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * Only this query is routed, not its eager loads.
      *
      * @template TBuilder of \Illuminate\Contracts\Database\Query\Builder

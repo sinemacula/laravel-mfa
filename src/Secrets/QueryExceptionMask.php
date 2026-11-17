@@ -26,11 +26,6 @@ final class QueryExceptionMask
     private const string DEADLOCK = 'deadlock detected';
 
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  \Illuminate\Database\QueryException  $exception
      * @return void
      */

@@ -19,11 +19,6 @@ use Illuminate\Contracts\Container\Container as ContainerContract;
 final class PackageDefault
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * Resolves the class as Laravel resolves a class bound by name.
      *
      * @param  \Illuminate\Contracts\Container\Container  $app

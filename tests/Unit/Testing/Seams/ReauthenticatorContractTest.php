@@ -6,6 +6,7 @@ namespace Tests\Unit\Testing\Seams;
 
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\CoversTrait;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
@@ -28,6 +29,7 @@ use Tests\TestCase;
  */
 #[CoversClass(ReauthenticatorContract::class)]
 #[CoversClass(RefusingReauthenticator::class)]
+#[CoversTrait(ReauthenticatorTests::class)]
 final class ReauthenticatorContractTest extends TestCase
 {
     use ReauthenticatorTests;

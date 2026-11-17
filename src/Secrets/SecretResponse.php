@@ -19,11 +19,6 @@ use Symfony\Component\HttpFoundation\Response;
 final class SecretResponse
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * Reveals every `RevealedSecret` in the data, at any depth.
      *
      * @param  array<array-key, mixed>  $data

@@ -22,11 +22,6 @@ use SineMacula\Laravel\Mfa\Contracts\GuardApplicationResolver;
 final class RequestApplication
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @param  \Illuminate\Http\Request  $request
      * @param  string  $guard

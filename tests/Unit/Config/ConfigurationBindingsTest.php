@@ -157,6 +157,23 @@ final class ConfigurationBindingsTest extends TestCase
     }
 
     /**
+     * Nothing is checked before then, and no command is listened for.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testBootOutsideTheConsoleChecksOnceBooted(): void
+    {
+        $app = \Mockery::mock(Application::class);
+        $app->shouldReceive('runningInConsole')->andReturnFalse();
+        $app->shouldReceive('booted')->once()->with(\Mockery::type(\Closure::class));
+        $app->shouldNotReceive('make');
+
+        ConfigurationBindings::boot($app);
+    }
+
+    /**
      * @param  string  $command
      * @return void
      */

@@ -18,6 +18,7 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\Fixtures\Seams\Enums\ProofStoreFlaw;
 use Tests\Fixtures\Seams\FlawedProofStore;
+use Tests\Fixtures\Seams\InterruptingProofStore;
 use Tests\TestCase;
 
 /**
@@ -183,6 +184,23 @@ final class GenerationSessionRevokerTest extends TestCase
 
         self::assertSame('sign-in-2', $store->currentSession($this->user, SignInProofs::APPLICATION));
         self::assertSame([], $store->proofs($this->user, SignInProofs::APPLICATION, 'sign-in-2'));
+    }
+
+    /**
+     * The change still commits, and the current sign-in verifies again.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testProofsTheStoreRefusesToRecordAgainAreNotKept(): void
+    {
+        $this->container()->instance(ProofStore::class, new InterruptingProofStore($this->store(), PHP_INT_MAX, null, true));
+
+        DB::transaction(fn (): RemovalRevocation => $this->removeFactor());
+
+        self::assertSame([], $this->methods());
+        self::assertSame(1, VerificationGeneration::current($this->user));
     }
 
     /**

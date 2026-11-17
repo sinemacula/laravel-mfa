@@ -24,11 +24,6 @@ final class ReenrollmentObligation
     private const string COLUMN = 'reenrollment_required';
 
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
      * @return bool
      *

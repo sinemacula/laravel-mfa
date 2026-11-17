@@ -19,11 +19,6 @@ final class FreshnessBounds
     public const int MOST_SECONDS = 86400;
 
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * Refuse a part with no maximum age or one longer than a day.
      *
      * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement

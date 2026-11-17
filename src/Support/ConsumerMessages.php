@@ -54,11 +54,6 @@ final class ConsumerMessages
     private const string SHIPPED = __DIR__ . '/../../lang/en/messages.php';
 
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  string  $key
      * @return string
      */

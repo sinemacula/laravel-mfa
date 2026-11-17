@@ -24,11 +24,6 @@ use SineMacula\Laravel\Mfa\Requirements\SessionChange;
 final class SessionTransitionContract
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * `$arrange` runs per change so an earlier one cannot leave a later one
      * only an ended session to judge.
      *

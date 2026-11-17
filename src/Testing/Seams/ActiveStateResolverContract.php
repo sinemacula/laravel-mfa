@@ -20,11 +20,6 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 final class ActiveStateResolverContract
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  \SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver  $resolver
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $active
      * @return void

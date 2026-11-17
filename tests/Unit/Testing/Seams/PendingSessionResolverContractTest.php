@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\CoversTrait;
 use SineMacula\Laravel\Mfa\Context\NoPendingSessionResolver;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
@@ -30,6 +31,7 @@ use Tests\TestCase;
 #[CoversClass(PendingSessionResolverContract::class)]
 #[CoversClass(SeamAssert::class)]
 #[CoversClass(NoPendingSessionResolver::class)]
+#[CoversTrait(PendingSessionResolverTests::class)]
 final class PendingSessionResolverContractTest extends TestCase
 {
     use PendingSessionResolverTests;

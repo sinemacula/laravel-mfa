@@ -29,11 +29,6 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 final class FactorStateTransaction
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * The factor model instance only names the class and its connection.
      *
      * @template TReturn

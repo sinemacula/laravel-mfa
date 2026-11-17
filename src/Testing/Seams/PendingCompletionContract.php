@@ -26,11 +26,6 @@ use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 final class PendingCompletionContract
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  \SineMacula\Laravel\Mfa\Contracts\PendingCompletion  $completion
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
      * @param  \SineMacula\Laravel\Mfa\Verification\VerificationResult  $matching

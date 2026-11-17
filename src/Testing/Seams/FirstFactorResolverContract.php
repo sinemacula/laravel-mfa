@@ -24,11 +24,6 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 final class FirstFactorResolverContract
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * The answer is `null`, or a first factor bound to the identity and
      * application, made no later than now.
      *

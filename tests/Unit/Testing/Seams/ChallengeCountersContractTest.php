@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\CoversTrait;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeCounters;
 use SineMacula\Laravel\Mfa\Attempts\LockedFactors;
@@ -46,6 +47,7 @@ use Tests\TestCase;
 #[CoversClass(ChallengeCountersContract::class)]
 #[CoversClass(ChallengeCounters::class)]
 #[CoversClass(PackageChallengeGateway::class)]
+#[CoversTrait(ChallengeCountersTests::class)]
 final class ChallengeCountersContractTest extends TestCase
 {
     use ArrangesEmailChallenges, ChallengeCountersTests;

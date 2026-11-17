@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Assurance\Evaluation;
+use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
 use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
@@ -180,6 +181,29 @@ final class LevelEvidenceTest extends TestCase
         $this->expectExceptionMessage('Requested aal2 with additional verification; reached aal2; unmet: phishing_resistance.');
 
         LevelEvidence::assertReached(AssuranceLevel::AAL2, $this->check(Requirement::none()->withPhishingResistance(), ...$this->afterAPassword(AssuranceLevel::AAL2)));
+    }
+
+    /**
+     * Read from the proof store, as the route gate reads them.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testEvaluatesTheProofsTheSignInHolds(): void
+    {
+        $store = $this->container()->make(ProofStore::class);
+
+        $store->begin($this->person(), SignInProofs::APPLICATION, SignInProofs::SESSION);
+
+        foreach ($this->afterAPassword(AssuranceLevel::AAL2) as $proof) {
+            $store->record($this->person(), $proof);
+        }
+
+        $evaluation = LevelEvidence::evaluate($this->container(), $this->person(), SignInProofs::APPLICATION, SignInProofs::SESSION, AssuranceLevel::AAL2);
+
+        self::assertTrue($evaluation->meetsRequirement());
+        self::assertSame(AssuranceLevel::AAL2, $evaluation->level);
     }
 
     /**

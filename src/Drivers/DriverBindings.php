@@ -23,11 +23,6 @@ use SineMacula\Laravel\Mfa\MfaManager;
 final class DriverBindings
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @return void
      */

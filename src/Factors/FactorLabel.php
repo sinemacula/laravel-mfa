@@ -18,11 +18,6 @@ final class FactorLabel
     public const int MAX_LENGTH = 255;
 
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * Throws on a long label: the application validates input before this.
      *
      * @param  ?string  $label

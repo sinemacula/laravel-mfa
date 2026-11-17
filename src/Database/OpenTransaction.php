@@ -18,11 +18,6 @@ use Illuminate\Support\Facades\DB;
 final class OpenTransaction
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  string  $message
      * @return void
      *

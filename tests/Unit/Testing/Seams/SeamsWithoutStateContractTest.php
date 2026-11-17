@@ -9,6 +9,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\CoversTrait;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\DefaultEventContextResolver;
@@ -91,6 +92,14 @@ use Tests\TestCase;
 #[CoversClass(IdentityContractRequirement::class)]
 #[CoversClass(NoTenantRequirement::class)]
 #[CoversClass(DefaultEventContextResolver::class)]
+#[CoversTrait(ActiveStateResolverTests::class)]
+#[CoversTrait(ApplicationResolverTests::class)]
+#[CoversTrait(EventContextResolverTests::class)]
+#[CoversTrait(FreshnessGateTests::class)]
+#[CoversTrait(IdentityRequirementTests::class)]
+#[CoversTrait(SessionTransitionTests::class)]
+#[CoversTrait(SubjectTypeResolverTests::class)]
+#[CoversTrait(TenantRequirementTests::class)]
 final class SeamsWithoutStateContractTest extends TestCase
 {
     use ActiveStateResolverTests,

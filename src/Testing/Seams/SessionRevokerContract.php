@@ -24,11 +24,6 @@ use SineMacula\Laravel\Mfa\Database\StorageConnection;
 final class SessionRevokerContract
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * The revoker must also answer what it did.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\SessionRevoker  $revoker

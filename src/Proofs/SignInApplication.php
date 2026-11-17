@@ -20,11 +20,6 @@ use SineMacula\Laravel\Mfa\Context\RequestApplication;
 final class SignInApplication
 {
     /**
-     * Disallow instantiation; utility container only.
-     */
-    private function __construct() {}
-
-    /**
      * @param  \Illuminate\Contracts\Container\Container  $container
      * @param  string  $guard
      * @return string
