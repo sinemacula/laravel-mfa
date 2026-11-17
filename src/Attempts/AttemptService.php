@@ -341,7 +341,7 @@ final readonly class AttemptService
 
         $now     = CarbonImmutable::now();
         $subject = $this->subject($attempt->identity);
-        $state   = $this->identityState($subject, true) ?? throw new \LogicException('The identity state row is missing under its lock.');
+        $state   = $this->identityState($subject, true);
 
         $lockout = HeldLockouts::strictest($state, $factor, $settings, $now);
 
@@ -356,7 +356,7 @@ final readonly class AttemptService
             return AttemptOutcome::pass();
         }
 
-        $run = $this->countIdentityFailure($attempt, $subject, $state, $settings, $now, $events);
+        $run = $this->countIdentityFailure($attempt, $subject, $state ?? throw new \LogicException('The identity state row is missing under its lock.'), $settings, $now, $events);
 
         if ($factor !== null) {
             $this->countFactorFailure($attempt, $factor, $settings, $now, $run >= $settings->failureCeiling(), $events);

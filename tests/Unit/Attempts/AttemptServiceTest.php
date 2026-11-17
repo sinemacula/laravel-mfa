@@ -7,6 +7,7 @@ namespace Tests\Unit\Attempts;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Carbon\Exceptions\InvalidFormatException;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -1082,6 +1083,32 @@ final class AttemptServiceTest extends TestCase
         }
 
         self::assertSame(AttemptScope::IDENTITY, $this->service()->lockout($user)?->scope);
+    }
+
+    /**
+     * Counting nothing for the identity would let its guesses run past the
+     * cap, so a state row the locked read cannot see is an error.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAStateRowTheLockedReadCannotSeeIsAnError(): void
+    {
+        $user = $this->user();
+
+        IdentityState::addGlobalScope('hidden', static fn (Builder $query): Builder => $query->whereRaw('1 = 0'));
+
+        try {
+            $this->attempt($user, null, false);
+            self::fail('A missing state row was expected to throw.');
+        } catch (\LogicException $exception) {
+            self::assertStringContainsString('state row', $exception->getMessage());
+        } finally {
+            IdentityState::clearBootedModels();
+        }
+
+        self::assertNull($this->state($user)?->consecutive_failures);
     }
 
     /**
