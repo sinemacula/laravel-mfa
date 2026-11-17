@@ -12,7 +12,7 @@ use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 
 /**
  * A store whose proofs and sign-ins only an authentication layer writes,
- * through `write()`, `signOut()` and `enrol()`. A proof naming a factor counts
+ * through `write()`, `signOut()` and `enroll()`. A proof naming a factor counts
  * only while the identity holds that factor.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
@@ -67,7 +67,7 @@ final class LayerWrittenProofStore implements ProofStore
     /**
      * @return string
      */
-    public function enrol(): string
+    public function enroll(): string
     {
         $factor = 'factor-' . (count($this->factors) + 1);
 

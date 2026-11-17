@@ -450,7 +450,7 @@ final class ProofStoreContractTest extends TestCase
 
         ProofStoreContract::assertForgettingASignInForgetsItsProofs($store, $identity, 'web', $store->signIn(), $store->write(...), $store->signOut(...));
         ProofStoreContract::assertVoidedProofsStopCounting($store, $identity, 'web', $store->signIn(), $store->signOut(...), $store->write(...));
-        ProofStoreContract::assertForgettingAFactorStopsItsProofsCounting($store, $identity, 'web', $store->signIn(), $store->enrol(), $store->write(...));
+        ProofStoreContract::assertForgettingAFactorStopsItsProofsCounting($store, $identity, 'web', $store->signIn(), $store->enroll(), $store->write(...));
         ProofStoreContract::assertRefusesAProofOfAnotherSignIn($store, $identity, 'web', $store->signIn(), $store->write(...));
         ProofStoreContract::assertRefusesAProofOfAnotherApplication($store, $identity, 'web', $store->signIn(), $store->write(...));
         ProofStoreContract::assertReadsOnlyTheNamedSignIn($store, $identity, 'web', $store->signIn(), static function () use ($store, $identity): string {

@@ -343,7 +343,7 @@ final class AttemptServiceTest extends TestCase
      *
      * @throws \Throwable
      */
-    public function testACancelledSaveRollsTheLockoutBack(): void
+    public function testACanceledSaveRollsTheLockoutBack(): void
     {
         config()->set('mfa.attempts.factor_limit', 1);
 
@@ -418,7 +418,7 @@ final class AttemptServiceTest extends TestCase
      *
      * @throws \Throwable
      */
-    public function testACancelledSaveOfTheIdentityLockoutRollsItBack(): void
+    public function testACanceledSaveOfTheIdentityLockoutRollsItBack(): void
     {
         config()->set('mfa.attempts.identity_limit', 1);
 
@@ -453,7 +453,7 @@ final class AttemptServiceTest extends TestCase
      *
      * @throws \Throwable
      */
-    public function testACancelledSaveOfASuccessRollsItBack(): void
+    public function testACanceledSaveOfASuccessRollsItBack(): void
     {
         $user   = $this->user();
         $factor = $this->factor($user, failures: 1);
@@ -914,7 +914,7 @@ final class AttemptServiceTest extends TestCase
      *
      * @throws \Throwable
      */
-    public function testACancelledSaveLeavesTheLockoutInForce(): void
+    public function testACanceledSaveLeavesTheLockoutInForce(): void
     {
         Event::fake([LockoutLifted::class]);
 

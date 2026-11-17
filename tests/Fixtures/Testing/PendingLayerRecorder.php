@@ -62,7 +62,7 @@ final class PendingLayerRecorder implements VerifiedSignInRecorder
             kind: $proof->kind,
             method: $proof->method,
             channel: $proof->channel,
-            reference: $proof->reference === null ? null : $this->layer->enrol(),
+            reference: $proof->reference === null ? null : $this->layer->enroll(),
             properties: $proof->properties,
             provedAt: $proof->provedAt,
             binding: $proof->binding,

@@ -103,7 +103,7 @@ final class MultifactorAtEvaluationTest extends TestCase
     /**
      * @return void
      */
-    public function testTheEvidenceTimeIsNotSerialised(): void
+    public function testTheEvidenceTimeIsNotSerialized(): void
     {
         $proofs     = new SignInProofs;
         $evaluation = $this->evaluate($proofs->password(1000), $proofs->totp(100));
