@@ -64,6 +64,7 @@ final class LifecycleServiceTest extends TestCase
 
         $calls = [
             static fn (): bool => Mfa::unlockFactor($user, $factor->id, self::actor()),
+            static fn (): bool => Mfa::unlockFactor($user, 'missing', self::actor()),
             static fn (): bool => Mfa::enableFactor($user, $factor->id, self::actor()),
             static fn (): bool => Mfa::unlockIdentity($user, self::actor()),
         ];
