@@ -7,6 +7,7 @@ namespace Tests\Unit\Testing\Seams;
 use Carbon\CarbonImmutable;
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\CoversTrait;
 use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
@@ -19,6 +20,7 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\PendingCompletionTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\StepUpTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\PendingCompletionContract;
+use SineMacula\Laravel\Mfa\Testing\Seams\SeamAssert;
 use SineMacula\Laravel\Mfa\Testing\Seams\StepUpContract;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 use Tests\Fixtures\Context\Callers;
@@ -39,6 +41,9 @@ use Tests\TestCase;
  */
 #[CoversClass(PendingCompletionContract::class)]
 #[CoversClass(StepUpContract::class)]
+#[CoversClass(SeamAssert::class)]
+#[CoversTrait(PendingCompletionTests::class)]
+#[CoversTrait(StepUpTests::class)]
 final class CompletionContractTest extends TestCase
 {
     use PendingCompletionTests, StepUpTests;

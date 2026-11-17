@@ -70,6 +70,32 @@ final class LockedFactorsTest extends TestCase
     }
 
     /**
+     * Exactly, so another case or a padded id finds nothing.
+     *
+     * @return void
+     */
+    public function testAFactorIsFoundByItsId(): void
+    {
+        $factors = FactorSets::of($this->factor('01jd5g'), $this->factor('7'));
+
+        self::assertSame($factors[0], LockedFactors::withId('01jd5g', $factors));
+        self::assertSame($factors[1], LockedFactors::withId(7, $factors));
+        self::assertNull(LockedFactors::withId('01JD5G', $factors));
+        self::assertNull(LockedFactors::withId('7 ', $factors));
+    }
+
+    /**
+     * @return void
+     */
+    public function testAnIdThatIsNeitherAStringNorAnIntegerFindsNothing(): void
+    {
+        $factors = FactorSets::of($this->factor('7'));
+
+        self::assertNull(LockedFactors::withId(7.0, $factors));
+        self::assertNull(LockedFactors::withId(null, $factors));
+    }
+
+    /**
      * @return iterable<string, array{0: mixed, 1: ?string}>
      */
     public static function ids(): iterable

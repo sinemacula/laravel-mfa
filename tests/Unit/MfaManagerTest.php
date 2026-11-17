@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
+use SineMacula\Laravel\Mfa\Context\AuthenticationContextContributor;
 use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Contracts\FactorDriver;
@@ -257,6 +258,16 @@ final class MfaManagerTest extends TestCase
         self::assertSame(FailureReason::NOT_FOUND, $generation->reason);
         self::assertSame(0, RecoveryCode::query()->count());
         self::assertNull($this->manager()->recoveryCodeStatus(Callers::current()));
+    }
+
+    /**
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testTheAuthenticationContextOfNobodyIsNeutral(): void
+    {
+        self::assertSame(AuthenticationContextContributor::neutral(), $this->manager()->authenticationContext(Callers::current()));
     }
 
     /**

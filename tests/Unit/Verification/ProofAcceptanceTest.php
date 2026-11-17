@@ -10,9 +10,11 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Assurance\Evaluation;
 use SineMacula\Laravel\Mfa\Context\Caller;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
+use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\RequirementCheck;
 use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
+use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
@@ -139,6 +141,23 @@ final class ProofAcceptanceTest extends TestCase
         });
 
         self::assertFalse($this->accept($this->proofs->password(1000), $this->proofs->totp())->refreshesMultifactor);
+    }
+
+    /**
+     * An active sign-in holding no first factor has none to pair it with.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAProofWithoutAFirstFactorIsRefused(): void
+    {
+        $this->container()->make(ProofStore::class)->begin($this->user, SignInProofs::APPLICATION, SignInProofs::SESSION);
+
+        $this->expectException(OperationRefusedException::class);
+        $this->expectExceptionMessage('The proof is not accepted after the session\'s first factor.');
+
+        $this->container()->make(ProofAcceptance::class)->evaluate(new Caller($this->user, null, SignInProofs::APPLICATION), SignInProofs::of($this->user)->totp(), [], 'totp');
     }
 
     /**

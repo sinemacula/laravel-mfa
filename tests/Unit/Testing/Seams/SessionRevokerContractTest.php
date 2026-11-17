@@ -9,6 +9,7 @@ use Illuminate\Session\Store;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\CoversTrait;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
@@ -32,6 +33,7 @@ use Tests\TestCase;
  */
 #[CoversClass(SessionRevokerContract::class)]
 #[CoversClass(GenerationSessionRevoker::class)]
+#[CoversTrait(SessionRevokerTests::class)]
 final class SessionRevokerContractTest extends TestCase
 {
     use SessionRevokerTests;

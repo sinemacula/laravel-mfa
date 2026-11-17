@@ -295,6 +295,63 @@ final class FactorStateTransactionTest extends TestCase
     }
 
     /**
+     * For a record whose factor is gone; another owner's factors are not
+     * included.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testLocksAnOwnerNamedByItsTypeAndKey(): void
+    {
+        $user   = $this->createUser('one@example.test');
+        $factor = $this->createFactor($user, 'totp');
+        $other  = $this->createUser('two@example.test');
+        $type   = $user->getMorphClass();
+        $level  = DB::connection()->transactionLevel();
+
+        $this->createFactor($other, 'totp');
+
+        $factors = FactorStateTransaction::forOwner($type, (string) $user->id, new Factor, static function (Collection $factors) use ($level): Collection {
+            self::assertSame($level + 1, DB::connection()->transactionLevel());
+
+            return $factors;
+        });
+
+        self::assertSame([$factor->getKey()], $factors->modelKeys());
+        self::assertSame([(string) $user->id], DB::table('mfa_identity_states')->where('authenticatable_type', $type)->pluck('authenticatable_id')->all());
+    }
+
+    /**
+     * Read without a lock, so no state row is created.
+     *
+     * @return void
+     */
+    public function testASnapshotHoldsOnlyTheIdentitysFactors(): void
+    {
+        $user  = $this->createUser('one@example.test');
+        $first = $this->createFactor($user, 'totp');
+        $other = $this->createUser('two@example.test');
+
+        $second = $this->createFactor($user, 'email');
+        $this->createFactor($other, 'totp');
+
+        self::assertEqualsCanonicalizing([$first->getKey(), $second->getKey()], FactorStateTransaction::snapshot($user, new Factor)->modelKeys());
+        self::assertSame(0, DB::table('mfa_identity_states')->count());
+    }
+
+    /**
+     * Rather than refused, as a listing has nothing to lock.
+     *
+     * @return void
+     */
+    public function testASnapshotOfAnIdentityWithoutAUsableKeyIsEmpty(): void
+    {
+        self::assertTrue(FactorStateTransaction::snapshot(new NonScalarIdentifierUser, new Factor)->isEmpty());
+        self::assertTrue(FactorStateTransaction::snapshot(new NonEloquentIdentity(''), new Factor)->isEmpty());
+    }
+
+    /**
      * @param  string  $email
      * @return \Tests\Fixtures\Identities\TestUser
      */

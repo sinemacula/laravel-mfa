@@ -7,7 +7,9 @@ namespace Tests\Unit\Testing\Seams;
 use Illuminate\Http\Request;
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\CoversTrait;
 use SineMacula\Laravel\Mfa\Contracts\GuardApplicationResolver;
+use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\ApplicationResolverTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\GuardApplicationResolverTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\GuardApplicationResolverContract;
 use Tests\Fixtures\Context\GuardPortalResolver;
@@ -20,6 +22,8 @@ use Tests\TestCase;
  * @internal
  */
 #[CoversClass(GuardApplicationResolverContract::class)]
+#[CoversTrait(GuardApplicationResolverTests::class)]
+#[CoversTrait(ApplicationResolverTests::class)]
 final class GuardApplicationResolverContractTest extends TestCase
 {
     use GuardApplicationResolverTests;

@@ -6,8 +6,10 @@ namespace Tests\Unit\Attempts;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Attempts\AttemptSettings;
 use SineMacula\Laravel\Mfa\Attempts\AttemptStore;
@@ -191,6 +193,26 @@ final class AttemptStoreTest extends TestCase
         self::assertCount(2, $rows);
         self::assertSame(['hits' => 2, 'ends' => self::NOW + 120], $rows[$this->key('second')]);
         self::assertSame(['hits' => 3, 'ends' => self::NOW + 180], $rows[$this->key('third')]);
+    }
+
+    /**
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testARowWhoseKeyIsNotAStringIsSkipped(): void
+    {
+        Schema::drop('mfa_attempts');
+        Schema::create('mfa_attempts', static function (Blueprint $table): void {
+            $table->integer('key')->primary();
+            $table->string('scope');
+            $table->unsignedInteger('hits');
+            $table->timestamp('window_ends_at');
+        });
+
+        DB::table('mfa_attempts')->insert(['key' => 123, 'scope' => AttemptScope::IP->value, 'hits' => 1, 'window_ends_at' => $this->formatted(self::NOW + 60)]);
+
+        self::assertSame([], $this->store()->read(['123']));
     }
 
     /**

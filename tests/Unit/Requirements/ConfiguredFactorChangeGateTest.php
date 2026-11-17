@@ -12,6 +12,7 @@ use SineMacula\Laravel\Mfa\Contracts\Reauthenticator;
 use SineMacula\Laravel\Mfa\Enums\FactorChange;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
+use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use SineMacula\Laravel\Mfa\Requirements\ConfiguredFactorChangeGate;
 use SineMacula\Laravel\Mfa\Requirements\FactorChangeRequest;
 use Tests\Fixtures\Factors\FactorSets;
@@ -19,6 +20,7 @@ use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Lifecycle\FixedFreshnessGate;
 use Tests\Fixtures\Requirements\Concerns\ArrangesFactorChanges;
 use Tests\Fixtures\Requirements\SignInProofs;
+use Tests\Fixtures\Seams\FixedReauthenticator;
 use Tests\Fixtures\Seams\FreshReauthenticator;
 use Tests\TestCase;
 
@@ -138,6 +140,25 @@ final class ConfiguredFactorChangeGateTest extends TestCase
 
             $this->assertRefused($this->changeRequest($user, FactorChange::ADD_FIRST_ADDITIONAL_FACTOR, null));
         }
+    }
+
+    /**
+     * Made before the identity's proofs were last revoked.
+     *
+     * @return void
+     */
+    public function testAFirstFactorIsRefusedAReauthenticationOfAnEarlierGeneration(): void
+    {
+        $user             = $this->steppedUp();
+        $reauthentication = SignInProofs::of($user)->reauthentication();
+
+        $this->container()->instance(Reauthenticator::class, new FixedReauthenticator($reauthentication));
+
+        self::assertNotNull($this->authorize($this->changeRequest($user, FactorChange::ADD_FIRST_ADDITIONAL_FACTOR, null)));
+
+        VerificationGeneration::advance($user);
+
+        $this->assertRefused($this->changeRequest($user, FactorChange::ADD_FIRST_ADDITIONAL_FACTOR, null));
     }
 
     /**

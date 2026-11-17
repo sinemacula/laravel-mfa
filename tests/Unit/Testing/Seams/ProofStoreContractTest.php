@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\CoversTrait;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
@@ -37,6 +38,7 @@ use Tests\TestCase;
  */
 #[CoversClass(ProofStoreContract::class)]
 #[CoversClass(SessionProofStore::class)]
+#[CoversTrait(ProofStoreTests::class)]
 final class ProofStoreContractTest extends TestCase
 {
     use ProofStoreTests;

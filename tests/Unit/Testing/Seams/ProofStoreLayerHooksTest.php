@@ -6,6 +6,7 @@ namespace Tests\Unit\Testing\Seams;
 
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\CoversTrait;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
@@ -25,6 +26,7 @@ use Tests\TestCase;
  * @internal
  */
 #[CoversClass(ProofStoreContract::class)]
+#[CoversTrait(ProofStoreTests::class)]
 final class ProofStoreLayerHooksTest extends TestCase
 {
     use ProofStoreTests;

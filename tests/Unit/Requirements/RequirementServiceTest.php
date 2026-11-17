@@ -372,6 +372,24 @@ final class RequirementServiceTest extends TestCase
     }
 
     /**
+     * Whatever the caller would say, so it never throws; the gate is not asked.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testANameThatIsNotAnOperationsHasNoFreshnessRequirement(): void
+    {
+        $asked = [];
+
+        $this->container()->instance(FreshnessGate::class, self::gateRecording($asked, true));
+
+        self::assertNull($this->service()->freshnessRequirement(Callers::current(), 'Not An Operation', Requirement::none()->withMultifactor()));
+        self::assertNotNull($this->service()->freshnessRequirement(Callers::current(), 'billing.change_plan', Requirement::none()->withAdditionalVerification(600)));
+        self::assertSame([['billing.change_plan', ['additional_verification' => ['max_age' => 600]]]], $asked);
+    }
+
+    /**
      * Before the gate is asked.
      *
      * @return void

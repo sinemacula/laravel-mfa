@@ -887,6 +887,59 @@ final class PasskeyChangeGateTest extends TestCase
     }
 
     /**
+     * The association is deleted on its own, and nothing is refused.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testRemovingACredentialWhoseFactorIsGoneForgetsIt(): void
+    {
+        $this->enablePasskeys();
+
+        $user    = $this->signedInPerson();
+        $passkey = $this->confirmedFactor($user, 'passkey', self::CREDENTIAL);
+
+        Factor::query()->whereKey($passkey->id)->toBase()->delete();
+
+        self::assertNull(DB::transaction(fn (): ?object => $this->gate()->removing(Callers::of($user, self::APPLICATION), self::CREDENTIAL)));
+        self::assertSame(0, PasskeyAssociation::query()->count());
+        Event::assertNotDispatched(FactorRemoved::class);
+    }
+
+    /**
+     * Forgotten after the unlocked read and before the lock, nothing is left to
+     * remove.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testRemovingACredentialForgottenBeforeTheLockIsANoOp(): void
+    {
+        $this->enablePasskeys();
+
+        $user      = $this->signedInPerson();
+        $passkey   = $this->confirmedFactor($user, 'passkey', self::CREDENTIAL);
+        $forgotten = false;
+
+        DB::beforeExecuting(static function (string $query) use (&$forgotten): void {
+            if ($forgotten || !str_contains($query, TableNames::of(TableNames::IDENTITY_STATES))) {
+                return;
+            }
+
+            $forgotten = true;
+
+            PasskeyAssociation::query()->toBase()->delete();
+        });
+
+        self::assertNull(DB::transaction(fn (): ?object => $this->gate()->removing(Callers::of($user, self::APPLICATION), self::CREDENTIAL)));
+        self::assertTrue($forgotten);
+        self::assertTrue(Factor::query()->whereKey($passkey->id)->exists());
+        Event::assertNotDispatched(FactorRemoved::class);
+    }
+
+    /**
      * @return void
      *
      * @throws \Throwable

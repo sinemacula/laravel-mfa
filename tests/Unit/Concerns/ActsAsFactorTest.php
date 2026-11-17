@@ -8,11 +8,13 @@ use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\CoversTrait;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Concerns\ActsAsFactor;
 use SineMacula\Laravel\Mfa\Exceptions\InvalidModelException;
+use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Factors\RemappedLockoutFactor;
 use Tests\Fixtures\Identities\TestUser;
@@ -420,6 +422,40 @@ final class ActsAsFactorTest extends TestCase
         self::assertNotNull($factor->id);
         // @phpstan-ignore staticMethod.dynamicCall
         self::assertTrue(Factor::query()->whereKey($factor->id)->exists());
+    }
+
+    /**
+     * Its bindings carry the destination.
+     *
+     * @return void
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
+     */
+    public function testAFailedPersistIsMaskedOfWhatItWasGiven(): void
+    {
+        $factor = new Factor(['type' => 'email', 'destination' => 'secret-destination@example.com']);
+
+        try {
+            $factor->persist();
+
+            self::fail('A factor with no owner must not be saved.');
+        } catch (QueryException $failure) {
+            self::assertSame([], $failure->getBindings());
+            self::assertStringNotContainsString('secret-destination@example.com', $failure->getMessage());
+        }
+    }
+
+    /**
+     * @return void
+     */
+    public function testACanceledPersistThrows(): void
+    {
+        Factor::saving(static fn (): bool => false);
+
+        $this->expectException(WriteCanceledException::class);
+        $this->expectExceptionMessage('A model event cancelled the factor\'s save, so the change it is part of was not made.');
+
+        (new Factor(['type' => 'totp']))->persist();
     }
 
     /**
