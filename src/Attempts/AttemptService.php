@@ -331,7 +331,7 @@ final readonly class AttemptService
 
         $now     = CarbonImmutable::now();
         $subject = $this->subject($attempt->identity);
-        $state   = $this->identityState($subject, true);
+        $state   = $this->identityState($subject, true) ?? throw new \LogicException('The identity state row is missing under its lock.');
 
         $lockout = HeldLockouts::strictest($state, $factor, $settings, $now);
 
@@ -418,15 +418,11 @@ final readonly class AttemptService
      * @throws \InvalidArgumentException
      * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
      */
-    private function countIdentityFailure(Attempt $attempt, array $subject, ?IdentityState $state, AttemptSettings $settings, CarbonImmutable $now, array &$events): int
+    private function countIdentityFailure(Attempt $attempt, array $subject, IdentityState $state, AttemptSettings $settings, CarbonImmutable $now, array &$events): int
     {
         $key = $this->keys->identity($subject[0], $subject[1]);
 
         $this->store->record($key, AttemptScope::IDENTITY, $now->getTimestamp(), $now->getTimestamp() + $settings->windowSeconds());
-
-        if ($state === null) {
-            return 0;
-        }
 
         $state->consecutive_failures++;
 
