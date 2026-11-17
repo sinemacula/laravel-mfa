@@ -123,8 +123,8 @@ $attempts->resetIdentityFailures($user);                  // clear the identity'
 disabled factor for one, keeping its failures in a row, unlike `enableFactor($factor)` here, with the factor found by
 its id under the identity's lock, and `Mfa::resetIdentity()` clears the lot (see [Factor lifecycle](lifecycle.md)).
 
-Who may call these, and what they report, is the application's to decide; the package checks only that the identity is
-a person and the factor is its own.
+Who may call these, and what they report, is the application's to decide; the package checks only that the factor is
+the identity's, and on a lift and the `Mfa` helpers that the identity is a person.
 
 ## Events
 
