@@ -36,22 +36,22 @@ public function handle(): void
 }
 ```
 
+Before each job that is not `sync`, the package forgets the proofs the default proof store keeps in the worker's
+session, so a job never reads the proofs an earlier job made for the same person. The rest of the session is left alone.
+
 An application on plain Laravel guards still clears them before each job, so its own code in a job never acts as the
-last job's person. It clears the session too: the default proof store keeps its records in the session, and a worker's
-session lives in memory for as long as the worker does, so without this a job would read the proofs an earlier job made
-for the same person. Leave `sync` jobs out: they run inside the request that dispatched
-them, and clearing its guards and its session would sign that request out.
+last job's person. Leave `sync` jobs out: they run inside the request that dispatched them, and clearing its guards
+would sign that request out.
 
 ```php
 use Illuminate\Queue\Events\JobProcessing;
+use Illuminate\Queue\Jobs\SyncJob;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Queue;
-use Illuminate\Support\Facades\Session;
 
 Queue::before(static function (JobProcessing $event): void {
-    if ($event->connectionName !== 'sync') {
+    if (! $event->job instanceof SyncJob) {
         Auth::forgetGuards();
-        Session::flush();
     }
 });
 ```
