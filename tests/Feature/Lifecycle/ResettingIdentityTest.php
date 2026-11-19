@@ -7,6 +7,7 @@ namespace Tests\Feature\Lifecycle;
 use Carbon\CarbonImmutable;
 use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
@@ -19,12 +20,14 @@ use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentRequest;
 use SineMacula\Laravel\Mfa\Enrollment\PendingEnrollments;
 use SineMacula\Laravel\Mfa\Enums\AbandonmentCause;
+use SineMacula\Laravel\Mfa\Enums\EnrollmentAuthorization;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Events\EnrollmentAbandoned;
 use SineMacula\Laravel\Mfa\Events\FactorRemoved;
 use SineMacula\Laravel\Mfa\Events\FactorsReset;
 use SineMacula\Laravel\Mfa\Events\LockoutLifted;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodesRemoved;
+use SineMacula\Laravel\Mfa\Exceptions\InsufficientAuthenticationException;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
@@ -74,6 +77,12 @@ final class ResettingIdentityTest extends TestCase
 
     /** @var string The reason every reset is made for. */
     private const string REASON = 'Lost phone, identity checked by support.';
+
+    /** @var string Route behind `mfa`. */
+    private const string GATED = 'gate/account';
+
+    /** @var string Route behind `mfa` and `mfa.exempt`. */
+    private const string EXEMPT = 'gate/enroll';
 
     /**
      * @return void
@@ -737,6 +746,94 @@ final class ResettingIdentityTest extends TestCase
 
         self::assertInstanceOf(FactorsReset::class, $reset);
         self::assertFalse($reset->reenrollmentRequired);
+    }
+
+    /**
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAResetPersonPassesOnceReenrolledInTheSameSession(): void
+    {
+        $this->reenrolledAfterAReset();
+
+        $this->get(self::GATED)->assertOk();
+    }
+
+    /**
+     * The new factor is then held to the application's own mode.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testOnAnEnrolledApplicationTheReenrolledPersonVerifiesWithTheNewFactor(): void
+    {
+        config()->set('mfa.applications.' . self::APPLICATION . '.requirement', 'enrolled');
+
+        $factor  = $this->reenrolledAfterAReset();
+        $refusal = $this->get(self::GATED)->exception;
+
+        self::assertInstanceOf(InsufficientAuthenticationException::class, $refusal);
+        self::assertTrue($refusal->hasConfirmedFactor);
+        self::assertSame([$factor->id], array_column($refusal->offered, 'id'));
+
+        CarbonImmutable::setTestNow(CarbonImmutable::now()->addSeconds(30));
+
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)))->isVerified());
+
+        $this->get(self::GATED)->assertOk();
+    }
+
+    /**
+     * @param  \Illuminate\Routing\Router  $router
+     * @return void
+     */
+    #[\Override]
+    protected function defineRoutes(mixed $router): void
+    {
+        $router->get(self::GATED, static fn (): string => 'reached')->middleware('mfa');
+        $router->get(self::EXEMPT, static fn (): string => 'reached')->middleware(['mfa', 'mfa.exempt']);
+    }
+
+    /**
+     * Signs in, is reset by an operator, is gated with nothing to offer, then
+     * enrols TOTP again in the same session.
+     *
+     * @return \SineMacula\Laravel\Mfa\Models\Factor
+     *
+     * @throws \Throwable
+     */
+    private function reenrolledAfterAReset(): Factor
+    {
+        $user = TestUser::query()->create(['email' => 'person@example.test']);
+
+        Auth::login($user);
+
+        $this->confirmedFactor($user);
+        $this->container()->instance(Reauthenticator::class, new FreshReauthenticator($this->container()->make(ProofStore::class)));
+
+        Mfa::resetIdentity($user, self::actor(), self::REASON);
+
+        $refusal = $this->get(self::GATED)->exception;
+
+        self::assertInstanceOf(InsufficientAuthenticationException::class, $refusal);
+        self::assertFalse($refusal->hasConfirmedFactor);
+        self::assertSame([], $refusal->offered);
+
+        $this->get(self::EXEMPT)->assertOk();
+
+        $start = Mfa::startEnrollment(Callers::current(), EnrollmentRequest::totp('person@example.test'));
+
+        self::assertTrue($start->hasStarted());
+        self::assertSame(EnrollmentAuthorization::REAUTHENTICATION, Enrollment::query()->sole()->authority);
+
+        $factor = Factor::query()->whereKey($start->factor?->id)->sole();
+
+        self::assertTrue(Mfa::confirmEnrollment(Callers::current(), (string) $start->grant?->reveal(), AuthenticatorApp::code($factor))->isConfirmed());
+        self::assertFalse(ReenrollmentObligation::isRequired($user));
+
+        return $factor;
     }
 
     /**
