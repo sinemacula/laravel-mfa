@@ -15,17 +15,24 @@ use SineMacula\Laravel\Mfa\Attempts\AttemptKeys;
 use SineMacula\Laravel\Mfa\Attempts\AttemptOutcome;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Attempts\AttemptStore;
+use SineMacula\Laravel\Mfa\Codes\CodeService;
 use SineMacula\Laravel\Mfa\Enums\AttemptScope;
+use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
+use SineMacula\Laravel\Mfa\Models\Code;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Exceptions\MidRotationFailureException;
 use Tests\Fixtures\Identities\TestUser;
+use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
+use Tests\Integration\Database\Concerns\RacesAForkedWorker;
 use Tests\TestCase;
 
 /**
- * A lockout `observer` commits after the application's transaction took its
- * snapshot still refuses an attempt in it, as the lock read sees the commit.
+ * A lockout or send `observer` commits after the application's transaction took
+ * its snapshot still binds an attempt or send in it.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -33,8 +40,14 @@ use Tests\TestCase;
  * @internal
  */
 #[CoversClass(AttemptService::class)]
+#[CoversClass(CodeService::class)]
 final class FactorLockoutSnapshotTest extends TestCase
 {
+    use ArrangesVerification, RacesAForkedWorker;
+
+    /** @var string The sign-in that sends second. */
+    private const string LATER_SESSION = 'sign-in-b';
+
     /**
      * Ends a transaction a failed test left open before migrations roll back.
      *
@@ -231,6 +244,94 @@ final class FactorLockoutSnapshotTest extends TestCase
     }
 
     /**
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testPostgresqlRepeatableReadFailsASendPastTheCapUntilRetried(): void
+    {
+        $this->requireDriver('pgsql');
+
+        [$user, $factor] = $this->arrangeSends();
+
+        $this->openTransaction('REPEATABLE READ');
+        $this->takeSnapshot($factor);
+        $this->commitSendElsewhere($factor);
+        $this->beginSignIn($user, self::LATER_SESSION);
+
+        try {
+            $this->mfa()->sendCode(Callers::current(), $factor->id);
+
+            self::fail('The stale snapshot must not answer the send.');
+        } catch (\PDOException $failure) {
+            self::assertSerializationFailure($failure, 'mfa_identity_states');
+        }
+
+        DB::connection()->rollBack();
+
+        $this->openTransaction('REPEATABLE READ');
+
+        $result = $this->mfa()->sendCode(Callers::current(), $factor->id);
+
+        DB::connection()->commit();
+
+        self::assertSame(FailureReason::SENDING_CAPPED, $result->reason);
+        $this->assertSentOnce();
+    }
+
+    /**
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testPostgresqlReadCommittedCapsASendAnotherJustCommitted(): void
+    {
+        $this->requireDriver('pgsql');
+
+        [$user, $factor] = $this->arrangeSends();
+
+        $this->openTransaction('READ COMMITTED');
+        $this->takeSnapshot($factor);
+        $this->commitSendElsewhere($factor);
+        $this->beginSignIn($user, self::LATER_SESSION);
+
+        $result = $this->mfa()->sendCode(Callers::current(), $factor->id);
+
+        DB::connection()->commit();
+
+        self::assertSame(FailureReason::SENDING_CAPPED, $result->reason);
+        $this->assertSentOnce();
+    }
+
+    /**
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testASendWaitingOnAnotherIsCappedOnceItCommits(): void
+    {
+        if (!in_array(DB::connection()->getDriverName(), ['mysql', 'pgsql'], true)) {
+            self::markTestSkipped('Overlapping sends are proven on MySQL and PostgreSQL.');
+        }
+
+        $this->needsAFork();
+
+        [$user, $factor] = $this->arrangeSends();
+
+        $outcome = $this->holdingTheLock(
+            fn () => self::assertTrue($this->mfa()->sendCode(Callers::current(), $factor->id)->wasSent()),
+            function () use ($user, $factor): ?FailureReason {
+                $this->beginSignIn($user, self::LATER_SESSION);
+
+                return $this->mfa()->sendCode(Callers::current(), $factor->id)->reason;
+            },
+        );
+
+        self::assertSame(FailureReason::SENDING_CAPPED->value, $outcome);
+        $this->assertSentOnce();
+    }
+
+    /**
      * @param  mixed  $app
      * @return void
      *
@@ -248,6 +349,7 @@ final class FactorLockoutSnapshotTest extends TestCase
         $config = $app->make(Repository::class);
 
         $config->set('database.connections.observer', $config->get('database.connections.testing'));
+        $config->set('database.connections.racer', $config->get('database.connections.testing'));
     }
 
     /**
@@ -301,6 +403,26 @@ final class FactorLockoutSnapshotTest extends TestCase
         IdentityState::query()->create(['authenticatable_type' => $user::class, 'authenticatable_id' => (string) $user->id]);
 
         return [$user, $factor];
+    }
+
+    /**
+     * An email factor whose destination takes one send, for a signed-in person
+     * whose state row exists.
+     *
+     * @return array{0: \Tests\Fixtures\Identities\TestUser, 1: \SineMacula\Laravel\Mfa\Models\Factor}
+     */
+    private function arrangeSends(): array
+    {
+        $this->arrangeVerification();
+
+        config()->set('mfa.codes.factor_send_limit', 1);
+
+        $user  = $this->signedInPerson();
+        $owner = ProofOwner::of($user);
+
+        IdentityState::query()->create(['authenticatable_type' => $owner->type, 'authenticatable_id' => $owner->key]);
+
+        return [$user, $this->emailFactor($user)];
     }
 
     /**
@@ -366,6 +488,25 @@ final class FactorLockoutSnapshotTest extends TestCase
     }
 
     /**
+     * From the first sign-in.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    private function commitSendElsewhere(Factor $factor): void
+    {
+        config()->set('mfa.storage.connection', 'observer');
+
+        try {
+            self::assertTrue($this->mfa()->sendCode(Callers::current(), $factor->id)->wasSent());
+        } finally {
+            config()->set('mfa.storage.connection', null);
+        }
+    }
+
+    /**
      * @param  \SineMacula\Laravel\Mfa\Models\Factor  $factor
      * @return \Carbon\CarbonImmutable
      */
@@ -424,6 +565,15 @@ final class FactorLockoutSnapshotTest extends TestCase
         $key = $this->container()->make(AttemptKeys::class)->identity($user::class, (string) $user->id);
 
         self::assertSame($failures, $this->container()->make(AttemptStore::class)->read([$key])[$key]['hits'] ?? 0);
+    }
+
+    /**
+     * @return void
+     */
+    private function assertSentOnce(): void
+    {
+        self::assertSame(1, Code::query()->count());
+        self::assertCount(1, $this->mailbox->sent());
     }
 
     /**
