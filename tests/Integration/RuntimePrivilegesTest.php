@@ -13,6 +13,9 @@ use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Events\Actor;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\MfaManager;
+use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Models\IdentityState;
+use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use SineMacula\Laravel\Mfa\Verification\Submission;
 use Tests\Fixtures\Context\Callers;
@@ -125,9 +128,11 @@ final class RuntimePrivilegesTest extends TestCase
 
         $factor = $this->emailFactor($user);
 
-        [$challenge] = $this->sentCode($factor);
+        [$challenge, $code] = $this->sentCode($factor);
 
-        Mfa::verify(Callers::current(), Submission::challenge($factor->id, $challenge, '000000'));
+        $wrong = $code === '000000' ? '111111' : '000000';
+
+        self::assertSame(FailureReason::INVALID_CODE, Mfa::verify(Callers::current(), Submission::challenge($factor->id, $challenge, $wrong))->reason);
 
         $this->recoveryCode($user);
         $this->recoveryCode($user);
@@ -151,8 +156,19 @@ final class RuntimePrivilegesTest extends TestCase
         $this->totpFactor($user);
         $this->recoveryCode($user);
 
+        $this->statements = [];
+
         Mfa::resetIdentity($user, new Actor('admin', '9'), 'Lost phone.');
+
+        self::assertSame([0, 0, 1], [Factor::query()->count(), RecoveryCode::query()->count(), IdentityState::query()->count()]);
+
+        $this->assertOnlyDataStatements();
+
+        $this->statements = [];
+
         Mfa::forgetIdentity($user);
+
+        self::assertSame(0, IdentityState::query()->count());
 
         $this->assertOnlyDataStatements();
     }
