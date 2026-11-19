@@ -24,6 +24,7 @@ use Tests\Fixtures\Codes\Concerns\ArrangesEmailChallenges;
 use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Seams\AcceptingChallengeGateway;
+use Tests\Fixtures\Seams\FaultyChallengeGatewayKit;
 use Tests\Fixtures\Seams\MemoryChallengeGateway;
 use Tests\Fixtures\Seams\ScriptedChallengeGateway;
 use Tests\TestCase;
@@ -214,6 +215,7 @@ final class ChallengeGatewayContractTest extends TestCase
      */
     public static function bindingPartsIgnored(): iterable
     {
+        yield 'the purpose' => ['purpose', 'another purpose'];
         yield 'the session' => ['session_id', 'another session'];
         yield 'the application' => ['application', 'another application'];
     }
@@ -284,6 +286,44 @@ final class ChallengeGatewayContractTest extends TestCase
         $this->expectExceptionMessage('must not be counted');
 
         ChallengeGatewayContract::assertAnotherCallersBindingIsNotFound($gateway, Callers::current(), $this->factor, $this->emailBinding($this->user), self::sent(...));
+    }
+
+    /**
+     * @return void
+     */
+    public function testRejectsAGatewayThatUsesUpTheCodeOnAnotherCallersBinding(): void
+    {
+        $asked   = 0;
+        $gateway = new ScriptedChallengeGateway(static function () use (&$asked): ChallengeOutcome {
+            return ++$asked <= 3 ? ChallengeOutcome::refused(FailureReason::NOT_FOUND, 'No.') : ChallengeOutcome::failed(FailureReason::REPLAYED, 'Used.');
+        });
+
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('must not use up the code');
+
+        ChallengeGatewayContract::assertAnotherCallersBindingIsNotFound($gateway, Callers::current(), $this->factor, $this->emailBinding($this->user), self::sent(...));
+    }
+
+    /**
+     * @return void
+     */
+    public function testTheKitRejectsAGatewayThatIgnoresTheCaller(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('must not be found');
+
+        (new FaultyChallengeGatewayKit('kit'))->testChallengeGatewayDoesNotFindAnotherCallersBinding();
+    }
+
+    /**
+     * @return void
+     */
+    public function testTheKitRejectsAGatewayWithNoAttemptLimit(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('once its challenge has taken its attempts');
+
+        (new FaultyChallengeGatewayKit('kit'))->testChallengeGatewayRefusesTheCodeOnceItsAttemptsAreTaken();
     }
 
     /**

@@ -12,6 +12,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\CoversTrait;
 use SineMacula\Laravel\Mfa\Context\NoPendingSessionResolver;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
+use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
@@ -22,7 +23,9 @@ use Tests\Fixtures\Context\FixedPendingSessionResolver;
 use Tests\Fixtures\Context\RecordingPendingSessionResolver;
 use Tests\Fixtures\Context\RequestAttributePendingSessionResolver;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
+use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Requirements\SignInProofs;
+use Tests\Fixtures\Seams\FaultyPendingSessionResolverKit;
 use Tests\TestCase;
 
 /**
@@ -153,6 +156,36 @@ final class PendingSessionResolverContractTest extends TestCase
     }
 
     /**
+     * One of the same key.
+     *
+     * @return void
+     */
+    public function testRejectsAResolverThatRevalidatesAsAnotherIdentityType(): void
+    {
+        $request = Request::create('/');
+
+        $request->attributes->set(RequestAttributePendingSessionResolver::ATTRIBUTE, self::pendingSession(identity: new NonEloquentIdentity(1)));
+
+        $this->servedRequestHolding(self::pendingSession(identity: (new TestUser)->forceFill(['id' => 1])));
+
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('as the same identity, application and session');
+
+        PendingSessionResolverContract::assertAnEndedSessionDoesNotRevalidate(new RequestAttributePendingSessionResolver, $request, 'web', self::endSession(...));
+    }
+
+    /**
+     * @return void
+     */
+    public function testTheKitRejectsAResolverWithoutCredentialsThatAnswersOne(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('A resolver with no pending credentials must answer none.');
+
+        (new FaultyPendingSessionResolverKit('kit'))->testPendingSessionResolverDoesNotRevalidateAnEndedSession();
+    }
+
+    /**
      * @return void
      */
     public function testRejectsAResolverThatDropsAStandingSession(): void
@@ -253,12 +286,11 @@ final class PendingSessionResolverContractTest extends TestCase
 
     /**
      * @param  string  $application
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @return \SineMacula\Laravel\Mfa\Context\PendingContext
      */
-    private static function pendingSession(string $application = 'web'): PendingContext
+    private static function pendingSession(string $application = 'web', MultiFactorAuthenticatable $identity = new NonEloquentIdentity): PendingContext
     {
-        $identity = new NonEloquentIdentity;
-
         return new PendingContext(
             $identity,
             $application,

@@ -23,6 +23,7 @@ use Tests\Fixtures\Lifecycle\FixedFreshnessGate;
 use Tests\Fixtures\Requirements\FreshOnceGate;
 use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\Fixtures\Seams\CallerBlindFreshnessGate;
+use Tests\Fixtures\Seams\FaultyFreshnessGateKit;
 use Tests\Fixtures\Seams\FaultySeams;
 use Tests\Fixtures\Seams\ScriptedFreshnessGate;
 use Tests\TestCase;
@@ -222,6 +223,44 @@ final class FreshnessGateContractTest extends TestCase
     }
 
     /**
+     * @return void
+     */
+    public function testTheKitRejectsAGateThatFindsEverythingFresh(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('must not be fresh for a stricter requirement');
+
+        (new FaultyFreshnessGateKit('kit'))->testFreshnessGateAppliesTheCallersStricterRequirement();
+    }
+
+    /**
+     * A verification exactly as old as the caller allows still counts.
+     *
+     * @return iterable<string, array{int, bool}>
+     */
+    public static function verificationAges(): iterable
+    {
+        yield '10 seconds old' => [10, false];
+        yield '11 seconds old' => [11, true];
+    }
+
+    /**
+     * @param  int  $secondsAgo
+     * @param  bool  $accepted
+     * @return void
+     */
+    #[DataProvider('verificationAges')]
+    public function testTheCallersRequirementAsksForAVerificationInTheLast10Seconds(int $secondsAgo, bool $accepted): void
+    {
+        $this->freezeTime();
+
+        $gate  = $this->gateVerified($secondsAgo);
+        $check = fn () => FreshnessGateContract::assertTheCallersStricterRequirementApplies($gate, Callers::current(), $this->freshOperation());
+
+        self::assertSame($accepted, self::rejection($check) === null);
+    }
+
+    /**
      * Which no caller's requirement can make stricter.
      *
      * @return void
@@ -248,24 +287,14 @@ final class FreshnessGateContractTest extends TestCase
     }
 
     /**
-     * Asked for a person with a step-up just recorded.
+     * Asked for a person with a step-up recorded 30 seconds ago.
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\FreshnessGate
      */
     #[\Override]
     protected function freshGate(): FreshnessGate
     {
-        $identity = TestUser::query()->create(['email' => 'fresh@example.test']);
-        $store    = $this->container()->make(ProofStore::class);
-        $proofs   = SignInProofs::of($identity);
-
-        $this->actingAs($identity);
-
-        $store->begin($identity, SignInProofs::APPLICATION, SignInProofs::SESSION);
-        $store->record($identity, $proofs->password(60));
-        $store->record($identity, $proofs->totp(30));
-
-        return $this->container()->make(FreshnessGate::class);
+        return $this->gateVerified(30);
     }
 
     /**
@@ -290,6 +319,27 @@ final class FreshnessGateContractTest extends TestCase
     protected function freshnessCaller(): CallerContext
     {
         return Callers::current();
+    }
+
+    /**
+     * Asked for a person with a step-up recorded `$secondsAgo` seconds ago.
+     *
+     * @param  int  $secondsAgo
+     * @return \SineMacula\Laravel\Mfa\Contracts\FreshnessGate
+     */
+    private function gateVerified(int $secondsAgo): FreshnessGate
+    {
+        $identity = TestUser::query()->create(['email' => 'fresh@example.test']);
+        $store    = $this->container()->make(ProofStore::class);
+        $proofs   = SignInProofs::of($identity);
+
+        $this->actingAs($identity);
+
+        $store->begin($identity, SignInProofs::APPLICATION, SignInProofs::SESSION);
+        $store->record($identity, $proofs->password(60));
+        $store->record($identity, $proofs->totp($secondsAgo));
+
+        return $this->container()->make(FreshnessGate::class);
     }
 
     /**

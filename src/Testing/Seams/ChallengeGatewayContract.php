@@ -191,7 +191,7 @@ final class ChallengeGatewayContract
         $fields  = $binding->toArray();
         $purpose = $binding->purpose === Purpose::STEP_UP ? Purpose::SIGN_IN : Purpose::STEP_UP;
 
-        $fields[$part] = $part === 'purpose' ? $purpose->value : $fields[$part] . '-other';
+        $fields[$part] = $part === 'purpose' ? $purpose->value : sprintf('%s-other', $fields[$part]);
 
         return ProofBinding::fromArray($fields);
     }
