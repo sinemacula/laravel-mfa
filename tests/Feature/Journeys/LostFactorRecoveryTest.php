@@ -71,6 +71,7 @@ final class LostFactorRecoveryTest extends TestCase
         [$lost, $codes] = $this->recoveredWithACode();
 
         self::assertTrue(Mfa::removeFactor(Callers::current(), $lost->id)->wasMade());
+        self::assertFalse(Factor::query()->whereKey($lost->id)->exists());
         self::assertFalse(Mfa::recoveryCodeStatus(Callers::current())?->exists());
 
         $start = $this->startedTotp();
@@ -115,12 +116,14 @@ final class LostFactorRecoveryTest extends TestCase
         $start = $this->startedTotp();
 
         self::assertSame(EnrollmentAuthorization::STEP_UP, $this->rowOf($start)->authority);
+        self::assertSame(FailureReason::LAST_FACTOR, Mfa::removeFactor(Callers::current(), $lost->id)->reason);
 
         $confirmation = Mfa::confirmEnrollment(Callers::current(), $this->grantOf($start), $this->appCode($start));
 
         self::assertTrue($confirmation->isConfirmed());
         self::assertSame([], $confirmation->recoveryCodes);
         self::assertTrue(Mfa::removeFactor(Callers::current(), $lost->id)->wasMade());
+        self::assertFalse(Factor::query()->whereKey($lost->id)->exists());
         self::assertSame(9, Mfa::recoveryCodeStatus(Callers::current())?->remaining);
 
         $this->get(self::GATED)->assertOk();
