@@ -132,9 +132,9 @@ final class TotpSettingsTest extends TestCase
     public function testTheIssuerIsTheConfiguredOneOrTheApplicationsName(): void
     {
         self::assertSame('Acme', (new TotpSettings(new Repository(['app' => ['name' => 'Acme']])))->issuer());
-        self::assertSame('Own', (new TotpSettings(new Repository(['app' => ['name' => 'Acme'], 'mfa' => ['totp' => ['issuer' => 'Own']]])))->issuer());
+        self::assertSame('Own', (new TotpSettings(new Repository(['app' => ['name' => 'Acme: Admin'], 'mfa' => ['totp' => ['issuer' => 'Own']]])))->issuer());
 
-        foreach (['', '  ', 12] as $issuer) {
+        foreach (['', '  ', 12, 'Acme: Admin'] as $issuer) {
             $settings = self::settingsWith(['issuer' => $issuer]);
 
             foreach ([$settings->issuer(...), $settings->validate(...)] as $read) {
@@ -143,15 +143,37 @@ final class TotpSettingsTest extends TestCase
 
                     self::fail('An issuer that is no name was expected to be refused.');
                 } catch (\InvalidArgumentException $exception) {
-                    self::assertSame('mfa.totp.issuer must be a non-empty string.', $exception->getMessage());
+                    self::assertSame('mfa.totp.issuer must be a non-empty string without a colon.', $exception->getMessage());
                 }
             }
         }
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Set mfa.totp.issuer or app.name: an authenticator app must show an issuer.');
+        $this->expectExceptionMessage('Set mfa.totp.issuer, or a non-empty app.name without a colon: an authenticator app must show an issuer.');
 
         self::settingsWith([])->issuer();
+    }
+
+    /**
+     * Refused only when read, like a missing one.
+     *
+     * @return void
+     */
+    public function testABlankOrColonApplicationNameIsNoIssuer(): void
+    {
+        foreach (['', '  ', 'Acme: Admin'] as $name) {
+            $settings = new TotpSettings(new Repository(['app' => ['name' => $name]]));
+
+            $settings->validate();
+
+            try {
+                $settings->issuer();
+
+                self::fail('An application name that is no issuer was expected to be refused.');
+            } catch (\InvalidArgumentException $exception) {
+                self::assertSame('Set mfa.totp.issuer, or a non-empty app.name without a colon: an authenticator app must show an issuer.', $exception->getMessage());
+            }
+        }
     }
 
     /**

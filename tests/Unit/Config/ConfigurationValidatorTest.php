@@ -131,6 +131,7 @@ final class ConfigurationValidatorTest extends TestCase
             ),
         ];
         yield 'a TOTP setting' => ['mfa.totp.window', 4, 'totp', 'mfa.totp.window must be an integer from 0 to 3.'];
+        yield 'a TOTP issuer holding a colon' => ['mfa.totp.issuer', 'Acme: Admin', 'totp', 'mfa.totp.issuer must be a non-empty string without a colon.'];
         yield 'a code setting' => ['mfa.codes.length', 5, 'codes', 'mfa.codes.length must be an integer from 6 to 10.'];
         yield 'a recovery code setting' => [
             'mfa.recovery_codes.length',
@@ -245,6 +246,34 @@ final class ConfigurationValidatorTest extends TestCase
         self::assertSame([self::NO_FIRST_FACTOR], $this->validator()->report()['applications.web']);
 
         $this->container()->instance(FirstFactorResolver::class, \Mockery::mock(FirstFactorResolver::class));
+
+        self::assertSame([], $this->validator()->report()['applications.web']);
+    }
+
+    /**
+     * Only an application offering TOTP shows the application's name.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testATotpApplicationNeedsAnIssuerWithoutAColon(): void
+    {
+        $declared = ['method' => 'password', 'channel' => 'password'];
+
+        $this->config()->set('app.name', 'Acme: Admin');
+        $this->config()->set('mfa.applications', [
+            'web' => ['types' => ['totp'], 'first_factor' => $declared],
+            'api' => ['first_factor' => $declared],
+        ]);
+
+        $report = $this->validator()->report();
+
+        self::assertSame(['Set mfa.totp.issuer, or a non-empty app.name without a colon: an authenticator app must show an issuer.'], $report['applications.web']);
+        self::assertSame([], $report['applications.api']);
+        self::assertSame([], $report['totp']);
+
+        $this->config()->set('mfa.totp.issuer', 'Acme');
 
         self::assertSame([], $this->validator()->report()['applications.web']);
     }
