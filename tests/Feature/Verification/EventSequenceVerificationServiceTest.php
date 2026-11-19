@@ -11,12 +11,17 @@ use SineMacula\Laravel\Mfa\Attempts\ChallengeCounters;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeOutcome;
 use SineMacula\Laravel\Mfa\Codes\PackageChallengeGateway;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
+use SineMacula\Laravel\Mfa\Context\ClientContext;
+use SineMacula\Laravel\Mfa\Contracts\EventContextResolver;
 use SineMacula\Laravel\Mfa\Contracts\MfaEvent;
 use SineMacula\Laravel\Mfa\Contracts\StepUp;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\CodeSent;
 use SineMacula\Laravel\Mfa\Events\EventDispatcher;
+use SineMacula\Laravel\Mfa\Events\FactorDisabled;
+use SineMacula\Laravel\Mfa\Events\LockoutApplied;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodesLow;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodeUsed;
 use SineMacula\Laravel\Mfa\Events\VerificationFailed;
@@ -36,6 +41,7 @@ use SineMacula\Laravel\Mfa\Verification\SubmissionRoutes;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
 use Tests\Fixtures\Context\Callers;
+use Tests\Fixtures\Seams\RecordingEventContextResolver;
 use Tests\Fixtures\Seams\RefusingCompletion;
 use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 use Tests\TestCase;
@@ -245,6 +251,51 @@ final class EventSequenceVerificationServiceTest extends TestCase
         self::assertSame(self::APPLICATION, $event->context()['application']);
         self::assertSame(Purpose::STEP_UP, $event->purpose);
         self::assertContainsOnlyInstancesOf(MfaEvent::class, $this->reported);
+    }
+
+    /**
+     * Each names the step-up, the application and the caller's client, and no
+     * sign-in.
+     *
+     * @return void
+     */
+    public function testAStepUpsLockoutAndDisablingNameTheAttempt(): void
+    {
+        config()->set('mfa.attempts.factor_limit', 2);
+        config()->set('mfa.attempts.failure_ceiling', 3);
+        config()->set('mfa.attempts.lockout_seconds', 60);
+
+        $this->container()->instance(EventContextResolver::class, new RecordingEventContextResolver);
+
+        $user   = $this->signedInPerson();
+        $factor = $this->totpFactor($user);
+        $caller = CallerContext::forIdentity($user, self::APPLICATION, new ClientContext('203.0.113.7', 'Agent/2.0'));
+
+        $this->mfa()->verify($caller, Submission::factor($factor->id, '000000'));
+        $this->mfa()->verify($caller, Submission::factor($factor->id, '000000'));
+
+        Carbon::setTestNow('2026-11-01 12:01:01');
+
+        $this->mfa()->verify($caller, Submission::factor($factor->id, '000000'));
+
+        $events = array_values(array_filter($this->reported, static fn (MfaEvent $event): bool => $event instanceof LockoutApplied || $event instanceof FactorDisabled));
+
+        self::assertCount(2, $events);
+        [$lockout, $disabled] = $events;
+
+        self::assertInstanceOf(LockoutApplied::class, $lockout);
+        self::assertInstanceOf(FactorDisabled::class, $disabled);
+
+        foreach ([$lockout, $disabled] as $event) {
+            self::assertSame($factor->id, $event->factor?->id);
+            self::assertSame(Purpose::STEP_UP, $event->purpose);
+            self::assertSame(self::APPLICATION, $event->context()['application']);
+            self::assertSame('203.0.113.7', $event->context()['ip']);
+            self::assertSame('Agent/2.0', $event->context()['user_agent']);
+            self::assertNull($event->context()['session_id']);
+        }
+
+        self::assertSame([self::SESSION], array_values(array_unique(RecordingEventContextResolver::signInsOf($this->reported, VerificationFailed::class))));
     }
 
     /**

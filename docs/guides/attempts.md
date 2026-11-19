@@ -132,11 +132,12 @@ the identity's, and on a lift and the `Mfa` helpers that the identity is a perso
 |------------------|---------------------------------------------------------------------------|
 | `LockoutApplied` | A failure locks the factor (`factor` set) or the identity (`factor` null) |
 | `LockoutLifted`  | A live lockout is lifted before it ends, with the `actor` who lifted it   |
-| `FactorDisabled` | A factor's or the identity's failures in a row reach the failure ceiling  |
+| `FactorDisabled` | A failure disables a factor, its own or the identity's run at the ceiling |
 
 Each is dispatched once the attempt's transaction has committed (see [Events](events.md)), so a listener that throws
 cannot undo the count: the failure, and the IP address's charge for it, stand. The IP address's throttle has no event:
-it says nothing about any one identity.
+it says nothing about any one identity. Nor does the identity's run reaching the ceiling on an attempt that names no
+factor of its own, since no factor is disabled; `VerificationFailed` still reports the attempt.
 
 ## Limiting the endpoint
 

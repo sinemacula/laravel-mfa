@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
+use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\Reauthenticator;
 use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
@@ -228,7 +229,8 @@ final class ResettingIdentityTest extends TestCase
 
     /**
      * Lockouts first, each factor in id order by how far it got, the codes,
-     * then the reset; an ended lockout is not reported.
+     * then the reset; an ended lockout is not reported. No client is read from
+     * the request.
      *
      * @return void
      *
@@ -281,6 +283,40 @@ final class ResettingIdentityTest extends TestCase
         self::assertSame(self::REASON, $reset->reason);
         self::assertTrue($reset->reenrollmentRequired);
         self::assertSame((string) $user->id, (string) $reset->context()['identity_id']);
+
+        foreach ($this->reported as $event) {
+            self::assertNull($event->context()['ip']);
+            self::assertNull($event->context()['user_agent']);
+        }
+    }
+
+    /**
+     * Every event carries the client the operator acted from.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testTheEventsCarryTheClientGiven(): void
+    {
+        $user   = $this->signedInPerson();
+        $locked = $this->confirmedFactor($user);
+
+        $this->pendingEnrollmentOf($user);
+        $this->recoveryCodesOf($user);
+
+        $locked->update(['locked_until' => CarbonImmutable::now()->addMinutes(10)]);
+
+        IdentityState::query()->where('authenticatable_id', (string) $user->id)->update(['locked_until' => CarbonImmutable::now()->addHour()]);
+
+        Mfa::resetIdentity($user, self::actor(), self::REASON, client: new ClientContext('198.51.100.4', 'Admin/1.0'));
+
+        self::assertSame(['LockoutLifted', 'LockoutLifted', 'FactorRemoved', 'EnrollmentAbandoned', 'RecoveryCodesRemoved', 'FactorsReset'], $this->reportedNames());
+
+        foreach ($this->reported as $event) {
+            self::assertSame('198.51.100.4', $event->context()['ip']);
+            self::assertSame('Admin/1.0', $event->context()['user_agent']);
+        }
     }
 
     /**
