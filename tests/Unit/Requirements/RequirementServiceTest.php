@@ -347,6 +347,31 @@ final class RequirementServiceTest extends TestCase
     }
 
     /**
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testFreshnessReadsOnlyTheCallersApplicationsProofs(): void
+    {
+        config()->set('mfa.applications.web', ['freshness' => ['billing.close' => 900]]);
+        config()->set('mfa.applications.admin', ['freshness' => ['billing.close' => 900]]);
+
+        $user  = TestUser::query()->create(['email' => 'proofs@example.test', 'mfa_enabled' => true]);
+        $store = $this->container()->make(ProofStore::class);
+
+        foreach (['web' => 300, 'admin' => 3600] as $application => $factorAge) {
+            $signIn = SignInProofs::of($user)->onApplication($application)->inSession($application . '-sign-in');
+
+            $store->begin($user, $application, $signIn->sessionId);
+            $store->record($user, $signIn->password(3600));
+            $store->record($user, $signIn->totp($factorAge));
+        }
+
+        self::assertTrue($this->service()->isFresh(CallerContext::forIdentity($user, 'web'), 'billing.close'));
+        self::assertFalse($this->service()->isFresh(CallerContext::forIdentity($user, 'admin'), 'billing.close'));
+    }
+
+    /**
      * @return iterable<string, array{?string}>
      */
     public static function modes(): iterable
