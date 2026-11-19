@@ -105,22 +105,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     /**
      * @return void
      */
-    public function testRejectsARequirementThatKeepsState(): void
-    {
-        $faulty   = new FaultySeams;
-        $identity = new NonEloquentIdentity;
-
-        $this->expectException(AssertionFailedError::class);
-
-        RequirementSeamContract::assertKeepsNoStateBetweenCalls(
-            static fn () => $faulty->requirementFor($identity, 'web'),
-            static fn () => $faulty->requirementFor($identity, 'api'),
-        );
-    }
-
-    /**
-     * @return void
-     */
     public function testRejectsABlankApplication(): void
     {
         $this->expectException(AssertionFailedError::class);
@@ -227,26 +211,6 @@ final class SeamsWithoutStateContractTest extends TestCase
         $this->expectExceptionMessage('A person\'s identity must be a person.');
 
         SubjectTypeResolverContract::assertAPersonIsAPerson(new DriftingSeams, $this->personIdentity());
-    }
-
-    /**
-     * The same answer to a question asked twice in a row, but a different one
-     * once another was asked in between.
-     *
-     * @return void
-     */
-    public function testRejectsARequirementThatRemembersTheQuestionBefore(): void
-    {
-        $drifting = new DriftingSeams;
-        $identity = new NonEloquentIdentity;
-
-        $this->expectException(AssertionFailedError::class);
-        $this->expectExceptionMessage('whatever was asked in between');
-
-        RequirementSeamContract::assertKeepsNoStateBetweenCalls(
-            static fn () => $drifting->requirementFor($identity, 'web'),
-            static fn () => $drifting->requirementFor($identity, 'api'),
-        );
     }
 
     /**

@@ -15,7 +15,8 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
 /**
  * Keeps its challenges in memory, keyed by the binding parts it is told to
- * check, so the challenge gateway kit can be shown one that checks too few.
+ * check and by the caller unless told not to, so the challenge gateway kit can
+ * be shown one that checks too little.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -30,12 +31,13 @@ final class MemoryChallengeGateway implements ChallengeGateway
     /** @var list<string> */
     public const array EVERY_PART = ['identity_type', 'identity_key', 'application', 'session_id', 'purpose'];
 
-    /** @var array<string, array{key: array<string, string>, attempts: int, used: bool}> */
+    /** @var array<string, array{key: array<string, string>, caller: ?\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable, attempts: int, used: bool}> */
     private array $challenges = [];
 
     /**
      * @param  list<string>  $keyedBy
      * @param  ?int  $maxAttempts
+     * @param  bool  $checksCaller
      */
     public function __construct(
 
@@ -44,6 +46,9 @@ final class MemoryChallengeGateway implements ChallengeGateway
 
         /** Wrong codes a challenge takes, or `null` for no limit. */
         private readonly ?int $maxAttempts = 5,
+
+        /** Whether a challenge answers only the caller it was sent to. */
+        private readonly bool $checksCaller = true,
     ) {}
 
     /**
@@ -57,7 +62,7 @@ final class MemoryChallengeGateway implements ChallengeGateway
     {
         $id = 'memory-challenge-' . count($this->challenges);
 
-        $this->challenges[$id] = ['key' => $this->keyOf($binding), 'attempts' => 0, 'used' => false];
+        $this->challenges[$id] = ['key' => $this->keyOf($binding), 'caller' => $caller->identity, 'attempts' => 0, 'used' => false];
 
         return SendResult::sent($id, CarbonImmutable::now()->addMinutes(5));
     }
@@ -75,7 +80,7 @@ final class MemoryChallengeGateway implements ChallengeGateway
     {
         $challenge = $this->challenges[$challengeId] ?? null;
 
-        if ($challenge === null || $challenge['key'] !== $this->keyOf($binding)) {
+        if ($challenge === null || $challenge['key'] !== $this->keyOf($binding) || ($this->checksCaller && $challenge['caller'] !== $caller->identity)) {
             return ChallengeOutcome::refused(FailureReason::NOT_FOUND, 'No such challenge.');
         }
 

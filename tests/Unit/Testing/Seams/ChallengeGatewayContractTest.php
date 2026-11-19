@@ -60,6 +60,9 @@ final class ChallengeGatewayContractTest extends TestCase
     {
         parent::setUp();
 
+        // So the kit sees the challenge run out, not the factor lock.
+        config()->set('mfa.attempts.factor_limit', 10);
+
         [$this->user, $this->factor, $this->mailbox] = $this->arrangeEmailChallenges();
     }
 
@@ -248,6 +251,21 @@ final class ChallengeGatewayContractTest extends TestCase
     public function testRejectsAGatewayThatIgnoresTheIdentity(string $ignored): void
     {
         $gateway = new MemoryChallengeGateway(array_values(array_diff(MemoryChallengeGateway::EVERY_PART, [$ignored])));
+
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('must not be found');
+
+        ChallengeGatewayContract::assertAnotherCallersBindingIsNotFound($gateway, Callers::current(), $this->factor, $this->emailBinding($this->user), self::sent(...));
+    }
+
+    /**
+     * Its challenges still answer only their own binding.
+     *
+     * @return void
+     */
+    public function testRejectsAGatewayThatIgnoresTheCaller(): void
+    {
+        $gateway = new MemoryChallengeGateway(checksCaller: false);
 
         $this->expectException(AssertionFailedError::class);
         $this->expectExceptionMessage('must not be found');

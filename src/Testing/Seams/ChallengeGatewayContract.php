@@ -69,8 +69,8 @@ final class ChallengeGatewayContract
     }
 
     /**
-     * Another identity's binding is refused uncounted and leaves the code to
-     * answer its own.
+     * Another identity's binding, or the binding asked by a caller who is
+     * nobody, is refused uncounted and leaves the code to answer its own.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ChallengeGateway  $gateway
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
@@ -78,20 +78,28 @@ final class ChallengeGatewayContract
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  \Closure(string): string  $delivered
      * @return void
+     *
+     * @throws \InvalidArgumentException
      */
     public static function assertAnotherCallersBindingIsNotFound(ChallengeGateway $gateway, CallerContext $caller, Factor $factor, ProofBinding $binding, \Closure $delivered): void
     {
         $challenge = self::sent($gateway, $caller, $factor, $binding);
         $code      = $delivered($challenge);
 
-        foreach (['identity_key', 'identity_type'] as $part) {
-            $outcome = $gateway->verify($caller, $factor, self::another($binding, $part), $challenge, $code);
+        $asked = [
+            [$caller, self::another($binding, 'identity_key')],
+            [$caller, self::another($binding, 'identity_type')],
+            [CallerContext::nobody($caller->application, $caller->client), $binding],
+        ];
 
-            Assert::assertSame(FailureReason::NOT_FOUND, $outcome->reason, 'A binding naming another identity than the caller must not be found.');
-            Assert::assertFalse($outcome->counted, 'A binding naming another identity than the caller must not be counted.');
+        foreach ($asked as [$asking, $named]) {
+            $outcome = $gateway->verify($asking, $factor, $named, $challenge, $code);
+
+            Assert::assertSame(FailureReason::NOT_FOUND, $outcome->reason, 'A binding that does not name the caller must not be found.');
+            Assert::assertFalse($outcome->counted, 'A binding that does not name the caller must not be counted.');
         }
 
-        Assert::assertTrue($gateway->verify($caller, $factor, $binding, $challenge, $code)->hasPassed(), 'Another identity\'s binding must not use up the code.');
+        Assert::assertTrue($gateway->verify($caller, $factor, $binding, $challenge, $code)->hasPassed(), 'A binding that does not name the caller must not use up the code.');
     }
 
     /**

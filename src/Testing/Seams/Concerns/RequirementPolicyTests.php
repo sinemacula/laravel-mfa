@@ -23,7 +23,7 @@ use SineMacula\Laravel\Mfa\Testing\Seams\RequirementSeamContract;
 trait RequirementPolicyTests
 {
     /**
-     * Another identity is asked in between.
+     * Another identity is asked in between, and is not answered as the first.
      *
      * @return void
      */
@@ -35,11 +35,11 @@ trait RequirementPolicyTests
         $application = $this->policyApplication();
         $first       = $this->policyFirstFactor($identity);
         $otherFirst  = $this->policyFirstFactor($other);
+        $ask         = static fn () => $policy->requirementFor($identity, $application, $first);
+        $askAnother  = static fn () => $policy->requirementFor($other, $application, $otherFirst);
 
-        RequirementSeamContract::assertKeepsNoStateBetweenCalls(
-            static fn () => $policy->requirementFor($identity, $application, $first),
-            static fn () => $policy->requirementFor($other, $application, $otherFirst),
-        );
+        RequirementSeamContract::assertAnswersAnotherQuestionItsOwnWay($ask, $askAnother);
+        RequirementSeamContract::assertKeepsNoStateBetweenCalls($ask, $askAnother);
     }
 
     /**
