@@ -45,9 +45,6 @@ final class FactorLockoutSnapshotTest extends TestCase
 {
     use ArrangesVerification, RacesAForkedWorker;
 
-    /** @var string The sign-in that sends second. */
-    private const string LATER_SESSION = 'sign-in-b';
-
     /**
      * Ends a transaction a failed test left open before migrations roll back.
      *
@@ -257,7 +254,7 @@ final class FactorLockoutSnapshotTest extends TestCase
         $this->openTransaction('REPEATABLE READ');
         $this->takeSnapshot($factor);
         $this->commitSendElsewhere($factor);
-        $this->beginSignIn($user, self::LATER_SESSION);
+        $this->signInAgainElsewhere($user);
 
         try {
             $this->mfa()->sendCode(Callers::current(), $factor->id);
@@ -293,7 +290,7 @@ final class FactorLockoutSnapshotTest extends TestCase
         $this->openTransaction('READ COMMITTED');
         $this->takeSnapshot($factor);
         $this->commitSendElsewhere($factor);
-        $this->beginSignIn($user, self::LATER_SESSION);
+        $this->signInAgainElsewhere($user);
 
         $result = $this->mfa()->sendCode(Callers::current(), $factor->id);
 
@@ -321,7 +318,7 @@ final class FactorLockoutSnapshotTest extends TestCase
         $outcome = $this->holdingTheLock(
             fn () => self::assertTrue($this->mfa()->sendCode(Callers::current(), $factor->id)->wasSent()),
             function () use ($user, $factor): ?FailureReason {
-                $this->beginSignIn($user, self::LATER_SESSION);
+                $this->signInAgainElsewhere($user);
 
                 return $this->mfa()->sendCode(Callers::current(), $factor->id)->reason;
             },
@@ -417,6 +414,8 @@ final class FactorLockoutSnapshotTest extends TestCase
 
         config()->set('mfa.codes.factor_send_limit', 1);
 
+        $this->requestFrom('203.0.113.1');
+
         $user  = $this->signedInPerson();
         $owner = ProofOwner::of($user);
 
@@ -504,6 +503,19 @@ final class FactorLockoutSnapshotTest extends TestCase
         } finally {
             config()->set('mfa.storage.connection', null);
         }
+    }
+
+    /**
+     * From another address, so the two sends share no throttle row and meet
+     * only at the identity's lock.
+     *
+     * @param  \Tests\Fixtures\Identities\TestUser  $user
+     * @return void
+     */
+    private function signInAgainElsewhere(TestUser $user): void
+    {
+        $this->requestFrom('203.0.113.2');
+        $this->beginSignIn($user, 'sign-in-b');
     }
 
     /**
