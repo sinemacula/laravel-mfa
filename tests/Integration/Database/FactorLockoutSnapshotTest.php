@@ -320,7 +320,12 @@ final class FactorLockoutSnapshotTest extends TestCase
             function () use ($user, $factor): ?FailureReason {
                 $this->signInAgainElsewhere($user);
 
-                return $this->mfa()->sendCode(Callers::current(), $factor->id)->reason;
+                $reason = $this->mfa()->sendCode(Callers::current(), $factor->id)->reason;
+
+                // Only the worker's copy of the mailbox shows its delivery.
+                self::assertCount(1, $this->mailbox->sent());
+
+                return $reason;
             },
         );
 
