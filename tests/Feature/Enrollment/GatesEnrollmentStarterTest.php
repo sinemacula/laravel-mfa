@@ -305,6 +305,30 @@ final class GatesEnrollmentStarterTest extends TestCase
     }
 
     /**
+     * With no time, since the ceiling does not lift by itself.
+     *
+     * @return void
+     */
+    public function testAnIdentityAtTheFailureCeilingIsRefused(): void
+    {
+        $user  = $this->steppedUpPerson();
+        $owner = ProofOwner::of($user);
+
+        IdentityState::query()->updateOrCreate(
+            ['authenticatable_type' => $owner->type, 'authenticatable_id' => $owner->key],
+            ['consecutive_failures' => 100, 'locked_until' => null],
+        );
+
+        $start = $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::delivered('email', self::ADDRESS));
+
+        self::assertSame(FailureReason::LOCKED, $start->reason);
+        self::assertNull($start->lockedUntil);
+        self::assertSame(1, Factor::query()->count());
+        self::assertSame(0, Enrollment::query()->count());
+        self::assertSame([], $this->mailbox->sentTo(self::ADDRESS));
+    }
+
+    /**
      * With a confirmed factor and no step-up.
      *
      * @return void

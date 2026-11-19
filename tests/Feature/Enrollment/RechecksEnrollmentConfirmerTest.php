@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Feature\Enrollment;
 
+use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Assurance\Combination;
@@ -179,6 +180,42 @@ final class RechecksEnrollmentConfirmerTest extends TestCase
         self::assertSame(FailureReason::LOCKED, $this->failureReported()->reason);
         self::assertSame(0, $this->rowOf($start)->attempts);
         self::assertNull($this->pendingFactorOf($start)->getLastAcceptedStep());
+    }
+
+    /**
+     * Resending and confirming answer with no time, sending and counting
+     * nothing.
+     *
+     * @return void
+     */
+    public function testAnIdentityAtTheFailureCeilingIsRefused(): void
+    {
+        $user  = $this->reauthenticatedPerson();
+        $start = $this->startedEmail();
+        $code  = (string) $this->mailbox->lastCodeTo(self::ADDRESS);
+        $owner = ProofOwner::of($user);
+
+        IdentityState::query()->updateOrCreate(
+            ['authenticatable_type' => $owner->type, 'authenticatable_id' => $owner->key],
+            ['consecutive_failures' => 100, 'locked_until' => null],
+        );
+
+        Carbon::setTestNow(CarbonImmutable::now()->addSeconds(61));
+
+        $resend = $this->mfa()->resendEnrollmentCode(Callers::current(), $this->grantOf($start));
+
+        self::assertSame(FailureReason::LOCKED, $resend->reason);
+        self::assertNull($resend->retryAfter);
+        self::assertCount(1, $this->mailbox->sentTo(self::ADDRESS));
+
+        $confirmation = $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $code);
+
+        self::assertSame(FailureReason::LOCKED, $confirmation->reason);
+        self::assertNull($confirmation->lockedUntil);
+        self::assertSame(0, $this->rowOf($start)->attempts);
+        self::assertFalse($this->pendingFactorOf($start)->isConfirmed());
+        self::assertSame(0, $this->addressHits('127.0.0.1'));
+        self::assertSame(100, $this->identityRun($user));
     }
 
     /**
