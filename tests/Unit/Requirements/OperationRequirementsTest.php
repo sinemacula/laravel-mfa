@@ -43,6 +43,11 @@ final class OperationRequirementsTest extends TestCase
             Requirement::none()->withAdditionalVerification(3600),
             ['additional_verification' => ['max_age' => 120]],
         ];
+        yield 'a package operation the application gives a requirement of its own' => [
+            'mfa.generate_recovery_codes',
+            null,
+            ['minimum_level' => ['level' => 'aal1', 'max_age' => 300]],
+        ];
         yield 'an operation configured with a requirement of its own' => [
             'billing.change_plan',
             null,
@@ -137,8 +142,9 @@ final class OperationRequirementsTest extends TestCase
     private static function requirements(): OperationRequirements
     {
         return new OperationRequirements(new Repository(['mfa' => ['applications' => [self::APPLICATION => ['freshness' => [
-            'mfa.remove_factor'   => 120,
-            'billing.change_plan' => ['minimum_level' => ['level' => 'aal1', 'max_age' => 30]],
+            'mfa.remove_factor'           => 120,
+            'mfa.generate_recovery_codes' => ['minimum_level' => ['level' => 'aal1', 'max_age' => 300]],
+            'billing.change_plan'         => ['minimum_level' => ['level' => 'aal1', 'max_age' => 30]],
         ]]]]]));
     }
 }
