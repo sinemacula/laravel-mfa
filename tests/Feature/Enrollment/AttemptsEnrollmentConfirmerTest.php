@@ -260,7 +260,7 @@ final class AttemptsEnrollmentConfirmerTest extends TestCase
     public function testAnExhaustedChallengeCountsNothing(): void
     {
         config()->set('mfa.codes.max_attempts', 2);
-        config()->set('mfa.codes.ttl_minutes', 2);
+        config()->set('mfa.codes.ttl_minutes', 1);
         config()->set('mfa.codes.challenge_ttl_minutes', 2);
 
         $user  = $this->reauthenticatedPerson();

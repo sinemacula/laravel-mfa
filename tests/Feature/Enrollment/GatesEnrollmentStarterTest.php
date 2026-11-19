@@ -319,10 +319,15 @@ final class GatesEnrollmentStarterTest extends TestCase
             ['consecutive_failures' => 100, 'locked_until' => null],
         );
 
-        $start = $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::delivered('email', self::ADDRESS));
+        $totp = $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::totp(self::ACCOUNT));
 
-        self::assertSame(FailureReason::LOCKED, $start->reason);
-        self::assertNull($start->lockedUntil);
+        self::assertSame(FailureReason::LOCKED, $totp->reason);
+        self::assertNull($totp->lockedUntil);
+
+        $email = $this->mfa()->startEnrollment(Callers::current(), EnrollmentRequest::delivered('email', self::ADDRESS));
+
+        self::assertSame(FailureReason::LOCKED, $email->reason);
+        self::assertNull($email->lockedUntil);
         self::assertSame(1, Factor::query()->count());
         self::assertSame(0, Enrollment::query()->count());
         self::assertSame([], $this->mailbox->sentTo(self::ADDRESS));
