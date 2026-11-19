@@ -180,6 +180,7 @@ final class MultiAuthStackTest extends TestCase
         $this->withToken('token-b')->getJson('token/gated')->assertUnauthorized();
 
         $this->withToken('token-b')->postJson('token/verify', ['factor' => $factor->id, 'code' => AuthenticatorApp::code($factor, 1)])->assertContent('verified');
+        $this->withToken('token-a')->getJson('token/gated')->assertOk();
         $this->withToken('token-a')->postJson('token/logout')->assertOk();
 
         $this->withToken('token-a')->getJson('token/gated')->assertUnauthorized();
@@ -218,6 +219,9 @@ final class MultiAuthStackTest extends TestCase
         $factor = $this->confirmedTotp($user);
 
         Auth::guard('web')->login($user);
+
+        // Later requests restore the identity from the session.
+        Auth::forgetGuards();
 
         $this->guardedRoutes('sanctum');
 
