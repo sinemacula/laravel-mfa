@@ -111,7 +111,7 @@ final readonly class OperationGuard
         $blank = new $model;
 
         // PostgreSQL fails comparing an integer key with a non-integer string.
-        if ($blank->getKeyType() === 'int' && filter_var($factorId, FILTER_VALIDATE_INT) === false) {
+        if (in_array($blank->getKeyType(), ['int', 'integer'], true) && filter_var($factorId, FILTER_VALIDATE_INT) === false) {
             return null;
         }
 
