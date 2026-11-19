@@ -110,6 +110,11 @@ final readonly class OperationGuard
         $model = ConfiguredModels::factor($this->config);
         $blank = new $model;
 
+        // PostgreSQL fails comparing an integer key with a non-integer string.
+        if ($blank->getKeyType() === 'int' && filter_var($factorId, FILTER_VALIDATE_INT) === false) {
+            return null;
+        }
+
         [$typeColumn, $keyColumn] = FactorOwnerColumns::of($blank);
 
         $type = IdentityType::of($identity);
