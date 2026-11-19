@@ -75,7 +75,7 @@ final class GenericIdentity extends GenericUser implements MultiFactorAuthentica
     #[\Override]
     public function isMfaEnabled(): bool
     {
-        return $this->authFactors()->where('status', 'confirmed')->exists();
+        return $this->authFactors()->toBase()->pluck('status')->contains(static fn (mixed $status): bool => $status !== 'pending');
     }
 
     /**

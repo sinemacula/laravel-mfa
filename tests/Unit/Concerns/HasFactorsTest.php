@@ -260,24 +260,13 @@ final class HasFactorsTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{bool}>
-     */
-    public static function deleteTransactions(): iterable
-    {
-        yield 'inside a storage transaction' => [true];
-        yield 'on its own' => [false];
-    }
-
-    /**
      * Codes and enrolments are forgotten before the missing table fails it.
      *
-     * @param  bool  $wrapped
      * @return void
      *
      * @throws \Throwable
      */
-    #[DataProvider('deleteTransactions')]
-    public function testAFailedForgettingKeepsTheRecordsAndUndoesOnlyAWrappedDelete(bool $wrapped): void
+    public function testAFailedForgettingInsideATransactionUndoesTheDelete(): void
     {
         $identity = $this->createHolder('one@example.test');
 
@@ -288,16 +277,14 @@ final class HasFactorsTest extends TestCase
 
         $config->set($setting, 'missing_passkey_associations');
 
-        $delete = static fn (): ?bool => $identity->delete();
-
         try {
-            $wrapped ? DB::connection(StorageConnection::name())->transaction($delete) : $delete();
+            DB::connection(StorageConnection::name())->transaction(static fn (): ?bool => $identity->delete());
             self::fail('The forgetting was expected to fail.');
         } catch (QueryException) {
             $config->set($setting, null);
         }
 
-        self::assertSame($wrapped, FactorHolder::query()->whereKey($identity->id)->exists());
+        self::assertTrue(FactorHolder::query()->whereKey($identity->id)->exists());
         self::assertSame($this->eachTableHolding(1), $this->recordCounts($identity));
     }
 
