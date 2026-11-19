@@ -7,8 +7,9 @@ namespace SineMacula\Laravel\Mfa\Testing\Seams;
 use PHPUnit\Framework\Assert;
 
 /**
- * What every `IdentityRequirement` and `TenantRequirement` must guarantee: the
- * same question answers the same requirement whatever was asked in between.
+ * What every `RequirementPolicy`, `IdentityRequirement` and `TenantRequirement`
+ * must guarantee: the same question answers the same requirement whatever was
+ * asked in between.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited

@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Unit\Testing\Seams;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Container\Container;
 use Illuminate\Http\Request;
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -18,6 +19,8 @@ use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\PendingSessionResolverTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\PendingSessionResolverContract;
 use SineMacula\Laravel\Mfa\Testing\Seams\SeamAssert;
 use Tests\Fixtures\Context\FixedPendingSessionResolver;
+use Tests\Fixtures\Context\RecordingPendingSessionResolver;
+use Tests\Fixtures\Context\RequestAttributePendingSessionResolver;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\TestCase;
@@ -49,16 +52,7 @@ final class PendingSessionResolverContractTest extends TestCase
      */
     public function testRejectsAPendingSessionWithoutACredential(): void
     {
-        $identity = new NonEloquentIdentity;
-        $pending  = new PendingContext(
-            $identity,
-            'web',
-            'pending-1',
-            SignInProofs::of($identity)->inSession('pending-1')->password(),
-            Requirement::none(),
-            [PendingAction::VERIFY],
-            CarbonImmutable::now()->addMinutes(10),
-        );
+        $pending = self::pendingSession();
 
         $this->expectException(AssertionFailedError::class);
 
@@ -72,17 +66,7 @@ final class PendingSessionResolverContractTest extends TestCase
      */
     public function testTheCheckAsksForTheGuardGiven(): void
     {
-        $identity = new NonEloquentIdentity;
-        $pending  = new PendingContext(
-            $identity,
-            'admin',
-            'pending-1',
-            SignInProofs::of($identity)->onApplication('admin')->inSession('pending-1')->password(),
-            Requirement::none(),
-            [PendingAction::VERIFY],
-            CarbonImmutable::now()->addMinutes(10),
-        );
-        $resolver = new FixedPendingSessionResolver($pending, guard: 'admin');
+        $resolver = new FixedPendingSessionResolver(self::pendingSession('admin'), guard: 'admin');
 
         PendingSessionResolverContract::assertNoCredentialMeansNoPendingSession($resolver, Request::create('/'), 'web');
 
@@ -106,20 +90,104 @@ final class PendingSessionResolverContractTest extends TestCase
      */
     public function testRejectsAResolverWithoutCredentialsThatAnswersOne(): void
     {
-        $identity = new NonEloquentIdentity;
-        $pending  = new PendingContext(
-            $identity,
-            'web',
-            'pending-1',
-            SignInProofs::of($identity)->inSession('pending-1')->password(),
-            Requirement::none(),
-            [PendingAction::VERIFY],
-            CarbonImmutable::now()->addMinutes(10),
-        );
+        $pending = self::pendingSession();
 
         $this->expectException(AssertionFailedError::class);
 
         PendingSessionResolverContract::assertAnInvalidCredentialIsRefused(new FixedPendingSessionResolver($pending), null, 'web');
+    }
+
+    /**
+     * @return void
+     */
+    public function testAcceptsAResolverThatDropsAnEndedSession(): void
+    {
+        $request = $this->servedRequestHolding(self::pendingSession());
+
+        PendingSessionResolverContract::assertAnEndedSessionDoesNotRevalidate(new RequestAttributePendingSessionResolver, $request, 'web', self::endSession(...));
+    }
+
+    /**
+     * So a kit given a credential but no way to end its session fails.
+     *
+     * @return void
+     */
+    public function testTheDefaultEndHookEndsNothing(): void
+    {
+        $request = $this->servedRequestHolding(self::pendingSession());
+
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('A pending session that no longer stands must not revalidate.');
+
+        PendingSessionResolverContract::assertAnEndedSessionDoesNotRevalidate(new RequestAttributePendingSessionResolver, $request, 'web', $this->endPendingSession(...));
+    }
+
+    /**
+     * @return void
+     */
+    public function testRejectsAResolverThatRevalidatesAnEndedSession(): void
+    {
+        $resolver = new RecordingPendingSessionResolver(self::pendingSession());
+
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('A pending session that no longer stands must not revalidate.');
+
+        PendingSessionResolverContract::assertAnEndedSessionDoesNotRevalidate($resolver, Request::create('/'), 'web', self::endSession(...));
+    }
+
+    /**
+     * @return void
+     */
+    public function testRejectsAResolverThatRevalidatesAsAnotherSession(): void
+    {
+        $request = Request::create('/');
+
+        $request->attributes->set(RequestAttributePendingSessionResolver::ATTRIBUTE, self::pendingSession());
+
+        $this->servedRequestHolding(self::pendingSession('admin'));
+
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('as the same identity, application and session');
+
+        PendingSessionResolverContract::assertAnEndedSessionDoesNotRevalidate(new RequestAttributePendingSessionResolver, $request, 'web', self::endSession(...));
+    }
+
+    /**
+     * @return void
+     */
+    public function testRejectsAResolverThatDropsAStandingSession(): void
+    {
+        $request = Request::create('/');
+
+        $request->attributes->set(RequestAttributePendingSessionResolver::ATTRIBUTE, self::pendingSession());
+
+        $this->servedRequestHolding(null);
+
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('A pending session that still stands must revalidate.');
+
+        PendingSessionResolverContract::assertAnEndedSessionDoesNotRevalidate(new RequestAttributePendingSessionResolver, $request, 'web', self::endSession(...));
+    }
+
+    /**
+     * @return void
+     */
+    public function testRejectsAResolverThatFindsNoSessionForAValidCredential(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('A valid pending credential must resolve a pending session.');
+
+        PendingSessionResolverContract::assertAnEndedSessionDoesNotRevalidate(new RequestAttributePendingSessionResolver, Request::create('/'), 'web', self::endSession(...));
+    }
+
+    /**
+     * @return void
+     */
+    public function testTheRevalidationCheckRejectsAResolverWithoutCredentialsThatAnswersOne(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+
+        PendingSessionResolverContract::assertAnEndedSessionDoesNotRevalidate(new FixedPendingSessionResolver(self::pendingSession()), null, 'web', self::endSession(...));
     }
 
     /**
@@ -151,5 +219,54 @@ final class PendingSessionResolverContractTest extends TestCase
     protected function requestWithInvalidPendingCredential(): null
     {
         return null;
+    }
+
+    /**
+     * The request being served, holding the pending session, or none.
+     *
+     * @param  ?\SineMacula\Laravel\Mfa\Context\PendingContext  $pending
+     * @return \Illuminate\Http\Request
+     */
+    private function servedRequestHolding(?PendingContext $pending): Request
+    {
+        $request = Request::create('/');
+
+        $request->attributes->set(RequestAttributePendingSessionResolver::ATTRIBUTE, $pending);
+
+        $this->container()->instance('request', $request);
+
+        return $request;
+    }
+
+    /**
+     * Ends it on the request being served.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Context\PendingContext  $pending
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private static function endSession(PendingContext $pending): void
+    {
+        Container::getInstance()->make('request')->attributes->remove(RequestAttributePendingSessionResolver::ATTRIBUTE);
+    }
+
+    /**
+     * @param  string  $application
+     * @return \SineMacula\Laravel\Mfa\Context\PendingContext
+     */
+    private static function pendingSession(string $application = 'web'): PendingContext
+    {
+        $identity = new NonEloquentIdentity;
+
+        return new PendingContext(
+            $identity,
+            $application,
+            'pending-1',
+            SignInProofs::of($identity)->onApplication($application)->inSession('pending-1')->password(),
+            Requirement::none(),
+            [PendingAction::VERIFY],
+            CarbonImmutable::now()->addMinutes(10),
+        );
     }
 }
