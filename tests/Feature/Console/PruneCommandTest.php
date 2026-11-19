@@ -7,6 +7,7 @@ namespace Tests\Feature\Console;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -97,12 +98,25 @@ final class PruneCommandTest extends TestCase
         $this->insertRecoveryCodes(2001, $old);
         $this->insertRecoveryCodes(1, $new);
 
+        $deletes = [];
+
+        DB::listen(static function (QueryExecuted $query) use (&$deletes): void {
+            if (preg_match('/^delete from [`"]?(\w+)/i', $query->sql, $table) !== 1) {
+                return;
+            }
+
+            $deletes[] = $table[1];
+        });
+
         self::assertSame(0, $this->container()->make(Kernel::class)->call('mfa:prune'));
 
         $output = Artisan::output();
+        $counts = array_count_values($deletes);
 
         self::assertStringContainsString('Delivered codes: 2001', $output);
         self::assertStringContainsString('Recovery codes: 2001', $output);
+        self::assertSame(3, $counts['mfa_codes'] ?? 0);
+        self::assertSame(3, $counts['mfa_recovery_codes'] ?? 0);
         self::assertSame(1, DB::table('mfa_codes')->count());
         self::assertSame(1, DB::table('mfa_recovery_codes')->count());
     }
