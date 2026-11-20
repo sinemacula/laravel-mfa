@@ -16,6 +16,7 @@ use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Models\Factor as FactorModel;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
@@ -270,6 +271,23 @@ final class ChallengeGatewayContractTest extends TestCase
         $kit->testChallengeGatewayRefusesTheCodeToAnotherSessionOfTheIdentity();
 
         self::assertSame(1, $kit->numberOfAssertionsPerformed());
+    }
+
+    /**
+     * The second caller holds the first one's binding.
+     *
+     * @return void
+     */
+    public function testTheKitRejectsAGatewayThatAnswersAnotherSession(): void
+    {
+        $kit = new FaultyChallengeGatewayKit('kit');
+
+        $kit->secondCaller = [Callers::current(), new ProofBinding('user', '1', 'web', 'sign-in-1', Purpose::STEP_UP)];
+
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('must not answer the identity on another session or application');
+
+        $kit->testChallengeGatewayRefusesTheCodeToAnotherSessionOfTheIdentity();
     }
 
     /**
