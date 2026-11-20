@@ -110,11 +110,11 @@ $attempts->resetIdentityFailures($user);                  // clear the identity'
   snapshot. Use it to tell someone what to expect, not to decide anything; every attempt reads the lockouts again under
   the lock.
 - `liftLockout($identity, $factor, $actor)` lifts the factor's lockout, or the identity's when no factor is given. It
-  keeps the factor's failures in a row and the identity's, so a factor's next failure locks it again, and leaves a
-  disabled factor disabled. The identity's window is cleared with its lockout, so its count starts afresh. A factor
-  that is not the identity's lifts nothing. It dispatches `LockoutLifted`, naming the actor, when a live lockout was
-  lifted, and answers whether one was: a deadline that has already passed is cleared without either. A machine
-  identity is refused as `machine_identity`.
+  keeps the factor's failures in a row and the identity's, so a factor's next failure locks it again, while the
+  identity's window starts afresh, and leaves a disabled factor disabled. A factor that is not the identity's lifts
+  nothing. It dispatches `LockoutLifted`, naming the actor, when a live lockout was lifted, and answers whether one
+  was: a deadline that has already passed is cleared without either. A machine identity is refused as
+  `machine_identity`.
 - `enableFactor($factor)` enables a factor the failure ceiling disabled and clears its failures in a row, leaving any
   lockout to end on its own.
 - `resetIdentityFailures($identity)` clears the identity's failures in a row, so attempts that name no factor of its
@@ -133,12 +133,11 @@ the identity's, and on a lift and the `Mfa` helpers that the identity is a perso
 |------------------|---------------------------------------------------------------------------|
 | `LockoutApplied` | A failure locks the factor (`factor` set) or the identity (`factor` null) |
 | `LockoutLifted`  | A live lockout is lifted before it ends, with the `actor` who lifted it   |
-| `FactorDisabled` | A failure disables a factor, its own or the identity's run at the ceiling |
+| `FactorDisabled` | A factor's or the identity's failures in a row reach the failure ceiling  |
 
 Each is dispatched once the attempt's transaction has committed (see [Events](events.md)), so a listener that throws
 cannot undo the count: the failure, and the IP address's charge for it, stand. The IP address's throttle has no event:
-it says nothing about any one identity. Nor does the identity's run reaching the ceiling on an attempt that names no
-factor of its own, since no factor is disabled; `VerificationFailed` still reports the attempt.
+it says nothing about any one identity.
 
 ## Limiting the endpoint
 

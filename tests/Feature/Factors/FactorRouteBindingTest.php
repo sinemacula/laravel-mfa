@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Feature\Factors;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Support\Facades\Route;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -11,6 +12,7 @@ use PHPUnit\Framework\Attributes\CoversTrait;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Concerns\ResolvesFactorRouteBinding;
 use SineMacula\Laravel\Mfa\Context\CallerContextResolver;
+use SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver;
 use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
@@ -21,6 +23,7 @@ use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use SineMacula\Laravel\Mfa\Verification\Submission;
 use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Context\FixedPendingSessionResolver;
+use Tests\Fixtures\Context\InvertedActiveState;
 use Tests\Fixtures\Exceptions\InvalidPendingCredentialException;
 use Tests\Fixtures\Identities\ScopedFactorOwner;
 use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
@@ -76,6 +79,38 @@ final class FactorRouteBindingTest extends TestCase
      */
     public function testTheAccessCredentialBindsItsOwnFactor(): void
     {
+        $factor = $this->totpFactor($this->signedInPerson());
+
+        $this->getJson('access/factors/' . $factor->id)->assertOk()->assertSee($factor->id);
+    }
+
+    /**
+     * Only ownership is checked; each helper applies its own rules.
+     *
+     * @return void
+     */
+    public function testPendingDisabledAndOtherApplicationFactorsBindForTheirOwner(): void
+    {
+        $user = $this->signedInPerson();
+
+        $factors = [
+            $this->totpFactor($user, ['status' => 'pending', 'confirmed_at' => null]),
+            $this->totpFactor($user, ['disabled_at' => CarbonImmutable::now()]),
+            $this->totpFactor($user, ['application' => 'admin']),
+        ];
+
+        foreach ($factors as $factor) {
+            $this->getJson('access/factors/' . $factor->id)->assertOk()->assertSee($factor->id);
+        }
+    }
+
+    /**
+     * @return void
+     */
+    public function testAnInactiveIdentityBindsItsOwnFactor(): void
+    {
+        $this->container()->instance(ActiveStateResolver::class, new InvertedActiveState);
+
         $factor = $this->totpFactor($this->signedInPerson());
 
         $this->getJson('access/factors/' . $factor->id)->assertOk()->assertSee($factor->id);

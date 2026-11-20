@@ -135,6 +135,18 @@ final readonly class SignInProofs
     }
 
     /**
+     * Named after its channel's kind, observing nothing.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Assurance\Channel  $channel
+     * @param  int  $secondsAgo
+     * @return \SineMacula\Laravel\Mfa\Proofs\Proof
+     */
+    public function firstFactorOn(Channel $channel, int $secondsAgo = 0): Proof
+    {
+        return $this->proof(ProofKind::FIRST_FACTOR, $channel->kind->value, $channel, null, ObservedProperties::none(), $secondsAgo);
+    }
+
+    /**
      * @param  int  $secondsAgo
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
      */

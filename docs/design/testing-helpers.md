@@ -89,7 +89,8 @@ to the package's own test identities and settings, so both stay fixtures.
   driver accepting a code once; each refusal, none showing the secret.
 - `tests/Feature/Testing/VerifiedSignInTest.php`: through the real `web` group and `mfa:` routes: each level, the
   time, each refusal leaving nothing changed, AAL3 under the default and a custom policy, a second request, guards and
-  applications kept apart, a store with a no-op `begin()`, recording guards, the generation, the events.
+  applications kept apart, a second guard's own `mfa` route, a store with a no-op `begin()`, recording guards, the
+  generation, the events.
 - `tests/Unit/Testing/FakeSmsSenderTest.php`, `tests/Unit/Testing/FakeEmailSenderTest.php`.
 
 ## Change Triggers

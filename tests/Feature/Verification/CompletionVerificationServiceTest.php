@@ -689,4 +689,52 @@ final class CompletionVerificationServiceTest extends TestCase
         self::assertTrue($result->isVerified());
         self::assertSame($seam->accepted[0]->proof, $result->proof);
     }
+
+    /**
+     * Whether the sign-in is pending decides the seam, never the purpose.
+     *
+     * @return void
+     */
+    public function testAnActiveSignInVerifyingForSignInIsHandedToTheStepUp(): void
+    {
+        $user       = $this->signedInPerson();
+        $factor     = $this->emailFactor($user);
+        $completion = new \stdClass;
+        $stepUp     = new CheckingCompletion(self::SESSION, completion: $completion);
+        $pending    = new CheckingCompletion('unused', false);
+
+        $this->container()->instance(StepUp::class, $stepUp);
+        $this->container()->instance(PendingCompletion::class, $pending);
+
+        [$challenge, $code] = $this->sentCode($factor, Purpose::SIGN_IN);
+
+        $result = $this->mfa()->verify(Callers::current(), Submission::challenge($factor->id, $challenge, $code), Purpose::SIGN_IN);
+
+        self::assertSame($completion, $result->completion());
+        self::assertCount(1, $stepUp->accepted);
+        self::assertSame(Purpose::SIGN_IN, $stepUp->accepted[0]->proof?->binding->purpose);
+        self::assertSame([], $pending->accepted);
+    }
+
+    /**
+     * @return void
+     */
+    public function testAPendingSignInIsHandedToTheCompletion(): void
+    {
+        $user       = $this->person();
+        $factor     = $this->totpFactor($user);
+        $completion = new \stdClass;
+        $stepUp     = new CheckingCompletion('unused', false);
+        $pending    = new CheckingCompletion('unused', false, $completion);
+
+        $this->pendingSession($user);
+        $this->container()->instance(StepUp::class, $stepUp);
+        $this->container()->instance(PendingCompletion::class, $pending);
+
+        $result = $this->mfa()->verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)));
+
+        self::assertSame($completion, $result->completion());
+        self::assertCount(1, $pending->accepted);
+        self::assertSame([], $stepUp->accepted);
+    }
 }

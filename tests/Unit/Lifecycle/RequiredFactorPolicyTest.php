@@ -82,6 +82,27 @@ final class RequiredFactorPolicyTest extends TestCase
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
+    public function testAFactorOnlyAnotherApplicationEnablesKeepsTheIdentityCovered(): void
+    {
+        $this->enablePasskeys(['types' => ['totp']]);
+
+        config()->set('mfa.applications.admin', ['types' => ['sms'], 'requirement' => 'always', 'first_factor' => ['method' => 'password', 'channel' => 'password']]);
+
+        $user = $this->signedInPerson();
+        $totp = $this->confirmedFactor($user);
+
+        self::assertFalse($this->policy()->allowsRemoval($user, self::APPLICATION, $totp, $this->factorsOf($user)));
+
+        $this->confirmedFactor($user, 'sms');
+
+        self::assertTrue($this->policy()->allowsRemoval($user, self::APPLICATION, $totp, $this->factorsOf($user)));
+    }
+
+    /**
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
     public function testTheIdentitysOwnRequirementKeepsTheLastFactor(): void
     {
         $this->enablePasskeys();

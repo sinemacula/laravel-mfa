@@ -16,6 +16,7 @@ use SineMacula\Laravel\Mfa\Attempts\ChallengeCounters;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeOutcome;
 use SineMacula\Laravel\Mfa\Codes\PackageChallengeGateway;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
@@ -23,8 +24,10 @@ use SineMacula\Laravel\Mfa\Contracts\PasskeyGateway;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
+use SineMacula\Laravel\Mfa\Events\CodeSent;
 use SineMacula\Laravel\Mfa\Events\VerificationFailed;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
+use SineMacula\Laravel\Mfa\Models\Code;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion;
@@ -32,6 +35,7 @@ use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertions;
 use SineMacula\Laravel\Mfa\Passkeys\UnavailablePasskeyGateway;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
+use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use SineMacula\Laravel\Mfa\Verification\ChallengeRequests;
 use SineMacula\Laravel\Mfa\Verification\CheckOutcome;
@@ -41,6 +45,7 @@ use SineMacula\Laravel\Mfa\Verification\SubmissionRoutes;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
 use Tests\Fixtures\Context\Callers;
+use Tests\Fixtures\Factors\IntegerKeyedFactor;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\RecoveryCodes\CountingHasher;
 use Tests\Fixtures\Requirements\FixedFirstFactorResolver;
@@ -137,6 +142,29 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
+     * Nothing is delivered to the other person and nothing is spent.
+     *
+     * @return void
+     */
+    public function testASendForAMissingOrForeignFactorSendsNothing(): void
+    {
+        $other   = $this->person('other@example.test');
+        $foreign = $this->emailFactor($other, 'other@example.test');
+
+        $this->signedInPerson();
+
+        $missing = $this->mfa()->sendCode(Callers::current(), '01HZZZZZZZZZZZZZZZZZZZZZZZ');
+        $found   = $this->mfa()->sendCode(Callers::current(), $foreign->id);
+
+        self::assertSame(FailureReason::NOT_FOUND, $missing->reason);
+        self::assertNull($missing->retryAfter);
+        self::assertEquals($missing, $found);
+        self::assertSame([], $this->mailbox->sent());
+        self::assertSame(0, Code::query()->count());
+        self::assertSame([], array_filter($this->reported, static fn (object $event): bool => $event instanceof CodeSent));
+    }
+
+    /**
      * Neither a string nor an integer.
      *
      * @return void
@@ -146,6 +174,24 @@ final class FailureReasonsVerificationServiceTest extends TestCase
         $this->signedInPerson();
 
         self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->verify(Callers::current(), Submission::factor(['1'], '000000'))->reason);
+    }
+
+    /**
+     * PostgreSQL would refuse to compare the id with an integer key.
+     *
+     * @return void
+     */
+    public function testANonIntegerIdOnAnIntegerKeyIsNotFound(): void
+    {
+        config()->set('mfa.factor.model', IntegerKeyedFactor::class);
+        config()->set('mfa.factor.table', 'test_integer_keyed_factors');
+
+        $this->signedInPerson();
+
+        foreach (['abc', '1abc'] as $id) {
+            self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->verify(Callers::current(), Submission::factor($id, '000000'))->reason);
+            self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->sendCode(Callers::current(), $id)->reason);
+        }
     }
 
     /**
@@ -420,6 +466,69 @@ final class FailureReasonsVerificationServiceTest extends TestCase
 
         self::assertTrue($this->mfa()->verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)))->isVerified());
         self::assertSame(0, $this->identityRun($user));
+    }
+
+    /**
+     * One code is spent and the identity's run ends; the factor stays disabled.
+     *
+     * @return void
+     */
+    public function testARecoveryCodeRedeemsWhenTheOnlyFactorIsDisabled(): void
+    {
+        $user     = $this->signedInPerson();
+        $factor   = $this->totpFactor($user);
+        $code     = $this->recoveryCode($user);
+        $disabled = CarbonImmutable::now()->subMinute();
+
+        Factor::query()->whereKey($factor->id)->update(['disabled_at' => $disabled]);
+        IdentityState::query()->where('authenticatable_id', (string) $user->id)->update(['consecutive_failures' => 3]);
+
+        self::assertTrue($this->mfa()->verify(Callers::current(), Submission::recoveryCode($code))->isVerified());
+        self::assertSame(9, $this->mfa()->recoveryCodeStatus(Callers::current())?->remaining);
+        self::assertSame(0, $this->identityRun($user));
+        self::assertSame($disabled->getTimestamp(), Factor::query()->whereKey($factor->id)->sole()->getDisabledAt()?->getTimestamp());
+    }
+
+    /**
+     * Redeemed, counted and replaced across the applications that accept
+     * codes; one that does not spends nothing.
+     *
+     * @return void
+     */
+    public function testOneSetIsSharedAcrossTheApplicationsThatAcceptRecoveryCodes(): void
+    {
+        $first = ['method' => 'password', 'channel' => 'password'];
+
+        config()->set('mfa.applications.api', ['types' => ['totp'], 'recovery_codes' => ['enabled' => true], 'first_factor' => $first]);
+        config()->set('mfa.applications.admin', ['types' => ['totp'], 'recovery_codes' => ['enabled' => false], 'first_factor' => $first]);
+
+        $user    = $this->signedInPerson();
+        $service = $this->container()->make(RecoveryCodeService::class);
+        $store   = $this->container()->make(ProofStore::class);
+
+        $this->totpFactor($user);
+
+        $codes = array_map(static fn (RevealedSecret $code): string => $code->reveal(), $service->generate($user, self::APPLICATION));
+        $api   = CallerContext::forIdentity($user, 'api');
+        $admin = CallerContext::forIdentity($user, 'admin');
+
+        $store->begin($user, 'api', 'sign-in-api');
+        $store->begin($user, 'admin', 'sign-in-admin');
+
+        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->verify($admin, Submission::recoveryCode($codes[0]))->reason);
+        self::assertSame(10, $this->mfa()->recoveryCodeStatus($api)?->remaining);
+
+        self::assertTrue($this->mfa()->verify($api, Submission::recoveryCode($codes[0]))->isVerified());
+        self::assertSame(1, $this->mfa()->recoveryCodeStatus($api)?->generation);
+        self::assertSame(9, $this->mfa()->recoveryCodeStatus(Callers::current())?->remaining);
+
+        $replacement = $service->generate($user, 'api');
+        $status      = $this->mfa()->recoveryCodeStatus(Callers::current());
+
+        self::assertSame(2, $status->generation);
+        self::assertSame(10, $status->remaining);
+        self::assertSame(FailureReason::INVALID_CODE, $this->mfa()->verify(Callers::current(), Submission::recoveryCode($codes[1]))->reason);
+        self::assertTrue($this->mfa()->verify(Callers::current(), Submission::recoveryCode($replacement[0]->reveal()))->isVerified());
     }
 
     /**
