@@ -431,12 +431,10 @@ final class PruningTest extends TestCase
             'purpose'              => 'sign_in',
             'application'          => self::APPLICATION,
             'session_id'           => 'session',
-            'destination_hash'     => 'destination',
             'code_hash'            => 'code',
             'attempts'             => 0,
             'sends'                => 1,
             'sent_at'              => $expiresAt->subMinutes(10),
-            'sent_times'           => [],
             'expires_at'           => $expiresAt,
         ]);
     }

@@ -53,6 +53,9 @@ return new class extends Migration {
             $blueprint->unsignedInteger('recovery_codes_generation')->default(0);
             $blueprint->dateTime('recovery_codes_generated_at')->nullable();
 
+            // A JSON list of the recent code sends the send caps count.
+            $blueprint->json('code_sends')->nullable();
+
             $blueprint->datetimes();
         });
     }

@@ -18,6 +18,7 @@ use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\Reauthenticator;
 use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
 use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
+use SineMacula\Laravel\Mfa\Database\IdentityStateRow;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentRequest;
 use SineMacula\Laravel\Mfa\Enrollment\PendingEnrollments;
 use SineMacula\Laravel\Mfa\Enums\AbandonmentCause;
@@ -42,6 +43,7 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\Requirements\ReenrollmentObligation;
@@ -193,8 +195,8 @@ final class ResettingIdentityTest extends TestCase
     }
 
     /**
-     * Whichever application made them; the delivered code rows the send caps
-     * read stay.
+     * Whichever application made them; the delivered code rows and the sends
+     * the caps count stay.
      *
      * @return void
      *
@@ -219,18 +221,22 @@ final class ResettingIdentityTest extends TestCase
             'purpose'              => 'sign_in',
             'application'          => self::APPLICATION,
             'session_id'           => self::SESSION,
-            'destination_hash'     => hash('sha256', 'destination'),
             'code_hash'            => hash('sha256', 'code'),
             'sent_at'              => CarbonImmutable::now(),
-            'sent_times'           => [CarbonImmutable::now()->getTimestamp()],
             'expires_at'           => CarbonImmutable::now()->addMinutes(10),
         ]);
+
+        $sends = json_encode([['at' => CarbonImmutable::now()->getTimestamp(), 'to' => hash('sha256', 'destination'), 'enrollment' => false]], JSON_THROW_ON_ERROR);
+
+        IdentityStateRow::lock(ProofOwner::of($user), DB::connection());
+        IdentityStateRow::of(ProofOwner::of($user))->update(['code_sends' => $sends]);
 
         Mfa::resetIdentity($user, self::actor(), self::REASON);
 
         self::assertSame(0, Factor::query()->count());
         self::assertSame(0, Enrollment::query()->count());
         self::assertTrue(Code::query()->whereKey($code->getKey())->exists());
+        self::assertSame($sends, IdentityStateRow::of(ProofOwner::of($user))->value('code_sends'));
     }
 
     /**
