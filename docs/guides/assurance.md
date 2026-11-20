@@ -356,9 +356,11 @@ context keys are in [Events](events.md), and the configuration keys in [Configur
 A failure reason says what a caller may be told, not why in detail: a factor that does not exist and one that belongs
 to someone else both answer `not_found`. Operations name the package's own step-up checks (adding a further factor,
 replacing or removing one, generating recovery codes); an application names its own beside them. Pending actions name
-what a pending session may do towards completing its sign-in, and `laravel-authentication` uses the same values. Factor
-changes name what a `FactorChangeGate` is asked to authorise, and the changes made name what a `SessionTransition` is
-told changed.
+what a pending session may do towards completing its sign-in, and `laravel-authentication` uses the
+[same values][auth-pending-action]. Factor changes name what a `FactorChangeGate` is asked to authorise, and the changes
+made name what a `SessionTransition` is told changed.
 
 How the values are built and why they refuse what they do is described in
 [the assurance vocabulary design note](../design/assurance-vocabulary.md).
+
+[auth-pending-action]: https://github.com/sinemacula/laravel-authentication/blob/master/src/Sessions/Enums/PendingAction.php

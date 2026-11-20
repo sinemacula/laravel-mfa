@@ -74,8 +74,9 @@ are the evidence every later answer (freshness, levels, requirements) is worked 
 - A sign-in's proofs last as long as the sign-in, subject to invalidation and the verification generation. A time bound
   comes from a requirement's maximum age, set by an identity, a tenant or a named operation, never from a global window.
 - Verification is per device by default: a session's proofs are its own, in the authentication layer's session record
-  through a rebound store or in the Laravel session alone. A route naming an operation (`mfa:operation=name`) is how to
-  ask for a verification before one action, whatever the device has already proved.
+  (see `laravel-authentication`'s [Proofs and Freshness][auth-proofs]) through a rebound store or in the Laravel session
+  alone. A route naming an operation (`mfa:operation=name`) is how to ask for a verification before one action, whatever
+  the device has already proved.
 
 ## Success Path
 
@@ -150,3 +151,5 @@ are the evidence every later answer (freshness, levels, requirements) is worked 
 - Letting a guard that fires no event and calls no hook record a proof.
 - Recording a proof outside a verification, or a proof whose channel cannot carry a factor.
 - Letting a proof lapse by anything but a requirement's maximum age, its invalidation or the end of its sign-in.
+
+[auth-proofs]: https://github.com/sinemacula/laravel-authentication/blob/master/docs/design/proofs-and-freshness.md

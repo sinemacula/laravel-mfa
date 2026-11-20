@@ -174,21 +174,25 @@ Each part is a contract with a default, bound in the container; bind your own fr
 | `FactorChangeGate`     | `Requirements\ConfiguredFactorChangeGate`  | Whether the session may make a change to its factors      |
 
 `Mfa::isFresh()` hands the bound gate this package's own requirement for the operation as part of the caller's
-requirement. A gate bound in place of the default, such as an adapter over an authentication layer's freshness check,
-must apply the stricter of that and its own setting for the operation, never either alone, answer "not fresh" when it
-has neither, and keep no state between calls. Its `requirement()` says what it holds a session to, which removing a
-factor judges on the proofs made without that factor while the identity has another confirmed factor, so it must ask at
-least what the caller asks. It is asked with the operation's own name (`mfa.add_factor`, never a name of the
-authentication layer's), so the layer's own setting for that name is the one that applies; configure it there. It may be
-stricter than the package: a setting that takes only an additional factor or a recovery code refuses a fresh passkey
-reauthentication that the package alone would accept.
+requirement. A gate bound in place of the default, such as an adapter over an authentication layer's freshness check
+(`laravel-authentication`'s [`FreshnessPolicy`][auth-freshness-policy]), must apply the stricter of that and its own
+setting for the operation, never either alone, answer "not fresh" when it has neither, and keep no state between calls.
+Its `requirement()` says what it holds a session to, which removing a factor judges on the proofs made without that
+factor while the identity has another confirmed factor, so it must ask at least what the caller asks. It is asked with
+the operation's own name (`mfa.add_factor`, never a name of the authentication layer's), so the layer's own setting for
+that name is the one that applies; configure it there. It may be stricter than the package: a setting that takes only an
+additional factor or a recovery code refuses a fresh passkey reauthentication that the package alone would accept.
 
 A `FactorChangeGate` bound in place of the default, such as an adapter over an authentication layer's own factor-change
-gate, replaces the package's judgement of those changes rather than adding to it, so the freshness gate is not asked for
-them as well. It must hold the session to the requirement the request carries as well as its own policy, the stricter
-applying; never let the factor a removal names count towards its own removal; give a grant an end in the future, as the
-package refuses one without; and refuse by throwing an `OperationRefusedException`, which the caller receives as a
-refusal. It is asked inside the identity's transaction, after the package's locks, so it may lock its own session row
-there; it is never asked before the lock, nor when an enrolment is confirmed.
+gate (`laravel-authentication`'s [`factorChange()`][auth-factor-change]), replaces the package's judgement of those
+changes rather than adding to it, so the freshness gate is not asked for them as well. It must hold the session to the
+requirement the request carries as well as its own policy, the stricter applying; never let the factor a removal names
+count towards its own removal; give a grant an end in the future, as the package refuses one without; and refuse by
+throwing an `OperationRefusedException`, which the caller receives as a refusal. It is asked inside the identity's
+transaction, after the package's locks, so it may lock its own session row there; it is never asked before the lock, nor
+when an enrolment is confirmed.
 
 How each rule holds is in [the requirements and freshness design note](../design/requirements-and-freshness.md).
+
+[auth-freshness-policy]: https://github.com/sinemacula/laravel-authentication/blob/master/src/Contracts/FreshnessPolicy.php
+[auth-factor-change]: https://github.com/sinemacula/laravel-authentication/blob/master/docs/guides/sessions.md#changing-further-factors

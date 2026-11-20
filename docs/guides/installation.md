@@ -149,15 +149,20 @@ Behind any Laravel guard (session, Sanctum, Passport or your own) whose `Auth::u
 
 ### With `laravel-authentication`
 
-The same model implements `Identity` from that package and `Contracts\MultiFactorAuthenticatable` from this one: both
-extend Laravel's `Authenticatable`, so one class satisfies both. An adapter of yours implements this package's contracts
-with that package's, and binds them in a service provider, so proofs live on the authentication session through a
-rebound `Contracts\ProofStore`, a sign-in waits pending with `mfa` outstanding, and a step-up returns a new access
-token. [Seams with an authentication layer](extending.md#seams-with-an-authentication-layer) names what each contract
-meets, and warns against enabling `passkey` without it.
+Install that package as its [installation guide][auth-installation] describes. The same model implements
+[`Identity`][auth-identity] from that package and `Contracts\MultiFactorAuthenticatable` from this one: both extend
+Laravel's `Authenticatable`, so one class satisfies both. An adapter of yours implements this package's contracts with
+that package's, and binds them in a service provider, so proofs live on the authentication session through a rebound
+`Contracts\ProofStore`, a sign-in waits pending with `mfa` outstanding, and a step-up returns a new access token.
+[Seams with an authentication layer](extending.md#seams-with-an-authentication-layer) names what each contract meets,
+and warns against enabling `passkey` without it.
 
 ### Within `laravel-iam`
 
 `sinemacula/laravel-iam` installs the suite and provides those adapters, with its own requirement seams, the audit
 mappers and this package's senders, so you configure the applications and bind `laravel-authentication`'s
-`OneTimeCodeSender`. This package knows nothing of it.
+[`OneTimeCodeSender`][auth-code-sender]. This package knows nothing of it.
+
+[auth-installation]: https://github.com/sinemacula/laravel-authentication/blob/master/docs/guides/installation.md
+[auth-identity]: https://github.com/sinemacula/laravel-authentication/blob/master/src/Contracts/Identity.php
+[auth-code-sender]: https://github.com/sinemacula/laravel-authentication/blob/master/docs/guides/configuration.md#one-time-codes

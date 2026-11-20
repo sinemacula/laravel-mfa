@@ -5,7 +5,8 @@
 This note records how a passkey becomes, stays and stops being a factor: the association record, the change gate every
 registration and removal of a passkey passes through, and the assertions a passkey factor is verified with. This package
 stores no WebAuthn credentials and runs no ceremonies of its own: those belong to the authentication layer, reached
-through `Contracts\PasskeyGateway`.
+through `Contracts\PasskeyGateway` (see `laravel-authentication`'s [Passkeys][auth-passkeys] and
+[`PasskeyFactorGate`][auth-passkey-factor-gate]).
 
 ## Invariants
 
@@ -122,3 +123,6 @@ through `Contracts\PasskeyGateway`.
 
 - A change to what associates a passkey, what refuses it, or what its removal does.
 - A change to the credential id's form or how an association finds it.
+
+[auth-passkeys]: https://github.com/sinemacula/laravel-authentication/blob/master/docs/design/passkeys.md
+[auth-passkey-factor-gate]: https://github.com/sinemacula/laravel-authentication/blob/master/src/Contracts/PasskeyFactorGate.php

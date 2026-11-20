@@ -5,7 +5,8 @@
 This note lists the contracts the package declares for the seams between it, an authentication layer and the
 application: what each answers, what a fail-closed answer is, the default bound for each, what the authentication layer
 provides for each, and the calls it makes back into this package. Each public name of `laravel-authentication` a seam
-meets is in [Seams with an authentication layer](../guides/extending.md#seams-with-an-authentication-layer).
+meets is in [Seams with an authentication layer](../guides/extending.md#seams-with-an-authentication-layer), and that
+package's side of them in its [Further factors][auth-further-factors] guide.
 
 ## Invariants
 
@@ -141,34 +142,34 @@ meets is in [Seams with an authentication layer](../guides/extending.md#seams-wi
   a proof and never hands one back, so the mapping runs one way only. Trusting a provider's own evidence for more is a
   separate decision, made by rebinding the combination policy.
 
-| Contract                 | Answers                                                                      | `laravel-authentication` provides                  |
-|--------------------------|------------------------------------------------------------------------------|----------------------------------------------------|
-| `CombinationPolicy`      | Whether a factor may follow a first factor, and what proofs establish        | Nothing: this package's own                        |
-| `ProofStore`             | The current sign-in and its proofs that still count; forgetting them         | The session's proof records                        |
-| `RequirementPolicy`      | What a sign-in must prove after its first factor                             | Its additional-factor requirement, mapped          |
-| `IdentityRequirement`    | What the identity itself requires                                            | Nothing: the identity contract                     |
-| `TenantRequirement`      | What the active tenant requires                                              | Its tenant policy's requirement                    |
-| `ActiveTenantResolver`   | Which tenant applies to the session, from validated session context          | The session's validated tenant, by the adapter     |
-| `RequirementCheck`       | Whether a session's proofs meet a requirement                                | Nothing: it calls this package's check             |
-| `FreshnessGate`          | Whether the session is fresh enough for a named operation                    | Its freshness policy                               |
-| `Reauthenticator`        | The first factor proved again on an active session, or none                  | Its reauthentication with the first factor         |
-| `PendingSessionResolver` | The request's pending session, as a `PendingContext`, or none                | Its validated pending credential                   |
-| `FirstFactorResolver`    | The first factor's proof on the session, or none when unknown or untrusted   | The session's first-factor proof                   |
-| `PendingCompletion`      | Receives a successful verification on a pending session                      | Satisfying the pending session                     |
-| `StepUp`                 | Receives a successful verification on an active session                      | Its step-up                                        |
-| `ChallengeGateway`       | Sends and checks a delivered factor's codes as bound challenges              | Its `mfa` challenges                               |
-| `PasskeyGateway`         | Lists passkeys, and requests and verifies assertions for allowed ones        | Its WebAuthn credentials and ceremonies            |
-| `SessionRevoker`         | Ends the identity's other sessions, or all of them, inside a factor change   | Logging out everywhere, optionally but the current |
-| `FactorChangeGate`       | Whether an active session may change the identity's factors now              | Its factor-change gate                             |
-| `SessionTransition`      | Judges the current session again after a factor change                       | Judging a session after a factor change            |
-| `LastFactorPolicy`       | Whether the identity's last factor may be removed                            | Nothing: the default asks the tenant's requirement |
-| `SelfServiceRecovery`    | Whether an application offers its own recovery, and starting it              | Nothing: the application's own                     |
-| `SubjectTypeResolver`    | Whether an identity is a person                                              | Its subject type                                   |
-| `ActiveStateResolver`    | Whether an identity is active                                                | Its identity's active state                        |
-| `ApplicationResolver`    | The application a request is for                                             | The session's application                          |
-| `EventContextResolver`   | The scalar context every event carries                                       | Its event context                                  |
-| `SmsSender`              | Delivers a code by SMS, given its neutral details as a `Codes\CodeMessage`   | The gateway its own codes are sent through         |
-| `EmailSender`            | Delivers a code by email, given its neutral details as a `Codes\CodeMessage` | The gateway its own codes are sent through         |
+| Contract                 | Answers                                                                      | `laravel-authentication` provides                                    |
+|--------------------------|------------------------------------------------------------------------------|----------------------------------------------------------------------|
+| `CombinationPolicy`      | Whether a factor may follow a first factor, and what proofs establish        | Nothing: this package's own                                          |
+| `ProofStore`             | The current sign-in and its proofs that still count; forgetting them         | [The session's proof records][auth-proofs]                           |
+| `RequirementPolicy`      | What a sign-in must prove after its first factor                             | [Its additional-factor requirement, mapped][auth-pending]            |
+| `IdentityRequirement`    | What the identity itself requires                                            | Nothing: the identity contract                                       |
+| `TenantRequirement`      | What the active tenant requires                                              | [Its tenant policy's requirement][auth-tenant]                       |
+| `ActiveTenantResolver`   | Which tenant applies to the session, from validated session context          | [The session's validated tenant, by the adapter][auth-tenant]        |
+| `RequirementCheck`       | Whether a session's proofs meet a requirement                                | Nothing: it calls this package's check                               |
+| `FreshnessGate`          | Whether the session is fresh enough for a named operation                    | [Its freshness policy][auth-proofs]                                  |
+| `Reauthenticator`        | The first factor proved again on an active session, or none                  | [Its reauthentication with the first factor][auth-proofs]            |
+| `PendingSessionResolver` | The request's pending session, as a `PendingContext`, or none                | [Its validated pending credential][auth-pending]                     |
+| `FirstFactorResolver`    | The first factor's proof on the session, or none when unknown or untrusted   | [The session's first-factor proof][auth-proofs]                      |
+| `PendingCompletion`      | Receives a successful verification on a pending session                      | [Satisfying the pending session][auth-pending]                       |
+| `StepUp`                 | Receives a successful verification on an active session                      | [Its step-up][auth-proofs]                                           |
+| `ChallengeGateway`       | Sends and checks a delivered factor's codes as bound challenges              | [Its `mfa` challenges][auth-codes]                                   |
+| `PasskeyGateway`         | Lists passkeys, and requests and verifies assertions for allowed ones        | [Its WebAuthn credentials and ceremonies][auth-passkeys]             |
+| `SessionRevoker`         | Ends the identity's other sessions, or all of them, inside a factor change   | [Logging out everywhere, optionally but the current][auth-lifecycle] |
+| `FactorChangeGate`       | Whether an active session may change the identity's factors now              | [Its factor-change gate][auth-proofs]                                |
+| `SessionTransition`      | Judges the current session again after a factor change                       | [Judging a session after a factor change][auth-lifecycle]            |
+| `LastFactorPolicy`       | Whether the identity's last factor may be removed                            | Nothing: the default asks the tenant's requirement                   |
+| `SelfServiceRecovery`    | Whether an application offers its own recovery, and starting it              | Nothing: the application's own                                       |
+| `SubjectTypeResolver`    | Whether an identity is a person                                              | [Its subject type][auth-machines]                                    |
+| `ActiveStateResolver`    | Whether an identity is active                                                | [Its identity's active state][auth-active-state]                     |
+| `ApplicationResolver`    | The application a request is for                                             | [The session's application][auth-applications]                       |
+| `EventContextResolver`   | The scalar context every event carries                                       | [Its event context][auth-events]                                     |
+| `SmsSender`              | Delivers a code by SMS, given its neutral details as a `Codes\CodeMessage`   | [The gateway its own codes are sent through][auth-codes]             |
+| `EmailSender`            | Delivers a code by email, given its neutral details as a `Codes\CodeMessage` | [The gateway its own codes are sent through][auth-codes]             |
 
 The authentication layer makes these calls into this package inside its own transaction on the storage connection, and
 they are where the package's rules hold on that layer's own paths:
@@ -272,3 +273,16 @@ exception that rolls the caller's change back with it.
 - A new seam, or a change to what a contract takes or answers.
 - A default changing what it answers, or a seam gaining a default.
 - A kit gaining or losing a guarantee.
+
+[auth-proofs]: https://github.com/sinemacula/laravel-authentication/blob/master/docs/design/proofs-and-freshness.md
+[auth-pending]: https://github.com/sinemacula/laravel-authentication/blob/master/docs/design/pending-sessions.md
+[auth-tenant]: https://github.com/sinemacula/laravel-authentication/blob/master/docs/design/active-tenant-and-switching.md
+[auth-codes]: https://github.com/sinemacula/laravel-authentication/blob/master/docs/design/one-time-codes.md
+[auth-passkeys]: https://github.com/sinemacula/laravel-authentication/blob/master/docs/design/passkeys.md
+[auth-lifecycle]: https://github.com/sinemacula/laravel-authentication/blob/master/docs/design/session-lifecycle.md
+[auth-machines]: https://github.com/sinemacula/laravel-authentication/blob/master/docs/design/machine-credentials.md
+[auth-applications]: https://github.com/sinemacula/laravel-authentication/blob/master/docs/design/application-policy.md
+[auth-events]: https://github.com/sinemacula/laravel-authentication/blob/master/docs/design/event-model.md
+
+[auth-further-factors]: https://github.com/sinemacula/laravel-authentication/blob/master/docs/guides/extending.md#further-factors-laravel-mfa
+[auth-active-state]: https://github.com/sinemacula/laravel-authentication/blob/master/docs/guides/identity-models.md#active-state-enforcement

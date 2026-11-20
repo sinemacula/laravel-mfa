@@ -184,7 +184,8 @@ The defaults, both `Proofs\ProofStoreCompletion`, record the proof in the bound 
 commits. They refuse a binding whose owner, application or session is not the store's current sign-in, and for a pending
 session the pending context's as well, as `not_accepted`.
 
-An adapter over an authentication layer binds its own and returns what the caller needs:
+An adapter over an authentication layer binds its own and returns what the caller needs (with `laravel-authentication`,
+from [`satisfy()`][auth-satisfy] and [`stepUp()`][auth-step-up]):
 
 ```php
 final readonly class AuthenticationStepUp implements StepUp
@@ -241,3 +242,6 @@ id is the one its gateway reports with a verified assertion, so it is on `Verifi
 
 A listener that throws reaches the caller of `verify()` or `sendCode()`, whatever it throws, and the change has
 committed: it is not reported as a failure. See [Events](events.md).
+
+[auth-satisfy]: https://github.com/sinemacula/laravel-authentication/blob/master/docs/guides/signing-in.md#satisfying-a-further-factor
+[auth-step-up]: https://github.com/sinemacula/laravel-authentication/blob/master/docs/guides/sessions.md#stepping-up

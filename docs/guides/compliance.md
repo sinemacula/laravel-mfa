@@ -110,7 +110,7 @@ The limits, with reauthentication resetting both timeouts and either expiring en
 | AAL2  | SHOULD be at most 24 hours | SHOULD be at most 1 hour     | 2.2.3   |
 | AAL3  | SHALL be at most 12 hours  | SHOULD be at most 15 minutes | 2.3.3   |
 
-With `laravel-authentication`, a session's lifetimes are `jwt.refresh_idle_ttl_minutes` and
+With `laravel-authentication`, a session's [lifetimes][auth-lifetimes] are `jwt.refresh_idle_ttl_minutes` and
 `jwt.refresh_absolute_ttl_minutes`, set for the package or per guard. Their defaults are 90 and 180 days, far above
 AAL2's limits, so an application claiming AAL2 lowers them. Lowering them bounds the session but does not show
 reauthentication: a refresh moves the idle deadline without showing that the person was present (and renews no proof's
@@ -236,3 +236,5 @@ These are always on, and cannot be turned off:
 | An OTP accepted once while valid, from a key of 112 bits or more | 3.1.4   | Each TOTP time step once per factor; a secret of at least 160 bits  |
 | Look-up secrets single use, rate limited, salted and hashed      | 3.1.2.2 | One attempt against the whole unused set, under the identity's caps |
 | A refresh renews no authentication                               | 5.2     | Only a proof's own time counts                                      |
+
+[auth-lifetimes]: https://github.com/sinemacula/laravel-authentication/blob/master/docs/guides/configuration.md#token-and-session-lifetimes

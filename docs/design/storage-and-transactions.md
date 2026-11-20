@@ -121,8 +121,8 @@ plain reads from seeing an older snapshot. On MySQL and MariaDB at `REPEATABLE R
 fixes the snapshot every later plain read sees, and every flow here reads before a session seam runs (the caller is
 resolved first), so a layer's judgement in a seam may see proofs as they stood then. Run the storage connection at
 `READ COMMITTED` when a layer judges sessions this way; PostgreSQL's default already is. `laravel-authentication` does
-not: every judgement it makes under a session's lock, `factorChanged()` and `factorRemoved()` included, reads that
-session's proofs as committed, so binding it needs no change of isolation level.
+not: every judgement it makes under a session's lock, [`factorChanged()` and `factorRemoved()`][auth-sign-in-factors]
+included, reads that session's proofs as committed, so binding it needs no change of isolation level.
 
 Two things hold no second lock or are outside the order, and are kept as they are:
 
@@ -200,3 +200,5 @@ which stays with the tests CI runs on MySQL and PostgreSQL (`tests/Integration/D
 - Any change to the lock order, to how the identity's row is locked, or to how connections are compared.
 - A new read that decides a verification, a lockout or ownership outside `FactorStateTransaction`: it goes through
   `WriteConnection`.
+
+[auth-sign-in-factors]: https://github.com/sinemacula/laravel-authentication/blob/master/docs/guides/sessions.md#sign-in-factors

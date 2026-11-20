@@ -50,7 +50,8 @@ public function canHoldFactors(): bool
 }
 ```
 
-With an authentication layer, the adapter answers it from that layer's subject type.
+With an authentication layer, the adapter answers it from that layer's subject type, such as `laravel-authentication`'s
+[`MachineIdentity`][auth-machine-identity].
 
 ## Active identities
 
@@ -65,8 +66,9 @@ public function isMfaActive(): bool
 }
 ```
 
-With an authentication layer that knows whether an identity is active, the adapter binds `Contracts\ActiveStateResolver`
-instead, and the bound resolver answers in place of the model (see [Extending](extending.md)).
+With an authentication layer that knows whether an identity is active, such as `laravel-authentication`'s
+[`CanBeActive`][auth-can-be-active], the adapter binds `Contracts\ActiveStateResolver` instead, and the bound resolver
+answers in place of the model (see [Extending](extending.md)).
 
 ## Requirements of the identity's own
 
@@ -127,3 +129,6 @@ public function authFactors(): Builder
         ->where('authenticatable_id', (string) $this->getAuthIdentifier());
 }
 ```
+
+[auth-machine-identity]: https://github.com/sinemacula/laravel-authentication/blob/master/src/Contracts/MachineIdentity.php
+[auth-can-be-active]: https://github.com/sinemacula/laravel-authentication/blob/master/src/Contracts/CanBeActive.php
