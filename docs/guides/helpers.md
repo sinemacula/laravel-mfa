@@ -123,6 +123,7 @@ your authorisation. `resetIdentity()`, `unlockFactor()`, `enableFactor()` and `u
 | `driver($name)`            | `FactorDriver`    |
 | `extend($name, $callback)` | `MfaManager`      |
 | `getDefaultDriver()`       | `string`, `totp`  |
+| `hasDriver($name)`         | `bool`            |
 | `factorModel()`            | The model's class |
 
 The manager's inherited `getDrivers()`, `getContainer()` and `forgetDrivers()` stay callable as Laravel's

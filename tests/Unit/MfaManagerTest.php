@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Unit;
 
 use Carbon\CarbonImmutable;
+use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
@@ -45,6 +46,7 @@ use SineMacula\Laravel\Mfa\Verification\Submission;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
 use Tests\Fixtures\Context\Callers;
+use Tests\Fixtures\Drivers\NoopFactorDriver;
 use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
@@ -79,6 +81,43 @@ final class MfaManagerTest extends TestCase
     public function testDefaultDriverIsTotp(): void
     {
         self::assertSame('totp', $this->manager()->getDefaultDriver());
+    }
+
+    /**
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testHasDriverKnowsEachRegisteredDriverWithoutBuildingIt(): void
+    {
+        $manager = $this->manager();
+
+        $manager->extend('custom', fn () => Assert::fail('The driver must not be built.'));
+
+        foreach (['totp', 'email', 'sms', 'passkey', 'custom'] as $driver) {
+            self::assertTrue($manager->hasDriver($driver), $driver);
+        }
+
+        self::assertFalse($manager->hasDriver('topt'));
+    }
+
+    /**
+     * @return void
+     */
+    public function testHasDriverKnowsASubclassCreatorMethod(): void
+    {
+        $manager = new class ($this->container()) extends MfaManager {
+            /**
+             * @return \SineMacula\Laravel\Mfa\Contracts\FactorDriver
+             */
+            public function createVoiceCallDriver(): FactorDriver
+            {
+                return new NoopFactorDriver;
+            }
+        };
+
+        self::assertTrue($manager->hasDriver('voice_call'));
+        self::assertFalse($manager->hasDriver('voice'));
     }
 
     /**
