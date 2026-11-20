@@ -85,12 +85,12 @@ jobs:
                 laravel:
                     -   constraint: ^12.40
                         label: 12
-                    -   constraint: ^13.3
+                    -   constraint: ^13.4
                         label: 13
                     -   constraint: 12.40.0
                         label: 12 (lowest)
                         lowest: 1
-                    -   constraint: 13.3.0
+                    -   constraint: 13.4.0
                         label: 13 (lowest)
                         lowest: 1
 
