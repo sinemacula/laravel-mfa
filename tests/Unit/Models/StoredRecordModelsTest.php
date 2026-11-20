@@ -169,12 +169,10 @@ final class StoredRecordModelsTest extends TestCase
                 'purpose',
                 'application',
                 'session_id',
-                'destination_hash',
                 'code_hash',
                 'attempts',
                 'sends',
                 'sent_at',
-                'sent_times',
                 'expires_at',
                 'consumed_at',
             ],
@@ -218,13 +216,12 @@ final class StoredRecordModelsTest extends TestCase
             'expires_at'           => 'datetime',
             'attempts'             => 'integer',
         ]];
-        yield 'code' => [Code::class, 'mfa.codes.table', 'mfa_codes', ['code_hash', 'session_id', 'destination_hash'], [
+        yield 'code' => [Code::class, 'mfa.codes.table', 'mfa_codes', ['code_hash', 'session_id'], [
             'authenticatable_type' => 'string',
             'authenticatable_id'   => 'string',
             'attempts'             => 'integer',
             'sends'                => 'integer',
             'sent_at'              => 'datetime',
-            'sent_times'           => 'array',
             'expires_at'           => 'datetime',
             'consumed_at'          => 'datetime',
         ]];

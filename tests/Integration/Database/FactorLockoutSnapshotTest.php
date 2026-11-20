@@ -16,6 +16,7 @@ use SineMacula\Laravel\Mfa\Attempts\AttemptOutcome;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Attempts\AttemptStore;
 use SineMacula\Laravel\Mfa\Codes\CodeService;
+use SineMacula\Laravel\Mfa\Codes\SendLedger;
 use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
@@ -41,6 +42,7 @@ use Tests\TestCase;
  */
 #[CoversClass(AttemptService::class)]
 #[CoversClass(CodeService::class)]
+#[CoversClass(SendLedger::class)]
 final class FactorLockoutSnapshotTest extends TestCase
 {
     use ArrangesVerification, RacesAForkedWorker;
@@ -238,6 +240,34 @@ final class FactorLockoutSnapshotTest extends TestCase
         DB::connection()->commit();
 
         $this->assertRefusedByTheFactor($outcome, $user, $factor, $until, 0);
+    }
+
+    /**
+     * A plain read misses the committed send; the caps do not.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAnOlderMysqlSnapshotCannotHideASendFromTheCaps(): void
+    {
+        $this->requireDriver('mysql');
+
+        [$user, $factor] = $this->arrangeSends();
+
+        $this->openTransaction('REPEATABLE READ');
+        $this->takeSnapshot($factor);
+        $this->commitSendElsewhere($factor);
+        $this->signInAgainElsewhere($user);
+
+        self::assertSame(0, Code::query()->count());
+
+        $result = $this->mfa()->sendCode(Callers::current(), $factor->id);
+
+        DB::connection()->commit();
+
+        self::assertSame(FailureReason::SENDING_CAPPED, $result->reason);
+        $this->assertSentOnce();
     }
 
     /**

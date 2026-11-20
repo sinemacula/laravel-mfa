@@ -127,9 +127,9 @@ final class NamespaceDependenciesTest extends TestCase
             'forbids' => ['Console'],
             'allows'  => [],
         ],
-        'only the provider, the facade and the driver bindings name the manager' => [
+        'only the provider, the facade, the driver bindings and the check command name the manager' => [
             'from'    => ['*'],
-            'except'  => ['MfaServiceProvider', 'Facades\Mfa', 'Drivers\DriverBindings'],
+            'except'  => ['MfaServiceProvider', 'Facades\Mfa', 'Drivers\DriverBindings', 'Console\CheckConfigurationCommand'],
             'forbids' => ['MfaManager'],
             'allows'  => [],
         ],

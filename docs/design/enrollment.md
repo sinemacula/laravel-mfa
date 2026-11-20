@@ -35,13 +35,13 @@ for the session. The API is in [Enrolment](../guides/enrollment.md).
   the other two only an active one. The row is deleted at confirmation, so a repeat answers `not_found` and returns none
   of the secrets.
 - Restarting discards any pending enrolment of the same identity, application and type, from any session, and expired
-  ones of this application only; another application's belong to pruning. Delivered code rows of a discarded factor
-  stay, and carry a keyed digest of the owner and the destination (`destination_hash`), which outlives the factor. The
-  destination's cap counts by it, and a new enrolment challenge waits out `resend_cooldown_seconds` since the last
-  enrolment code to it, so restarting and sending bypasses neither. A refused restart rolls back and leaves the
-  enrolment under way. A new destination has its own count and cooldown, so a mistyped one can be corrected at once, and
-  the identity's cap bounds that. An adapter's `ChallengeGateway` owns its own caps and sees a new factor id on a
-  restart, so it must key them on what a restart keeps.
+  ones of this application only; another application's belong to pruning. The identity's sends are recorded on its
+  state row under a keyed digest of the owner and the destination, which outlives the factor. The destination's cap
+  counts by it, and a new enrolment challenge waits out `resend_cooldown_seconds` since the last enrolment code to it,
+  so restarting and sending bypasses neither. A refused restart rolls back and leaves the enrolment under way. A new
+  destination has its own count and cooldown, so a mistyped one can be corrected at once, and the identity's cap bounds
+  that. An adapter's `ChallengeGateway` owns its own caps and sees a new factor id on a restart, so it must key them on
+  what a restart keeps.
 - Every write the flow needs fails closed. A model event that cancels the factor's save, the row's save or deletion, the
   count of an attempt or the record of a challenge throws `WriteCanceledException`, so the whole transaction rolls back
   and no confirmation, recovery code, event or usable grant comes of what was not stored.

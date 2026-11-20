@@ -24,12 +24,10 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
  * @property string $purpose
  * @property string $application
  * @property ?string $session_id
- * @property string $destination_hash
  * @property string $code_hash
  * @property int $attempts
  * @property int $sends
  * @property \Carbon\CarbonInterface $sent_at
- * @property list<int> $sent_times
  * @property \Carbon\CarbonInterface $expires_at
  * @property ?\Carbon\CarbonInterface $consumed_at
  * @property \Carbon\CarbonInterface $created_at
@@ -49,12 +47,10 @@ final class Code extends Model
         'purpose',
         'application',
         'session_id',
-        'destination_hash',
         'code_hash',
         'attempts',
         'sends',
         'sent_at',
-        'sent_times',
         'expires_at',
         'consumed_at',
     ];
@@ -63,7 +59,6 @@ final class Code extends Model
     protected $hidden = [
         'code_hash',
         'session_id',
-        'destination_hash',
     ];
 
     /**
@@ -102,14 +97,12 @@ final class Code extends Model
             'purpose'              => 'string',
             'application'          => 'string',
             'session_id'           => 'string',
-            'destination_hash'     => 'string',
             'code_hash'            => 'string',
             'authenticatable_type' => 'string',
             'authenticatable_id'   => 'string',
             'attempts'             => 'integer',
             'sends'                => 'integer',
             'sent_at'              => 'datetime',
-            'sent_times'           => 'array',
             'expires_at'           => 'datetime',
             'consumed_at'          => 'datetime',
         ];
