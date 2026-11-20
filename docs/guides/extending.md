@@ -482,8 +482,9 @@ caller who is nobody, is not found and not counted, and that the code sent fails
 `challengeMaxAttempts()` wrong codes (by default `mfa.codes.max_attempts`; a gateway with a limit of its own overrides
 it). Override `secondChallengeCaller()` to return the same identity on another session or application, with the binding
 it holds there, and the kit also checks that the code sent can neither pass for that caller nor be used up by it, so a
-gateway that looks a code up without the session or application that caller differs in is caught. That caller's attempt
-may be counted, so leave the factor room for one more failure. By default it returns `null` and the check is skipped.
+gateway that looks a code up without the part that caller differs in is caught; a caller that differs in both catches
+only a lookup that leaves out both. That caller's attempt may be counted, so leave the factor room for one more failure.
+By default it returns `null` and the check holds trivially.
 The pending session resolver's kit asks for `requestWithPendingCredential()`, a request carrying a valid pending
 credential, and `endPendingSession()`, which ends that session as the authentication layer does when it is satisfied,
 expires or is revoked; the session must revalidate as itself until then and not after. By default the resolver has no

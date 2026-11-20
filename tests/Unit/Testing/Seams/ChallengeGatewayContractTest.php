@@ -218,11 +218,11 @@ final class ChallengeGatewayContractTest extends TestCase
      *
      * @return void
      */
-    public function testRejectsAGatewayThatIgnoresTheSessionAndApplicationOnLookup(): void
+    public function testRejectsAGatewayThatIgnoresTheApplicationOnLookup(): void
     {
         $gateway = new MemoryChallengeGateway(
-            keyedBy : ['identity_type', 'identity_key', 'purpose'],
-            sessions: [self::CHALLENGE_APPLICATION => self::CHALLENGE_SESSION, 'admin' => 'sign-in-2'],
+            keyedBy : ['identity_type', 'identity_key', 'session_id', 'purpose'],
+            sessions: [self::CHALLENGE_APPLICATION => self::CHALLENGE_SESSION, 'admin' => self::CHALLENGE_SESSION],
         );
 
         $caller  = Callers::current();
@@ -464,7 +464,7 @@ final class ChallengeGatewayContractTest extends TestCase
     }
 
     /**
-     * The person signed in to another application on another session.
+     * The person signed in to another application on the same session.
      *
      * @return array{0: \SineMacula\Laravel\Mfa\Context\CallerContext, 1: \SineMacula\Laravel\Mfa\Proofs\ProofBinding}
      *
@@ -474,9 +474,9 @@ final class ChallengeGatewayContractTest extends TestCase
     {
         config()->set('mfa.applications.admin', config('mfa.applications.' . self::CHALLENGE_APPLICATION));
 
-        $this->container()->make(ProofStore::class)->begin($this->user, 'admin', 'sign-in-2');
+        $this->container()->make(ProofStore::class)->begin($this->user, 'admin', self::CHALLENGE_SESSION);
 
-        $binding = ProofBinding::fromArray(['application' => 'admin', 'session_id' => 'sign-in-2'] + $this->emailBinding($this->user)->toArray());
+        $binding = ProofBinding::fromArray(['application' => 'admin'] + $this->emailBinding($this->user)->toArray());
 
         return [Callers::of($this->user, 'admin'), $binding];
     }
