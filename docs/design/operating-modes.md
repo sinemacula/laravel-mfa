@@ -42,6 +42,8 @@ repository can tell which. Any new work keeps all three working.
   [Storage and Transactions](storage-and-transactions.md)).
 - A stateless guard with the default store has no session to keep proofs in, so it needs a rebound `ProofStore` even
   with no sibling installed.
+- A Sanctum SPA signs in through `web` and its stateful requests are served under `sanctum`. With no
+  `ApplicationResolver` those are two applications, so the sign-in is not found where the caller is served.
 
 ## Implementation Anchors
 
@@ -51,7 +53,8 @@ repository can tell which. Any new work keeps all three working.
 
 ## Authoritative Tests
 
-- `tests/Integration/MultiAuthStackTest.php` `testSanctumGuardSeesIdentityAndFactors`
+- `tests/Integration/MultiAuthStackTest.php`: `testSanctumGuardSeesIdentityAndFactors`, a Sanctum SPA sign-in with and
+  without one application for both guards, and a token guard with its own store and on the session store.
 - `tests/Integration/PolymorphicIdentityTest.php`
 - `tests/Feature/Proofs/SignInProofsTest.php`
 - `tests/Unit/Testing/Seams/`

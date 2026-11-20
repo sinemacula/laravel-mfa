@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
+use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\Reauthenticator;
 use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
@@ -35,6 +36,7 @@ use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Lifecycle\FactorRemoval;
 use SineMacula\Laravel\Mfa\Lifecycle\IdentityReset;
 use SineMacula\Laravel\Mfa\MfaManager;
+use SineMacula\Laravel\Mfa\Models\Code;
 use SineMacula\Laravel\Mfa\Models\Enrollment;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
@@ -191,6 +193,47 @@ final class ResettingIdentityTest extends TestCase
     }
 
     /**
+     * Whichever application made them; the delivered code rows the send caps
+     * read stay.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAResetRemovesEveryApplicationsFactorsAndKeepsDeliveredCodes(): void
+    {
+        $user  = $this->signedInPerson();
+        $admin = $this->confirmedFactor($user);
+        $web   = $this->confirmedFactor($user);
+
+        [$pending, $enrollment] = $this->pendingEnrollmentOf($user);
+
+        $admin->update(['application' => 'admin']);
+        $pending->update(['application' => 'admin']);
+        $enrollment->update(['application' => 'admin']);
+
+        $code = Code::query()->create([
+            'factor_id'            => $web->id,
+            'authenticatable_type' => $user->getMorphClass(),
+            'authenticatable_id'   => (string) $user->id,
+            'purpose'              => 'sign_in',
+            'application'          => self::APPLICATION,
+            'session_id'           => self::SESSION,
+            'destination_hash'     => hash('sha256', 'destination'),
+            'code_hash'            => hash('sha256', 'code'),
+            'sent_at'              => CarbonImmutable::now(),
+            'sent_times'           => [CarbonImmutable::now()->getTimestamp()],
+            'expires_at'           => CarbonImmutable::now()->addMinutes(10),
+        ]);
+
+        Mfa::resetIdentity($user, self::actor(), self::REASON);
+
+        self::assertSame(0, Factor::query()->count());
+        self::assertSame(0, Enrollment::query()->count());
+        self::assertTrue(Code::query()->whereKey($code->getKey())->exists());
+    }
+
+    /**
      * By a console command with no caller at all.
      *
      * @return void
@@ -237,7 +280,8 @@ final class ResettingIdentityTest extends TestCase
 
     /**
      * Lockouts first, each factor in id order by how far it got, the codes,
-     * then the reset; an ended lockout is not reported.
+     * then the reset; an ended lockout is not reported. No client is read from
+     * the request.
      *
      * @return void
      *
@@ -290,6 +334,40 @@ final class ResettingIdentityTest extends TestCase
         self::assertSame(self::REASON, $reset->reason);
         self::assertTrue($reset->reenrollmentRequired);
         self::assertSame((string) $user->id, (string) $reset->context()['identity_id']);
+
+        foreach ($this->reported as $event) {
+            self::assertNull($event->context()['ip']);
+            self::assertNull($event->context()['user_agent']);
+        }
+    }
+
+    /**
+     * Every event carries the client the operator acted from.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testTheEventsCarryTheClientGiven(): void
+    {
+        $user   = $this->signedInPerson();
+        $locked = $this->confirmedFactor($user);
+
+        $this->pendingEnrollmentOf($user);
+        $this->recoveryCodesOf($user);
+
+        $locked->update(['locked_until' => CarbonImmutable::now()->addMinutes(10)]);
+
+        IdentityState::query()->where('authenticatable_id', (string) $user->id)->update(['locked_until' => CarbonImmutable::now()->addHour()]);
+
+        Mfa::resetIdentity($user, self::actor(), self::REASON, client: new ClientContext('198.51.100.4', 'Admin/1.0'));
+
+        self::assertSame(['LockoutLifted', 'LockoutLifted', 'FactorRemoved', 'EnrollmentAbandoned', 'RecoveryCodesRemoved', 'FactorsReset'], $this->reportedNames());
+
+        foreach ($this->reported as $event) {
+            self::assertSame('198.51.100.4', $event->context()['ip']);
+            self::assertSame('Admin/1.0', $event->context()['user_agent']);
+        }
     }
 
     /**

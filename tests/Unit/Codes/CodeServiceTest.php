@@ -7,10 +7,13 @@ namespace Tests\Unit\Codes;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Support\Facades\DB;
+use Orchestra\Testbench\Attributes\WithConfig;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Codes\CodeService;
 use SineMacula\Laravel\Mfa\Codes\DeliveredCodes;
+use SineMacula\Laravel\Mfa\Contracts\ProofStore;
+use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Enums\CodeCheck;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
@@ -18,12 +21,14 @@ use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Exceptions\CodeDeliveryFailedException;
 use SineMacula\Laravel\Mfa\Exceptions\MissingDestinationException;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedFactorException;
+use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Models\Code;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use Tests\Fixtures\Codes\LeakingSmsSender;
 use Tests\Fixtures\Codes\RecordingCodeDriver;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\Fixtures\Factors\LeakingLabelFactor;
 use Tests\Fixtures\Factors\TotpStubFactor;
@@ -185,17 +190,33 @@ final class CodeServiceTest extends TestCase
         self::assertStringStartsWith('Gateway said: invalid body "', (string) $failure->getPrevious()?->getMessage());
         self::assertStringEndsWith('[redacted]"', (string) $failure->getPrevious()?->getMessage());
 
-        for ($current = $exception; $current !== null; $current = $current->getPrevious()) {
-            foreach ([self::CODE, self::PHONE] as $plaintext) {
-                self::assertStringNotContainsString($plaintext, $current->getMessage());
-                self::assertStringNotContainsString($plaintext, $current->getTraceAsString());
+        self::assertScrubbed($exception, self::CODE, self::PHONE);
+        self::assertSame(0, Code::query()->count());
+    }
 
-                foreach (RecordedTrace::strings($current) as $string) {
-                    self::assertStringNotContainsString($plaintext, $string);
-                }
-            }
-        }
+    /**
+     * The scrub does not depend on `mfa.secrets.redact`.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    #[WithConfig('mfa.secrets.redact', false, false)]
+    public function testAFailedDeliveryIsScrubbedWithRedactionOff(): void
+    {
+        config()->set('mfa.applications.web', ['types' => ['sms'], 'first_factor' => ['method' => 'password', 'channel' => 'password']]);
 
+        $this->container()->instance(SmsSender::class, new LeakingSmsSender);
+
+        [$user, $factor] = $this->factor('sms', self::PHONE);
+
+        $this->actingAs($user);
+        $this->container()->make(ProofStore::class)->begin($user, 'web', 'session-a');
+
+        $exception = RecordedTrace::thrownBy(static fn () => Mfa::sendCode(Callers::current(), $factor->id));
+
+        self::assertInstanceOf(CodeDeliveryFailedException::class, $exception);
+        self::assertScrubbed($exception, self::CODE, self::PHONE);
         self::assertSame(0, Code::query()->count());
     }
 
@@ -486,14 +507,7 @@ final class CodeServiceTest extends TestCase
         self::assertInstanceOf(\RuntimeException::class, $exception);
         self::assertSame('No label could be read for [redacted].', $exception->getMessage());
 
-        foreach ([self::CODE, self::ADDRESS] as $plaintext) {
-            self::assertStringNotContainsString($plaintext, $exception->getTraceAsString());
-
-            foreach (RecordedTrace::strings($exception) as $string) {
-                self::assertStringNotContainsString($plaintext, $string);
-            }
-        }
-
+        self::assertScrubbed($exception, self::CODE, self::ADDRESS);
         self::assertSame([], $driver->delivered);
         self::assertSame(0, Code::query()->count());
     }
@@ -544,5 +558,26 @@ final class CodeServiceTest extends TestCase
     private static function binding(TestUser $user): ProofBinding
     {
         return new ProofBinding($user->getMorphClass(), (string) $user->id, 'web', 'session-a', Purpose::SIGN_IN);
+    }
+
+    /**
+     * No message, trace or recorded argument in the chain shows a plaintext.
+     *
+     * @param  \Throwable  $exception
+     * @param  string  ...$plaintexts
+     * @return void
+     */
+    private static function assertScrubbed(\Throwable $exception, string ...$plaintexts): void
+    {
+        for ($current = $exception; $current !== null; $current = $current->getPrevious()) {
+            foreach ($plaintexts as $plaintext) {
+                self::assertStringNotContainsString($plaintext, $current->getMessage());
+                self::assertStringNotContainsString($plaintext, $current->getTraceAsString());
+
+                foreach (RecordedTrace::strings($current) as $string) {
+                    self::assertStringNotContainsString($plaintext, $string);
+                }
+            }
+        }
     }
 }

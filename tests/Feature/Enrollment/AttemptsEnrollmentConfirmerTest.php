@@ -4,6 +4,8 @@ declare(strict_types = 1);
 
 namespace Tests\Feature\Enrollment;
 
+use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Assurance\Combination;
 use SineMacula\Laravel\Mfa\Assurance\DefaultCombinationPolicy;
@@ -159,18 +161,17 @@ final class AttemptsEnrollmentConfirmerTest extends TestCase
 
         self::assertFalse($this->mfa()->confirmEnrollment(Callers::current(), $grant, $wrong)->abandoned);
         self::assertSame(1, Factor::query()->count());
+        self::assertSame(1, $this->addressHits('127.0.0.1'));
 
         $last = $this->mfa()->confirmEnrollment(Callers::current(), $grant, $wrong);
 
         self::assertTrue($last->abandoned);
+        self::assertSame(2, $this->addressHits('127.0.0.1'));
         self::assertSame(FailureReason::INVALID_CODE, $last->reason);
         self::assertSame(0, Factor::query()->count());
         self::assertSame(0, Enrollment::query()->count());
         self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment(Callers::current(), $grant, $wrong)->reason);
-        $abandoned = array_values(array_filter($this->reported, static fn (object $event): bool => $event instanceof EnrollmentAbandoned));
-
-        self::assertCount(1, $abandoned);
-        self::assertSame(AbandonmentCause::ATTEMPTS_EXHAUSTED, $abandoned[0]->cause);
+        self::assertSame(AbandonmentCause::ATTEMPTS_EXHAUSTED, $this->abandonment()->cause);
     }
 
     /**
@@ -194,6 +195,108 @@ final class AttemptsEnrollmentConfirmerTest extends TestCase
 
         self::assertSame(4, $this->rowOf($start)->attempts);
         self::assertTrue($this->mfa()->confirmEnrollment(Callers::current(), $grant, $wrong)->abandoned);
+    }
+
+    /**
+     * @return void
+     */
+    public function testARestartStartsAFreshCount(): void
+    {
+        config()->set('mfa.enrollment.max_attempts', 2);
+
+        $this->reauthenticatedPerson();
+
+        $first = $this->startedTotp();
+
+        self::assertSame(FailureReason::INVALID_CODE, $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($first), $this->wrongCode($first))->reason);
+        self::assertSame(1, $this->rowOf($first)->attempts);
+
+        $second = $this->startedTotp();
+
+        self::assertSame(0, $this->rowOf($second)->attempts);
+        self::assertFalse($this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($second), $this->wrongCode($second))->abandoned);
+        self::assertSame(1, $this->rowOf($second)->attempts);
+    }
+
+    /**
+     * Charging neither the factor nor the identity.
+     *
+     * @return void
+     */
+    public function testWrongDeliveredCodesAbandonAtTheCap(): void
+    {
+        $user  = $this->reauthenticatedPerson();
+        $start = $this->startedEmail();
+        $grant = $this->grantOf($start);
+        $wrong = $this->wrongEmailCode();
+
+        for ($attempt = 1; $attempt < 5; $attempt++) {
+            $confirmation = $this->mfa()->confirmEnrollment(Callers::current(), $grant, $wrong);
+
+            self::assertSame(FailureReason::INVALID_CODE, $confirmation->reason);
+            self::assertFalse($confirmation->abandoned);
+            self::assertSame($attempt, $this->rowOf($start)->attempts);
+        }
+
+        self::assertSame(0, $this->factorRun($this->pendingFactorOf($start)));
+
+        $last = $this->mfa()->confirmEnrollment(Callers::current(), $grant, $wrong);
+
+        self::assertTrue($last->abandoned);
+        self::assertSame(FailureReason::INVALID_CODE, $last->reason);
+        self::assertSame(0, Factor::query()->count());
+        self::assertSame(0, Enrollment::query()->count());
+        self::assertSame(0, $this->identityRun($user));
+        self::assertSame(AbandonmentCause::ATTEMPTS_EXHAUSTED, $this->abandonment()->cause);
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment(Callers::current(), $grant, $wrong)->reason);
+    }
+
+    /**
+     * It answers expired; no code is sent until the challenge ends, then a
+     * resend opens another and the count carries on.
+     *
+     * @return void
+     */
+    public function testAnExhaustedChallengeCountsNothing(): void
+    {
+        config()->set('mfa.codes.max_attempts', 2);
+        config()->set('mfa.codes.ttl_minutes', 1);
+        config()->set('mfa.codes.challenge_ttl_minutes', 2);
+
+        $user  = $this->reauthenticatedPerson();
+        $start = $this->startedEmail();
+        $grant = $this->grantOf($start);
+
+        $this->mfa()->confirmEnrollment(Callers::current(), $grant, $this->wrongEmailCode());
+        $this->mfa()->confirmEnrollment(Callers::current(), $grant, $this->wrongEmailCode());
+
+        $exhausted = $this->mfa()->confirmEnrollment(Callers::current(), $grant, $this->wrongEmailCode());
+
+        self::assertSame(FailureReason::EXPIRED, $exhausted->reason);
+        self::assertFalse($exhausted->abandoned);
+        self::assertSame(2, $this->rowOf($start)->attempts);
+        self::assertSame(2, $this->addressHits('127.0.0.1'));
+
+        Carbon::setTestNow(CarbonImmutable::now()->addSeconds(61));
+
+        self::assertSame(FailureReason::SENDING_CAPPED, $this->mfa()->resendEnrollmentCode(Callers::current(), $grant)->reason);
+        self::assertCount(1, $this->mailbox->sentTo(self::ADDRESS));
+
+        Carbon::setTestNow(CarbonImmutable::now()->addSeconds(60));
+
+        self::assertTrue($this->mfa()->resendEnrollmentCode(Callers::current(), $grant)->wasSent());
+
+        $this->mfa()->confirmEnrollment(Callers::current(), $grant, $this->wrongEmailCode());
+
+        self::assertFalse($this->mfa()->confirmEnrollment(Callers::current(), $grant, $this->wrongEmailCode())->abandoned);
+        self::assertSame(4, $this->rowOf($start)->attempts);
+
+        Carbon::setTestNow(CarbonImmutable::now()->addMinutes(2));
+
+        self::assertTrue($this->mfa()->resendEnrollmentCode(Callers::current(), $grant)->wasSent());
+        self::assertTrue($this->mfa()->confirmEnrollment(Callers::current(), $grant, $this->wrongEmailCode())->abandoned);
+        self::assertSame(AbandonmentCause::ATTEMPTS_EXHAUSTED, $this->abandonment()->cause);
+        self::assertSame(0, $this->identityRun($user));
     }
 
     /**
@@ -247,5 +350,27 @@ final class AttemptsEnrollmentConfirmerTest extends TestCase
         self::assertSame(FailureReason::LOCKED, $this->failureReported()->reason);
         self::assertNull($this->failureReported()->factor);
         self::assertSame(1, $this->rowOf($start)->attempts);
+    }
+
+    /**
+     * Fails the test unless exactly one abandonment was reported.
+     *
+     * @return \SineMacula\Laravel\Mfa\Events\EnrollmentAbandoned
+     */
+    private function abandonment(): EnrollmentAbandoned
+    {
+        $abandoned = array_values(array_filter($this->reported, static fn (object $event): bool => $event instanceof EnrollmentAbandoned));
+
+        self::assertCount(1, $abandoned);
+
+        return $abandoned[0];
+    }
+
+    /**
+     * @return string
+     */
+    private function wrongEmailCode(): string
+    {
+        return $this->mailbox->lastCodeTo(self::ADDRESS) === '000000' ? '111111' : '000000';
     }
 }

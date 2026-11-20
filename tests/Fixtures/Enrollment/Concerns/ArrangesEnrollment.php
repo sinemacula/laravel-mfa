@@ -9,6 +9,7 @@ use PHPUnit\Framework\Assert;
 use SineMacula\Laravel\Mfa\Assurance\Channel;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Contracts\MfaEvent;
+use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\Reauthenticator;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentRequest;
@@ -62,12 +63,26 @@ trait ArrangesEnrollment
      */
     protected function reauthenticatedPerson(int $secondsAgo = 0): TestUser
     {
-        $user = $this->signedInPerson();
+        $user = $this->person();
 
-        $this->recordFirstFactor($user);
-        $this->container()->instance(Reauthenticator::class, new FreshReauthenticator($this->container()->make(ProofStore::class), $secondsAgo));
+        $this->reauthenticated($user, $secondsAgo);
 
         return $user;
+    }
+
+    /**
+     * Signs the identity in and has it just prove the first factor again.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @param  int  $secondsAgo
+     * @return void
+     */
+    protected function reauthenticated(MultiFactorAuthenticatable $identity, int $secondsAgo = 0): void
+    {
+        $this->actingAs($identity);
+        $this->beginSignIn($identity);
+        $this->recordFirstFactor($identity);
+        $this->container()->instance(Reauthenticator::class, new FreshReauthenticator($this->container()->make(ProofStore::class), $secondsAgo));
     }
 
     /**

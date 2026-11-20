@@ -52,6 +52,9 @@ final class ConfigurationValidatorTest extends TestCase
         'applications'   => [],
     ];
 
+    /** @var string The problem of a timezone other than UTC. */
+    private const string NOT_UTC = 'app.timezone and the PHP default timezone must be UTC.';
+
     /** @var string The problem of an application that neither declares nor resolves its first factor. */
     private const string NO_FIRST_FACTOR = 'The application declares no first_factor, and no ' . FirstFactorResolver::class . ' is bound to report it.';
 
@@ -84,6 +87,7 @@ final class ConfigurationValidatorTest extends TestCase
             'storage',
             '`mfa.storage.connection` must be a connection name, or null or empty for the default connection.',
         ];
+        yield 'an application timezone other than UTC' => ['app.timezone', 'Europe/London', 'storage', self::NOT_UTC];
         yield 'a factor model that is not one' => [
             'mfa.factor.model',
             \stdClass::class,
@@ -131,6 +135,7 @@ final class ConfigurationValidatorTest extends TestCase
             ),
         ];
         yield 'a TOTP setting' => ['mfa.totp.window', 4, 'totp', 'mfa.totp.window must be an integer from 0 to 3.'];
+        yield 'a TOTP issuer holding a colon' => ['mfa.totp.issuer', 'Acme: Admin', 'totp', 'mfa.totp.issuer must be a non-empty string without a colon.'];
         yield 'a code setting' => ['mfa.codes.length', 5, 'codes', 'mfa.codes.length must be an integer from 6 to 10.'];
         yield 'a recovery code setting' => [
             'mfa.recovery_codes.length',
@@ -177,6 +182,24 @@ final class ConfigurationValidatorTest extends TestCase
         }
 
         self::assertSame($expected, $report);
+    }
+
+    /**
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAPhpDefaultTimezoneOtherThanUtcIsAProblem(): void
+    {
+        date_default_timezone_set('Europe/London');
+
+        try {
+            $report = $this->validator()->report();
+        } finally {
+            date_default_timezone_set('UTC');
+        }
+
+        self::assertSame([...self::SHIPPED, 'storage' => [self::NOT_UTC]], $report);
     }
 
     /**
@@ -245,6 +268,34 @@ final class ConfigurationValidatorTest extends TestCase
         self::assertSame([self::NO_FIRST_FACTOR], $this->validator()->report()['applications.web']);
 
         $this->container()->instance(FirstFactorResolver::class, \Mockery::mock(FirstFactorResolver::class));
+
+        self::assertSame([], $this->validator()->report()['applications.web']);
+    }
+
+    /**
+     * Only an application offering TOTP shows the application's name.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testATotpApplicationNeedsAnIssuerWithoutAColon(): void
+    {
+        $declared = ['method' => 'password', 'channel' => 'password'];
+
+        $this->config()->set('app.name', 'Acme: Admin');
+        $this->config()->set('mfa.applications', [
+            'web' => ['types' => ['totp'], 'first_factor' => $declared],
+            'api' => ['first_factor' => $declared],
+        ]);
+
+        $report = $this->validator()->report();
+
+        self::assertSame(['Set mfa.totp.issuer, or a non-empty app.name without a colon: an authenticator app must show an issuer.'], $report['applications.web']);
+        self::assertSame([], $report['applications.api']);
+        self::assertSame([], $report['totp']);
+
+        $this->config()->set('mfa.totp.issuer', 'Acme');
 
         self::assertSame([], $this->validator()->report()['applications.web']);
     }
