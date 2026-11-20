@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Tests\Unit;
 
+use Illuminate\Container\Container;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\MfaServiceProvider;
 use Symfony\Component\Finder\Finder;
@@ -86,15 +87,21 @@ final class LongRunningSafetyTest extends TestCase
     }
 
     /**
+     * A scoped binding is forgotten between requests and jobs, so it is not
+     * shared across them.
+     *
      * @return void
      */
-    public function testOnlyTheRegistryIsShared(): void
+    public function testOnlyTheRegistryIsSharedAcrossRequests(): void
     {
         $shared = [];
 
+        /** @var list<string> $scoped */
+        $scoped = (new \ReflectionProperty(Container::class, 'scopedInstances'))->getValue($this->container());
+
         foreach (array_keys($this->container()->getBindings()) as $abstract) {
 
-            if (!str_starts_with($abstract, self::NAMESPACE) || !$this->container()->isShared($abstract)) {
+            if (!str_starts_with($abstract, self::NAMESPACE) || !$this->container()->isShared($abstract) || in_array($abstract, $scoped, true)) {
                 continue;
             }
 
