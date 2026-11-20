@@ -138,7 +138,12 @@ final readonly class AttemptService
             $outcome = $verification();
         } catch (\Throwable $exception) {
 
-            $this->ipThrottle->giveBack($slot);
+            try {
+                $this->ipThrottle->giveBack($slot);
+            } catch (\Throwable) {
+                // A transaction the failure aborted refuses this, which must
+                // not hide the failure.
+            }
 
             throw $exception;
         }

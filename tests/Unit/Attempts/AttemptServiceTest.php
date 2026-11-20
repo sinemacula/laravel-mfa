@@ -1494,6 +1494,22 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAFailedGiveBackLetsTheVerificationsExceptionPropagate(): void
+    {
+        $this->expectExceptionObject(new MidRotationFailureException('verification failed'));
+
+        $this->service()->throttled(self::IP, static function (): AttemptOutcome {
+            Schema::drop('mfa_attempts');
+
+            throw new MidRotationFailureException('verification failed');
+        });
+    }
+
+    /**
      * A key that is neither a string nor an integer cannot be counted.
      *
      * @return void
