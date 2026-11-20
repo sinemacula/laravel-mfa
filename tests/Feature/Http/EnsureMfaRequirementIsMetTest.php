@@ -10,6 +10,7 @@ use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Auth;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
+use SineMacula\Laravel\Mfa\Assurance\Channel;
 use SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver;
 use SineMacula\Laravel\Mfa\Contracts\ActiveTenantResolver;
 use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
@@ -288,6 +289,24 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
         $this->prove($user, static fn (SignInProofs $signIn): array => [$signIn->totp()]);
 
         self::assertSame(self::AAL2, $this->refusal(self::LEVEL)->requirement->toArray());
+    }
+
+    /**
+     * Under `always`, at the composed requirement and at a level.
+     *
+     * @return void
+     */
+    public function testAnUnknownFirstFactorIsRefusedAfterAFurtherProof(): void
+    {
+        $this->enableApplication(['requirement' => 'always']);
+
+        $user = $this->signedInPerson();
+
+        $this->totpFactor($user);
+        $this->prove($user, static fn (SignInProofs $signIn): array => [$signIn->firstFactorOn(Channel::unknown(), 60), $signIn->totp()]);
+
+        self::assertSame(self::VERIFIED, $this->refusal(self::BARE)->requirement->toArray());
+        self::assertSame([...self::VERIFIED, ...self::AAL2], $this->refusal(self::LEVEL)->requirement->toArray());
     }
 
     /**

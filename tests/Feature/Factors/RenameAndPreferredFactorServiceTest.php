@@ -161,6 +161,28 @@ final class RenameAndPreferredFactorServiceTest extends TestCase
     }
 
     /**
+     * Unlike a label, it may name a factor another application enrolled.
+     *
+     * @return void
+     */
+    public function testAPreferenceMayMoveToAnotherApplicationsFactor(): void
+    {
+        $user  = $this->signedInPerson();
+        $here  = $this->totpFactor($user, ['application' => self::APPLICATION, 'preferred' => true]);
+        $there = $this->totpFactor($user, ['application' => 'admin']);
+
+        $change = $this->mfa()->setPreferredFactor(Callers::current(), $there->id);
+
+        self::assertTrue($change->wasMade());
+        self::assertTrue($there->refresh()->isPreferred());
+        self::assertFalse($here->refresh()->isPreferred());
+        self::assertSame(['PreferredFactorChanged'], $this->reportedNames());
+        self::assertInstanceOf(PreferredFactorChanged::class, $this->reported[0]);
+        self::assertSame($there->id, $this->reported[0]->factor->id);
+        self::assertSame($here->id, $this->reported[0]->previous?->id);
+    }
+
+    /**
      * The first preference has nothing before it, and choosing the same one
      * again reports nothing.
      *

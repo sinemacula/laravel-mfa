@@ -7,6 +7,9 @@ composer require sinemacula/laravel-mfa
 The package registers itself, and needs PHP ^8.3 with `mbstring` and Laravel ^12.40 or ^13.3. Every class name below is
 relative to `SineMacula\Laravel\Mfa`.
 
+The application must run in UTC: keep `app.timezone` at Laravel's default, `UTC`, as any other fails the configuration
+check (see [Storage](configuration.md#storage)).
+
 ## Publishing and migrating
 
 Publish the config and the migrations, then migrate:
