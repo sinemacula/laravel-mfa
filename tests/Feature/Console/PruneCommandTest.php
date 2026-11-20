@@ -138,10 +138,8 @@ final class PruneCommandTest extends TestCase
             'owner_hash'           => (new ProofOwner('user', '1'))->hash(),
             'purpose'              => 'sign_in',
             'application'          => 'web',
-            'destination_hash'     => str_repeat('d', 64),
             'code_hash'            => str_repeat('c', 64),
             'sent_at'              => $expiresAt->subMinutes(10),
-            'sent_times'           => '[]',
             'expires_at'           => $expiresAt,
         ], range(1, $count));
 

@@ -48,19 +48,12 @@ return new class extends Migration {
             $blueprint->string('session_id')->nullable();
             $blueprint->index(['factor_id', 'purpose', 'session_id'], IndexName::for($table, '_binding_index'));
 
-            // Outlives the factor, so a restarted enrolment's sends stay
-            // counted.
-            $blueprint->char('destination_hash', 64);
-            $blueprint->index(['destination_hash', 'sent_at'], IndexName::for($table, '_destination_index'));
-
             // Keyed from `app.key`, never the code.
             $blueprint->char('code_hash', 64);
 
-            // `sent_times` is a JSON list of Unix times the send caps count.
             $blueprint->unsignedInteger('attempts')->default(0);
             $blueprint->unsignedInteger('sends')->default(1);
             $blueprint->dateTime('sent_at');
-            $blueprint->json('sent_times');
             $blueprint->dateTime('expires_at')->index(IndexName::for($table, '_expiry_index'));
             $blueprint->dateTime('consumed_at')->nullable();
 

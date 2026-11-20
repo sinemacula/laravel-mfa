@@ -134,8 +134,8 @@ In one transaction, in this order: every lockout is lifted and the identity's fa
 and enrolment goes, whichever application made it, with its passkey association and proofs; the recovery code set goes;
 the re-enrolment obligation is written as stated, so `false` clears one an earlier reset left; the verification
 generation advances, whatever the bound revoker does; and every session is revoked through the bound `SessionRevoker`,
-last, as the lock order puts the session row after the rest. Delivered code rows stay, since the send caps read them;
-with the factor gone they verify nothing.
+last, as the lock order puts the session row after the rest. Delivered code rows stay, though with the factor gone they
+verify nothing, and the identity's recent sends stay counted by the send caps.
 
 Resetting your own identity, from a request signed in as it, invalidates that request's proofs too: none are kept.
 Without an authentication layer the Laravel login itself goes on, and its next protected request finds no proof.
@@ -231,8 +231,9 @@ confirmed or gone, the enrolment row goes alone and nothing is reported. A model
 rolls that enrolment back and throws.
 
 The others are mass deletes in statements of at most a thousand rows, each carrying its conditions, so a row that stops
-matching meanwhile stays, and they fire no model event. Retention is at least a day and the longest send window is a
-day, so no send cap is shortened. A throttle row whose window has ended counts nothing, so deleting it lifts nothing.
+matching meanwhile stays, and they fire no model event. The send caps count sends from the identity's state row, so
+pruning delivered codes shortens none. A throttle row whose window has ended counts nothing, so deleting it lifts
+nothing.
 
 ## Events
 

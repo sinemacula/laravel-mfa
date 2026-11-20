@@ -122,7 +122,7 @@ final class CodeServiceTest extends TestCase
     }
 
     /**
-     * No cooldown is spent, and the failure names the factor with its
+     * No cooldown or cap is spent, and the failure names the factor with its
      * destination masked.
      *
      * @return void
@@ -131,6 +131,8 @@ final class CodeServiceTest extends TestCase
      */
     public function testAFailedDeliveryKeepsNothing(): void
     {
+        config()->set('mfa.codes.factor_send_limit', 1);
+
         [$user, $factor] = $this->factor();
 
         $driver       = new RecordingCodeDriver;
