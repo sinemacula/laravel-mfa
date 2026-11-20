@@ -92,6 +92,8 @@ credential the route uses, through the model's own lookup. It also records what 
 - `tests/Unit/Concerns/ResolvesFactorRouteBindingTest.php`
   `testAnOwnerDifferingOnlyInCaseMisses`
 - `tests/Feature/Factors/FactorRouteBindingTest.php`
+  `testPendingDisabledAndOtherApplicationFactorsBindForTheirOwner`
+- `tests/Feature/Factors/FactorRouteBindingTest.php`
   `testAPendingCredentialBindsPerItsActions`
 - `tests/Feature/Factors/FactorRouteBindingTest.php`
   `testAListOnlyCredentialBindsAndVerifyStillRefuses`

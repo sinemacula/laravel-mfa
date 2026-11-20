@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Auth;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Assurance\Channel;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
+use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
@@ -30,6 +31,8 @@ use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use SineMacula\Laravel\Mfa\Verification\Submission;
 use Symfony\Component\HttpFoundation\Response;
 use Tests\Fixtures\Context\Callers;
+use Tests\Fixtures\Context\GuardPortalResolver;
+use Tests\Fixtures\Drivers\HeaderApplicationResolver;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
@@ -173,6 +176,81 @@ final class SignInProofsTest extends TestCase
     }
 
     /**
+     * Signing in, verifying, reading and signing out agree on the application
+     * the resolver names for each guard.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAGuardResolverKeepsTheSignInAndItsProofsOnOneApplication(): void
+    {
+        $this->container()->instance(ApplicationResolver::class, new GuardPortalResolver);
+
+        config()->set('auth.guards.admin', ['driver' => 'session', 'provider' => 'users']);
+        config()->set('mfa.applications.admin-portal', config('mfa.applications.web'));
+        config()->set('mfa.applications.web-portal', config('mfa.applications.web'));
+
+        $user = $this->createUser('alice@example.test');
+
+        [$factor, $code] = $this->enrollTotp($user);
+
+        Auth::guard('web')->login($user);
+        Auth::guard('admin')->login($user);
+        Auth::shouldUse('admin');
+
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::factor($factor->id, $code))->isVerified());
+
+        $proofs = Mfa::proofs(Callers::current());
+
+        self::assertCount(1, $proofs);
+        self::assertSame('admin-portal', $proofs[0]->binding->application);
+        self::assertSame('reached', $this->gate('level=aal2')->getContent());
+
+        Auth::shouldUse('web');
+
+        self::assertSame([], Mfa::proofs(Callers::current()));
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor, 1)))->isVerified());
+
+        Auth::guard('admin')->logout();
+
+        $web = Mfa::proofs(Callers::current('web'));
+
+        self::assertCount(1, $web);
+        self::assertSame('web-portal', $web[0]->binding->application);
+
+        Auth::guard('admin')->setUser($user);
+        Auth::shouldUse('admin');
+
+        self::assertSame([], Mfa::proofs(Callers::current()));
+    }
+
+    /**
+     * @return void
+     */
+    public function testASignInUnderOneHeaderApplicationIsInvisibleUnderAnother(): void
+    {
+        $this->container()->instance(ApplicationResolver::class, new HeaderApplicationResolver);
+        $this->container()->instance('request', HeaderApplicationResolver::requestFor('mobile'));
+
+        config()->set('mfa.applications.mobile', config('mfa.applications.web'));
+
+        $user = $this->createUser('alice@example.test');
+
+        [$factor, $code] = $this->enrollTotp($user);
+
+        Auth::login($user);
+
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::factor($factor->id, $code))->isVerified());
+        self::assertCount(1, Mfa::proofs(Callers::current()));
+
+        $this->container()->instance('request', HeaderApplicationResolver::requestFor('web'));
+
+        self::assertSame([], Mfa::proofs(Callers::current()));
+        self::assertSame(FailureReason::NOT_FOUND, Mfa::verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor, 1)))->reason);
+    }
+
+    /**
      * @return void
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
@@ -207,10 +285,7 @@ final class SignInProofsTest extends TestCase
 
         $this->expectException(InsufficientAuthenticationException::class);
 
-        $this->container()->make(EnsureMfaRequirementIsMet::class)->handle(
-            $this->container()->make(Request::class),
-            static fn (): Response => new Response('reached'),
-        );
+        $this->gate();
     }
 
     /**
@@ -258,10 +333,7 @@ final class SignInProofsTest extends TestCase
 
         $this->expectException(InsufficientAuthenticationException::class);
 
-        $this->container()->make(EnsureMfaRequirementIsMet::class)->handle(
-            $this->container()->make(Request::class),
-            static fn (): Response => new Response('reached'),
-        );
+        $this->gate();
     }
 
     /**
@@ -337,6 +409,23 @@ final class SignInProofsTest extends TestCase
 
         self::assertSame([], $phone->proofs($user, 'web', 'phone-sign-in'));
         self::assertCount(1, $laptop->proofs($user, 'web', 'laptop-sign-in'));
+    }
+
+    /**
+     * Runs the `mfa` middleware for the current request.
+     *
+     * @param  string  ...$parameters
+     * @return \Symfony\Component\HttpFoundation\Response
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function gate(string ...$parameters): Response
+    {
+        return $this->container()->make(EnsureMfaRequirementIsMet::class)->handle(
+            $this->container()->make(Request::class),
+            static fn (): Response => new Response('reached'),
+            ...$parameters,
+        );
     }
 
     /**

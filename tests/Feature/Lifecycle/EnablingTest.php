@@ -6,6 +6,7 @@ namespace Tests\Feature\Lifecycle;
 
 use Carbon\CarbonImmutable;
 use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Events\FactorEnabled;
 use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
@@ -68,6 +69,8 @@ final class EnablingTest extends TestCase
         self::assertSame($factor->id, $this->reported[0]->factor->id);
         self::assertFalse($this->reported[0]->factor->disabled);
         self::assertEquals(self::actor(), $this->reported[0]->actor);
+        self::assertNull($this->reported[0]->context()['ip']);
+        self::assertNull($this->reported[0]->context()['user_agent']);
 
         $stored = Factor::query()->whereKey($factor->id)->sole();
 
@@ -97,6 +100,24 @@ final class EnablingTest extends TestCase
         self::assertFalse(Mfa::enableFactor($user, $factor->id, self::actor()));
         self::assertSame(['FactorEnabled'], $this->reportedNames());
         self::assertSame(3, Factor::query()->whereKey($factor->id)->sole()->getConsecutiveFailures());
+    }
+
+    /**
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testEnablingCarriesTheClientGiven(): void
+    {
+        $user   = $this->signedInPerson();
+        $factor = $this->confirmedFactor($user);
+
+        $factor->update(['disabled_at' => CarbonImmutable::now()]);
+
+        self::assertTrue(Mfa::enableFactor($user, $factor->id, self::actor(), new ClientContext('198.51.100.4', 'Admin/1.0')));
+        self::assertSame(['FactorEnabled'], $this->reportedNames());
+        self::assertSame('198.51.100.4', $this->reported[0]->context()['ip']);
+        self::assertSame('Admin/1.0', $this->reported[0]->context()['user_agent']);
     }
 
     /**

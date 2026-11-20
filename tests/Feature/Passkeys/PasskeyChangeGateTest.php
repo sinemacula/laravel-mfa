@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Assurance\Channel;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
@@ -24,9 +25,11 @@ use SineMacula\Laravel\Mfa\Contracts\SessionRevoker;
 use SineMacula\Laravel\Mfa\Contracts\SessionTransition;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentAuthority;
+use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\Enums\FactorChangeMade;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
+use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\BootstrapEnrollmentCompleted;
 use SineMacula\Laravel\Mfa\Events\FactorConfirmed;
@@ -35,6 +38,8 @@ use SineMacula\Laravel\Mfa\Events\PasskeyAssociated;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodesGenerated;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
+use SineMacula\Laravel\Mfa\Facades\Mfa;
+use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Lifecycle\FactorRemoval;
 use SineMacula\Laravel\Mfa\Lifecycle\RemovalGuard;
 use SineMacula\Laravel\Mfa\Lifecycle\RequiredFactorPolicy;
@@ -43,6 +48,7 @@ use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 use SineMacula\Laravel\Mfa\Passkeys\CredentialId;
+use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociationResult;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssociations;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyChangeGate;
@@ -59,6 +65,7 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Requirements\SessionChange;
 use SineMacula\Laravel\Mfa\Requirements\SessionReevaluation;
 use SineMacula\Laravel\Mfa\Verification\ProofAcceptance;
+use SineMacula\Laravel\Mfa\Verification\Submission;
 use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Context\FixedPendingSessionResolver;
 use Tests\Fixtures\Exceptions\MidRotationFailureException;
@@ -1232,6 +1239,171 @@ final class PasskeyChangeGateTest extends TestCase
             $this->refusal(fn () => $this->registrar()->register($user, self::APPLICATION, $this->registration($user))),
         );
         self::assertSame(0, Factor::query()->count());
+    }
+
+    /**
+     * The existing set stays as it was.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAFurtherPasskeyBringsNoRecoveryCodes(): void
+    {
+        $this->enablePasskeys(['recovery_codes' => ['enabled' => true]]);
+
+        $user = $this->signedInPerson();
+        $totp = $this->confirmedFactor($user);
+
+        $this->container()->make(RecoveryCodeService::class)->generate($user, self::APPLICATION);
+
+        $codes = RecoveryCode::query()->toBase()->orderBy('id')->get()->all();
+
+        $this->stepUpWith($user, $totp);
+
+        $result = $this->registrar()->register($user, self::APPLICATION, $this->registration($user));
+
+        self::assertNotNull($result);
+        self::assertSame([], $result->recoveryCodes);
+        self::assertCount(10, $codes);
+        self::assertEquals($codes, RecoveryCode::query()->toBase()->orderBy('id')->get()->all());
+        Event::assertDispatchedTimes(RecoveryCodesGenerated::class, 1);
+    }
+
+    /**
+     * Through the facade, as the factor and association were written.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testARegisteredPasskeyIsOfferedAndVerifies(): void
+    {
+        $gateway = $this->enablePasskeys(registered: [self::CREDENTIAL]);
+
+        $this->reauthenticate();
+
+        $user   = $this->signedInPerson();
+        $factor = $this->registrar()->register($user, self::APPLICATION, $this->registration($user))?->factor;
+
+        self::assertNotNull($factor);
+        self::assertSame([$factor->id], array_map(static fn (FactorSummary $offered): string => $offered->id, Mfa::offeredFactors(Callers::current())));
+        self::assertTrue(Mfa::requestAssertion(Callers::current(), $factor->id)->hasStarted());
+        self::assertSame([[self::CREDENTIAL]], $gateway->requested);
+
+        $gateway->assertion = new PasskeyAssertion(self::CREDENTIAL, new ObservedProperties(userPresence: true, userVerification: true), 'passkey-challenge');
+
+        $result = Mfa::verify(Callers::current(), Submission::assertion($factor->id, ['id' => self::CREDENTIAL]));
+
+        self::assertTrue($result->isVerified());
+        self::assertSame([[self::CREDENTIAL]], $gateway->verified);
+        self::assertSame($factor->id, $result->proof?->reference);
+        self::assertEquals(new Channel(ChannelKind::PASSKEY, self::CREDENTIAL), $result->proof->channel);
+    }
+
+    /**
+     * A padded id is refused and the caller's deletion rolls back.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testRemovingANonCanonicalCredentialIdIsRefused(): void
+    {
+        $this->enablePasskeys();
+
+        $user    = $this->signedInPerson();
+        $totp    = $this->confirmedFactor($user);
+        $passkey = $this->confirmedFactor($user, 'passkey', self::CREDENTIAL);
+
+        StandInRegistrar::store($user, self::CREDENTIAL);
+
+        $this->stepUpWith($user, $totp);
+
+        try {
+            DB::transaction(function () use ($user): void {
+                DB::table(StandInRegistrar::TABLE)->where('credential_id', self::CREDENTIAL)->delete();
+
+                $this->gate()->removing(Callers::of($user, self::APPLICATION), self::CREDENTIAL . '=');
+            });
+            self::fail('A padded credential id was expected to be refused.');
+        } catch (\InvalidArgumentException $exception) {
+            self::assertStringContainsString('canonical unpadded base64url', $exception->getMessage());
+        }
+
+        self::assertTrue(StandInRegistrar::stores($user, self::CREDENTIAL));
+        self::assertTrue(Factor::query()->whereKey($passkey->id)->exists());
+        self::assertSame($passkey->id, PasskeyAssociation::query()->sole()->factor_id);
+        Event::assertNotDispatched(FactorRemoved::class);
+    }
+
+    /**
+     * Even one allowing every pending action.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAPendingSessionCannotRemoveAPasskey(): void
+    {
+        $this->enablePasskeys();
+
+        $user    = $this->signedInPerson();
+        $passkey = $this->confirmedFactor($user, 'passkey', self::CREDENTIAL);
+
+        StandInRegistrar::store($user, self::CREDENTIAL);
+
+        $this->pending($user, PendingAction::cases());
+
+        self::assertSame(FailureReason::NOT_FOUND, $this->refusal(function () use ($user): void {
+            $this->registrar()->remove($user, self::APPLICATION, self::CREDENTIAL);
+        }));
+        self::assertTrue(StandInRegistrar::stores($user, self::CREDENTIAL));
+        self::assertTrue(Factor::query()->whereKey($passkey->id)->exists());
+        self::assertSame($passkey->id, PasskeyAssociation::query()->sole()->factor_id);
+    }
+
+    /**
+     * Only once the caller commits.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testTheDefaultCompletionRecordsABootstrapPasskeysProof(): void
+    {
+        $this->enablePasskeys(['bootstrap' => ['enabled' => true, 'types' => ['passkey']]]);
+
+        $user  = $this->signedInPerson();
+        $store = $this->container()->make(ProofStore::class);
+
+        $nothingRecorded = static function () use ($store, $user): void {
+            self::assertSame([], $store->proofs($user, self::APPLICATION, 'pending-1'));
+        };
+
+        $this->pending($user, [PendingAction::CONFIRM_BOOTSTRAP_ENROLLMENT]);
+
+        try {
+            $this->registrar()->register($user, self::APPLICATION, $this->registration($user, session: 'pending-1'), static function (): void {
+                throw new MidRotationFailureException('The caller failed after the gate.');
+            });
+            self::fail('The caller\'s failure was expected to propagate.');
+        } catch (MidRotationFailureException) {
+            // Expected.
+        }
+
+        $nothingRecorded();
+
+        $this->registrar()->register($user, self::APPLICATION, $this->registration($user, session: 'pending-1'), $nothingRecorded);
+
+        $proofs = $store->proofs($user, self::APPLICATION, 'pending-1');
+
+        self::assertCount(1, $proofs);
+        self::assertSame(ProofKind::ADDITIONAL_FACTOR, $proofs[0]->kind);
+        self::assertSame(Purpose::ENROLLMENT, $proofs[0]->binding->purpose);
+        self::assertSame('pending-1', $proofs[0]->binding->sessionId);
+        self::assertSame(Factor::query()->sole()->id, $proofs[0]->reference);
+        self::assertEquals(new Channel(ChannelKind::PASSKEY, self::CREDENTIAL), $proofs[0]->channel);
     }
 
     /**

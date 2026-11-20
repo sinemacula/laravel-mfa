@@ -4,6 +4,8 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Testing\Seams\Concerns;
 
+use Illuminate\Container\Container;
+use SineMacula\Laravel\Mfa\Codes\CodeSettings;
 use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
@@ -71,6 +73,49 @@ trait ChallengeGatewayTests
     public function testChallengeGatewayDoesNotFindAnUnknownChallenge(): void
     {
         ChallengeGatewayContract::assertAnUnknownChallengeIsNotFound($this->challengeGateway(), $this->challengeCaller(), $this->challengedFactor(), $this->challengeBinding());
+    }
+
+    /**
+     * @return void
+     */
+    public function testChallengeGatewayDoesNotFindAnotherCallersBinding(): void
+    {
+        ChallengeGatewayContract::assertAnotherCallersBindingIsNotFound(
+            $this->challengeGateway(),
+            $this->challengeCaller(),
+            $this->challengedFactor(),
+            $this->challengeBinding(),
+            $this->deliveredCode(...),
+        );
+    }
+
+    /**
+     * @return void
+     */
+    public function testChallengeGatewayRefusesTheCodeOnceItsAttemptsAreTaken(): void
+    {
+        ChallengeGatewayContract::assertAChallengeTakesNoMoreThanItsAttempts(
+            $this->challengeGateway(),
+            $this->challengeCaller(),
+            $this->challengedFactor(),
+            $this->challengeBinding(),
+            $this->deliveredCode(...),
+            $this->challengeMaxAttempts(),
+        );
+    }
+
+    /**
+     * Wrong codes a challenge takes; by default the package's
+     * `mfa.codes.max_attempts`.
+     *
+     * @return int
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @throws \InvalidArgumentException
+     */
+    protected function challengeMaxAttempts(): int
+    {
+        return (new CodeSettings(Container::getInstance()->make('config')))->maxAttempts();
     }
 
     /**

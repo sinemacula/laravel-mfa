@@ -12,6 +12,7 @@ use Illuminate\Queue\Worker;
 use Illuminate\Queue\WorkerOptions;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Mail;
+use Orchestra\Testbench\Attributes\WithConfig;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Codes\MailEmailSender;
@@ -65,21 +66,20 @@ final class MfaCodeMessageFailureTest extends TestCase
     #[DataProvider('traceArguments')]
     public function testAQueuedMessageAWorkerFailsToSendIsScrubbed(bool $arguments): void
     {
-        $this->failMail();
+        $this->assertAWorkerFailureIsScrubbed($arguments);
+    }
 
-        $seen = null;
-
-        Event::listen(JobExceptionOccurred::class, static function (JobExceptionOccurred $event) use (&$seen): void {
-            $seen = $event->exception->getMessage() . $event->exception->getTraceAsString();
-        });
-
-        $exception = RecordedTrace::thrownBy(fn () => $this->work(self::CODE, self::ADDRESS), $arguments);
-
-        self::assertSame('The relay refused the message to [redacted].', $exception->getMessage());
-        self::assertIsString($seen);
-        self::assertStringNotContainsString(self::CODE, $seen);
-        self::assertStringNotContainsString(self::ADDRESS, $seen);
-        $this->assertScrubbed($exception, self::CODE, self::ADDRESS);
+    /**
+     * The scrub does not depend on `mfa.secrets.redact`.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    #[WithConfig('mfa.secrets.redact', false, false)]
+    public function testAQueuedMessageIsScrubbedWithRedactionOff(): void
+    {
+        $this->assertAWorkerFailureIsScrubbed(true);
     }
 
     /**
@@ -124,6 +124,31 @@ final class MfaCodeMessageFailureTest extends TestCase
         ExceptionScrubber::scrub($later);
 
         self::assertSame('Unrelated failure mentioning ' . self::CODE . ' and ' . self::ADDRESS . '.', $later->getMessage());
+    }
+
+    /**
+     * @param  bool  $arguments
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function assertAWorkerFailureIsScrubbed(bool $arguments): void
+    {
+        $this->failMail();
+
+        $seen = null;
+
+        Event::listen(JobExceptionOccurred::class, static function (JobExceptionOccurred $event) use (&$seen): void {
+            $seen = $event->exception->getMessage() . $event->exception->getTraceAsString();
+        });
+
+        $exception = RecordedTrace::thrownBy(fn () => $this->work(self::CODE, self::ADDRESS), $arguments);
+
+        self::assertSame('The relay refused the message to [redacted].', $exception->getMessage());
+        self::assertIsString($seen);
+        self::assertStringNotContainsString(self::CODE, $seen);
+        self::assertStringNotContainsString(self::ADDRESS, $seen);
+        $this->assertScrubbed($exception, self::CODE, self::ADDRESS);
     }
 
     /**

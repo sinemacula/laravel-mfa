@@ -31,7 +31,7 @@ between requests.
 | `totp.digits`                   | `6`                                | 6 to 8                                 | `MFA_TOTP_DIGITS`                   |
 | `totp.period`                   | `30`                               | 15 to 120 seconds                      | `MFA_TOTP_PERIOD`                   |
 | `totp.window`                   | `1`                                | 0 to 3 steps                           | `MFA_TOTP_WINDOW`                   |
-| `totp.issuer`                   | the application's name             | a non-empty string                     | `MFA_TOTP_ISSUER`                   |
+| `totp.issuer`                   | the application's name             | a non-empty string without a colon     | `MFA_TOTP_ISSUER`                   |
 | `codes.length`                  | `6`                                | 6 to 10 digits                         | `MFA_CODES_LENGTH`                  |
 | `codes.ttl_minutes`             | `10`                               | 1 to 10 minutes                        | `MFA_CODES_TTL_MINUTES`             |
 | `codes.max_attempts`            | `5`                                | 1 to 10                                | `MFA_CODES_MAX_ATTEMPTS`            |
@@ -195,6 +195,13 @@ When the storage connection splits reads and writes (`read` and `write` hosts), 
 lockout or who owns a factor go to the write host, so a replica that has not caught up cannot pass a used code or miss
 a lockout.
 
+The package stores its times as wall-clock strings, so `app.timezone`, and the PHP default timezone Laravel sets from
+it, must be `UTC`, Laravel's default. In a timezone with daylight saving, a code issued just before the clocks go back
+would be stored as expiring before it was created, and attempt windows and lockouts would end early. Any other timezone
+fails the configuration check under `storage`. On MySQL or MariaDB, whose `timestamp` columns convert through the
+session time zone, also set the connection's `timezone` to `+00:00`: the check opens no connection, so it cannot see
+the session's.
+
 A value that is neither a connection name nor `null` or empty fails closed with an `InvalidArgumentException` naming the
 key, and a name `database.connections` does not configure fails the configuration check. A model takes the connection
 when it is built, so keep the setting fixed while the application runs. Changing it does not move tables already
@@ -262,7 +269,8 @@ them only for apps you know honour them. Each factor stores the parameters it wa
 affects only enrolments started afterwards: existing factors keep working as they were. A period is at most 120 seconds.
 A new factor's secret is random and as long as the algorithm's output: 20 bytes for SHA-1, 32 for SHA-256 and 64 for
 SHA-512. `issuer` is what an authenticator app shows for a new factor when the enrolment names none of its own, and the
-application's name without one; it may not hold a colon.
+application's name without one; it may not hold a colon. An application that enables `totp` without an `issuer` fails
+the configuration check when `app.name` is missing, blank or holds a colon.
 
 `window` is the number of time steps either side of the current one a code is accepted for, absorbing clock skew and
 entry delay, for an application that sets no `totp_window` of its own or has no block. It is at most 3; the default of 1
@@ -405,8 +413,8 @@ service provider, so a binding made in a provider's `boot()` counts) and again w
 problem fails with an `Exceptions\InvalidConfigurationException` whose message, and whose `problems`, list every problem
 found, each as `[<subject>] <message>`. The subjects are `storage`, `factor`, `identity_state`, each capability block
 (`totp`, `codes`, `recovery_codes`, `attempts`, `enrollment`, `passkeys`, `lifecycle`), `applications`, and
-`applications.<name>` for each configured application, whose problems include a code type with no delivery binding and a
-first factor neither declared nor resolved.
+`applications.<name>` for each configured application, whose problems include a code type with no delivery binding, a
+first factor neither declared nor resolved and TOTP without an issuer to show.
 
 Run the same check from a deploy pipeline or a readiness probe:
 

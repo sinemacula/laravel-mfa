@@ -20,6 +20,7 @@ use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Factors\OperationGuard;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Context\InvertedActiveState;
+use Tests\Fixtures\Factors\IntegerAliasKeyedFactor;
 use Tests\Fixtures\Factors\IntegerKeyedFactor;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
@@ -258,21 +259,45 @@ final class OperationGuardTest extends TestCase
      */
     public function testAnIntegerAndAStringFormOfOneIdAreEqual(): void
     {
-        config()->set('mfa.factor.model', IntegerKeyedFactor::class);
-        config()->set('mfa.factor.table', 'test_integer_keyed_factors');
-
         $identity = new NonEloquentIdentity('plain-key');
-
-        $factor = IntegerKeyedFactor::query()->forceCreate([
-            'authenticatable_type' => NonEloquentIdentity::class,
-            'authenticatable_id'   => 'plain-key',
-            'type'                 => 'totp',
-            'status'               => FactorStatus::CONFIRMED->value,
-        ]);
+        $factor   = $this->integerKeyedFactor();
 
         self::assertIsInt($factor->getKey());
         self::assertSame($factor->getKey(), $this->guard()->factor($identity, $factor->getKey(), self::APPLICATION)->getKey());
         self::assertSame($factor->getKey(), $this->guard()->factor($identity, (string) $factor->getKey(), self::APPLICATION)->getKey());
+    }
+
+    /**
+     * @return iterable<string, array{class-string<\SineMacula\Laravel\Mfa\Models\Factor>, string}>
+     */
+    public static function nonIntegerIds(): iterable
+    {
+        foreach (['int' => IntegerKeyedFactor::class, 'integer' => IntegerAliasKeyedFactor::class] as $keyType => $model) {
+            yield "letters on an {$keyType} key" => [$model, 'abc'];
+            yield "a number with a suffix on an {$keyType} key" => [$model, '1abc'];
+        }
+    }
+
+    /**
+     * PostgreSQL would refuse the query, so it is never sent.
+     *
+     * @param  class-string<\SineMacula\Laravel\Mfa\Models\Factor>  $model
+     * @param  string  $id
+     * @return void
+     */
+    #[DataProvider('nonIntegerIds')]
+    public function testANonIntegerIdOnAnIntegerKeyIsNotFoundWithoutAQuery(string $model, string $id): void
+    {
+        $this->integerKeyedFactor($model);
+
+        $queries = 0;
+
+        DB::listen(static function () use (&$queries): void {
+            $queries++;
+        });
+
+        self::assertSame(FailureReason::NOT_FOUND, $this->refusal(fn () => $this->guard()->factor(new NonEloquentIdentity('plain-key'), $id, self::APPLICATION)));
+        self::assertSame(0, $queries);
     }
 
     /**
@@ -368,6 +393,23 @@ final class OperationGuardTest extends TestCase
     private function createUser(string $email = 'person@example.test'): TestUser
     {
         return TestUser::query()->create(['email' => $email, 'mfa_enabled' => true]);
+    }
+
+    /**
+     * @param  class-string<\SineMacula\Laravel\Mfa\Models\Factor>  $model
+     * @return \SineMacula\Laravel\Mfa\Models\Factor
+     */
+    private function integerKeyedFactor(string $model = IntegerKeyedFactor::class): Factor
+    {
+        config()->set('mfa.factor.model', $model);
+        config()->set('mfa.factor.table', 'test_integer_keyed_factors');
+
+        return $model::query()->forceCreate([
+            'authenticatable_type' => NonEloquentIdentity::class,
+            'authenticatable_id'   => 'plain-key',
+            'type'                 => 'totp',
+            'status'               => FactorStatus::CONFIRMED->value,
+        ]);
     }
 
     /**

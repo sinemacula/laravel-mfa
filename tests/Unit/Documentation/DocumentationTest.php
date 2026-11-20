@@ -133,10 +133,7 @@ final class DocumentationTest extends TestCase
      */
     public static function provideConfigurationKeys(): iterable
     {
-        /** @var array<string, mixed> $config */
-        $config = require dirname(__DIR__, 3) . '/config/mfa.php';
-
-        foreach (self::leafKeys($config) as $key) {
+        foreach (self::leafKeys(self::configuration()) as $key) {
             yield $key => [$key];
         }
     }
@@ -149,6 +146,71 @@ final class DocumentationTest extends TestCase
     public function testEveryConfigurationKeyIsDocumented(string $key): void
     {
         self::assertTrue(str_contains(self::documentation(), '`' . $key . '`'), sprintf('The documentation does not name the configuration key `%s`.', $key));
+    }
+
+    /**
+     * The rows of the configuration guide's key table.
+     *
+     * @return iterable<string, array{0: string, 1: string, 2: string}>
+     */
+    public static function provideConfigurationTableRows(): iterable
+    {
+        $guide = (string) file_get_contents(dirname(__DIR__, 3) . '/docs/guides/configuration.md');
+
+        preg_match('/^\| Key .*?\n\n/ms', $guide, $table);
+        preg_match_all('/^\| `([\w.]+)` +\| (.+?) +\| .+? \| (?:`(\w+)`)? *\|$/m', $table[0] ?? '', $rows, PREG_SET_ORDER);
+
+        foreach ($rows as $row) {
+            yield $row[1] => [$row[1], $row[2], $row[3] ?? ''];
+        }
+    }
+
+    /**
+     * A default in prose describes a fallback, so the shipped value is null.
+     *
+     * @param  string  $key
+     * @param  string  $default
+     * @param  string  $env
+     * @return void
+     */
+    #[DataProvider('provideConfigurationTableRows')]
+    public function testTheConfigurationTableMatchesTheShippedFile(string $key, string $default, string $env): void
+    {
+        $shipped = data_get(self::configuration(), $key);
+        $shown   = match (true) {
+            is_string($shipped) => str_replace('SineMacula\Laravel\Mfa\\', '', $shipped),
+            $shipped === []     => '[]',
+            default             => strtolower(var_export($shipped, true)),
+        };
+
+        self::assertSame(str_starts_with($default, '`') ? trim($default, '`') : 'null', $shown, sprintf('The default of `%s` is not the shipped one.', $key));
+
+        if ($env === '') {
+            return;
+        }
+
+        $_SERVER[$env] = 'documented';
+
+        try {
+            self::assertSame('documented', data_get(self::configuration(), $key), sprintf('`%s` does not read %s.', $key, $env));
+        } finally {
+            unset($_SERVER[$env]);
+        }
+    }
+
+    /**
+     * @return void
+     */
+    public function testEveryEnvVariableTheConfigurationReadsIsInTheTable(): void
+    {
+        preg_match_all('/\benv\(\'(\w+)\'/', (string) file_get_contents(dirname(__DIR__, 3) . '/config/mfa.php'), $read);
+
+        $documented = array_filter(array_column(iterator_to_array(self::provideConfigurationTableRows()), 2), static fn (string $env): bool => $env !== '');
+
+        sort($read[1]);
+        sort($documented);
+
+        self::assertSame($read[1], $documented);
     }
 
     /**
@@ -274,6 +336,17 @@ final class DocumentationTest extends TestCase
         }
 
         return $keys;
+    }
+
+    /**
+     * `config/mfa.php` as the current environment gives it.
+     *
+     * @return array<string, mixed>
+     */
+    private static function configuration(): array
+    {
+        /** @var array<string, mixed> */
+        return require dirname(__DIR__, 3) . '/config/mfa.php';
     }
 
     /**
