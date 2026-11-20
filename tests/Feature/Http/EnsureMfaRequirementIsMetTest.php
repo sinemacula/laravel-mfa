@@ -35,6 +35,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Tests\Fixtures\Context\FixedPendingSessionResolver;
 use Tests\Fixtures\Context\InvertedActiveState;
 use Tests\Fixtures\Exceptions\InvalidPendingCredentialException;
+use Tests\Fixtures\Http\ExemptingController;
 use Tests\Fixtures\Http\NeverFreshGate;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\PlainUser;
@@ -768,6 +769,49 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
     }
 
     /**
+     * @return iterable<string, array{0: list<\SineMacula\Laravel\Mfa\Enums\PendingAction>}>
+     */
+    public static function pendingActionSets(): iterable
+    {
+        yield 'verifying' => [[PendingAction::VERIFY]];
+        yield 'bootstrap enrolment' => [[PendingAction::START_BOOTSTRAP_ENROLLMENT, PendingAction::CONFIRM_BOOTSTRAP_ENROLLMENT]];
+    }
+
+    /**
+     * The same session is still refused on a route without the marker.
+     *
+     * @param  list<\SineMacula\Laravel\Mfa\Enums\PendingAction>  $actions
+     * @return void
+     */
+    #[DataProvider('pendingActionSets')]
+    public function testAPendingSessionReachesAnExemptRoute(array $actions): void
+    {
+        $this->pendingSession($this->person(), Requirement::none()->withAdditionalVerification(), $actions);
+
+        foreach (['gate/exempt', 'gate/exempt-first', 'gate/exempt-level'] as $uri) {
+            $this->get($uri)->assertOk()->assertSee('reached');
+        }
+
+        self::assertSame(self::VERIFIED, $this->refusal(self::BARE)->requirement->toArray());
+    }
+
+    /**
+     * Limited with `only`, so the controller's other action stays gated.
+     *
+     * @return void
+     */
+    public function testTheMarkerFromControllerMiddlewareLiftsTheGate(): void
+    {
+        $this->enableApplication(['requirement' => 'always']);
+
+        $this->signedInPerson();
+
+        $this->get('gate/controller/verify')->assertOk()->assertSee('reached');
+
+        self::assertSame(self::VERIFIED, $this->refusal('gate/controller/settings')->requirement->toArray());
+    }
+
+    /**
      * @return void
      */
     public function testTheMarkerTakenOffIsNotAnExemption(): void
@@ -959,6 +1003,11 @@ final class EnsureMfaRequirementIsMetTest extends TestCase
         $router->get('gate/exempt-group-before', self::reached(...))->middleware(['exempted', 'gated']);
         $router->get('gate/exempt-class', self::reached(...))->middleware(['mfa', ExemptFromMfa::class]);
         $router->get('gate/exempt-excluded', self::reached(...))->middleware(['mfa', 'mfa.exempt'])->withoutMiddleware('mfa.exempt');
+
+        $router->group(['middleware' => 'mfa'], static function (Router $router): void {
+            $router->get('gate/controller/verify', [ExemptingController::class, 'verify']);
+            $router->get('gate/controller/settings', [ExemptingController::class, 'settings']);
+        });
     }
 
     /**

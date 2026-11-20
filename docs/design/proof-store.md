@@ -139,7 +139,8 @@ are the evidence every later answer (freshness, levels, requirements) is worked 
   `tests/Feature/Verification/CompletionVerificationServiceTest.php` (the proof each verification hands over);
   `tests/Feature/Lifecycle/RemovingFactorTest.php` (a removed factor's proofs).
 - `tests/Feature/Proofs/SignInProofsTest.php`: a reused session, sign-out and current-device sign-out, two guards on
-  one session, a guard calling neither hook, a custom guard's hooks, a generation bump across sessions.
+  one session, a bound application resolver on the sign-in and the caller alike, a guard calling neither hook, a custom
+  guard's hooks, a generation bump across sessions.
 
 ## Change Triggers
 
