@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Facade;
  * @method static \SineMacula\Laravel\Mfa\Contracts\FactorDriver driver(\UnitEnum|string|null $driver = null)
  * @method static \SineMacula\Laravel\Mfa\MfaManager extend(string $driver, \Closure(\Illuminate\Contracts\Container\Container): \SineMacula\Laravel\Mfa\Contracts\FactorDriver $callback)
  * @method static string getDefaultDriver()
+ * @method static bool hasDriver(string $driver)
  * @method static class-string<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor> factorModel()
  * @method static \SineMacula\Laravel\Mfa\Requirements\Requirement requirement(\SineMacula\Laravel\Mfa\Context\CallerContext $caller)
  * @method static bool isFresh(\SineMacula\Laravel\Mfa\Context\CallerContext $caller, string $operation, ?\SineMacula\Laravel\Mfa\Requirements\Requirement $requirement = null)
