@@ -20,9 +20,11 @@ use SineMacula\Laravel\Mfa\Contracts\PasskeyGateway;
 use SineMacula\Laravel\Mfa\Contracts\RecoveryCode;
 use SineMacula\Laravel\Mfa\Contracts\SmsSender;
 use SineMacula\Laravel\Mfa\Exceptions\InvalidConfigurationException;
+use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use SineMacula\Laravel\Mfa\Testing\FakeSmsSender;
+use Tests\Fixtures\Drivers\NoopFactorDriver;
 use Tests\Fixtures\Factors\SecondaryConnectionFactor;
 use Tests\Fixtures\Passkeys\FakePasskeyGateway;
 use Tests\Fixtures\RecoveryCodes\SecondaryConnectionRecoveryCode;
@@ -470,6 +472,38 @@ final class ConfigurationValidatorTest extends TestCase
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
+    public function testTypesWithNoRegisteredDriverAreReportedOnlyGivenTheManager(): void
+    {
+        $this->configureApplication(['types' => ['totp', 'topt', 'smss'], 'first_factor' => ['method' => 'password', 'channel' => 'password']]);
+
+        self::assertSame([], $this->validator()->report()['applications.web']);
+        self::assertSame(
+            ['The application enables types with no registered driver: topt, smss.'],
+            $this->validator()->report($this->manager()->hasDriver(...))['applications.web'],
+        );
+    }
+
+    /**
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testATypeOfAnExtendedDriverHasNoProblem(): void
+    {
+        $this->configureApplication(['types' => ['totp', 'custom'], 'first_factor' => ['method' => 'password', 'channel' => 'password']]);
+
+        $manager = $this->manager();
+
+        $manager->extend('custom', fn (): NoopFactorDriver => new NoopFactorDriver);
+
+        self::assertSame([...self::SHIPPED, 'applications.web' => []], $this->validator()->report($manager->hasDriver(...)));
+    }
+
+    /**
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
     public function testValidateListsEveryProblem(): void
     {
         $this->config()->set('mfa.codes.length', 11);
@@ -508,6 +542,20 @@ final class ConfigurationValidatorTest extends TestCase
     private function config(): Repository
     {
         return $this->container()->make(Repository::class);
+    }
+
+    /**
+     * @return \SineMacula\Laravel\Mfa\MfaManager
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function manager(): MfaManager
+    {
+        $manager = $this->container()->make('mfa');
+
+        self::assertInstanceOf(MfaManager::class, $manager);
+
+        return $manager;
     }
 
     /**

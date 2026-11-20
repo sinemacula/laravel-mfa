@@ -8,6 +8,7 @@ use Illuminate\Container\Container;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Container\Container as ContainerContract;
 use Illuminate\Support\Manager;
+use Illuminate\Support\Str;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
 use SineMacula\Laravel\Mfa\Context\AuthenticationContextContributor;
 use SineMacula\Laravel\Mfa\Context\CallerContext;
@@ -115,6 +116,17 @@ class MfaManager extends Manager // phpcs:ignore SineMacula.Metrics.MaxMethodCou
 
         /** @var \SineMacula\Laravel\Mfa\Contracts\FactorDriver */
         return $this->createDriver($name ?: $this->getDefaultDriver());
+    }
+
+    /**
+     * Whether a driver is registered under the name, without building it.
+     *
+     * @param  string  $driver
+     * @return bool
+     */
+    public function hasDriver(string $driver): bool
+    {
+        return isset($this->customCreators[$driver]) || method_exists($this, 'create' . Str::studly($driver) . 'Driver');
     }
 
     /**
