@@ -4,6 +4,8 @@ declare(strict_types = 1);
 
 namespace Tests\Unit;
 
+use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Config\Repository;
 use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -13,8 +15,11 @@ use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
+use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use SineMacula\Laravel\Mfa\Verification\Submission;
 use Tests\Fixtures\Context\Callers;
+use Tests\Fixtures\Enrollment\Concerns\ArrangesEnrollment;
+use Tests\Fixtures\Identities\GenericIdentity;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 
 /**
@@ -29,6 +34,19 @@ use Tests\Fixtures\Identities\NonEloquentIdentity;
 #[CoversClass(MfaManager::class)]
 final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
 {
+    use ArrangesEnrollment;
+
+    /**
+     * @return void
+     */
+    #[\Override]
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->arrangeVerification();
+    }
+
     /**
      * @return void
      */
@@ -123,6 +141,43 @@ final class MfaManagerNonEloquentIdentityTest extends MfaManagerTestCase
                 ->where('authenticatable_id', 'plain-issue')
                 ->count(),
         );
+    }
+
+    /**
+     * Its `authFactors()` is the guide's, so it must match what enrolment
+     * stores and nothing of another identity of its class.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAnIdentityWrittenAsDocumentedIsOfferedOnlyTheFactorItEnrolled(): void
+    {
+        $identity = new GenericIdentity('person-1');
+
+        Factor::query()->create([
+            ...AuthenticatorApp::FACTOR,
+            'authenticatable_type' => GenericIdentity::class,
+            'authenticatable_id'   => 'person-2',
+            'status'               => 'confirmed',
+            'application'          => self::APPLICATION,
+        ]);
+
+        $this->reauthenticated($identity);
+
+        $start = $this->startedTotp();
+
+        self::assertTrue($this->manager()->confirmEnrollment(Callers::current(), $this->grantOf($start), $this->appCode($start))->isConfirmed());
+
+        $factor = $this->pendingFactorOf($start);
+
+        self::assertSame([$factor->id], $identity->authFactors()->pluck('id')->all());
+        self::assertTrue($identity->isMfaEnabled());
+        self::assertSame([$factor->id], array_map(static fn (FactorSummary $summary): string => $summary->id, $this->manager()->offeredFactors(Callers::current())));
+
+        Carbon::setTestNow(CarbonImmutable::now()->addSeconds(30));
+
+        self::assertTrue($this->manager()->verify(Callers::current(), Submission::factor($factor->id, $this->appCode($start)))->isVerified());
     }
 
     /**

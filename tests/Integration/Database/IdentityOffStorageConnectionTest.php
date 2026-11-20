@@ -19,6 +19,7 @@ use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\Verification\Submission;
 use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Identities\OtherConnectionUser;
+use Tests\Fixtures\Lifecycle\Concerns\HoldsIdentityRecords;
 use Tests\TestCase;
 
 /**
@@ -33,7 +34,7 @@ use Tests\TestCase;
 #[CoversClass(Factor::class)]
 final class IdentityOffStorageConnectionTest extends TestCase
 {
-    use RefreshDatabase;
+    use HoldsIdentityRecords, RefreshDatabase;
 
     /**
      * @return void
@@ -85,6 +86,26 @@ final class IdentityOffStorageConnectionTest extends TestCase
         self::assertTrue(Mfa::verify(Callers::current(), Submission::recoveryCode($codes[0]->reveal()))->isVerified());
         self::assertTrue(Mfa::verify(Callers::current(), Submission::recoveryCode($codes[0]->reveal()))->isFailed());
         self::assertSame(9, Mfa::recoveryCodeStatus(Callers::current())?->remaining);
+    }
+
+    /**
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testDeletingTheIdentityForgetsItsRecordsOnTheStorageConnection(): void
+    {
+        $user  = OtherConnectionUser::query()->create(['email' => 'deleted@example.test']);
+        $other = OtherConnectionUser::query()->create(['email' => 'kept@example.test']);
+
+        $this->giveRecords($user);
+        $this->giveRecords($other);
+
+        $user->delete();
+
+        self::assertFalse(OtherConnectionUser::query()->whereKey($user->id)->exists());
+        self::assertSame($this->eachTableHolding(0), $this->recordCounts($user));
+        self::assertSame($this->eachTableHolding(1), $this->recordCounts($other));
     }
 
     /**

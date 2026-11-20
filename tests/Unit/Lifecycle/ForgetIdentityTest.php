@@ -4,28 +4,27 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Lifecycle;
 
-use Carbon\CarbonImmutable;
-use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Database\TableNames;
-use SineMacula\Laravel\Mfa\Enums\EnrollmentAuthorization;
+use SineMacula\Laravel\Mfa\Facades\Mfa;
 use SineMacula\Laravel\Mfa\Lifecycle\ForgetIdentity;
-use SineMacula\Laravel\Mfa\Models\Code;
-use SineMacula\Laravel\Mfa\Models\Enrollment;
 use SineMacula\Laravel\Mfa\Models\Factor;
-use SineMacula\Laravel\Mfa\Models\IdentityState;
-use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
-use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Support\IdentityType;
+use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
+use SineMacula\Laravel\Mfa\Verification\Submission;
+use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Factors\RemappedOwnerFactor;
 use Tests\Fixtures\Identities\FactorHoldingRecord;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
+use Tests\Fixtures\Identities\SecondaryUser;
 use Tests\Fixtures\Identities\TestUser;
+use Tests\Fixtures\Lifecycle\Concerns\HoldsIdentityRecords;
 use Tests\TestCase;
 
 /**
@@ -37,7 +36,7 @@ use Tests\TestCase;
 #[CoversClass(ForgetIdentity::class)]
 final class ForgetIdentityTest extends TestCase
 {
-    use RefreshDatabase;
+    use HoldsIdentityRecords, RefreshDatabase;
 
     /**
      * @return void
@@ -54,8 +53,8 @@ final class ForgetIdentityTest extends TestCase
 
         $this->container()->make(ForgetIdentity::class)->forget($forgotten);
 
-        self::assertSame(array_fill_keys($this->tables(), 0), $this->counts($forgotten));
-        self::assertSame(array_fill_keys($this->tables(), 1), $this->counts($kept));
+        self::assertSame($this->eachTableHolding(0), $this->recordCounts($forgotten));
+        self::assertSame($this->eachTableHolding(1), $this->recordCounts($kept));
     }
 
     /**
@@ -71,7 +70,41 @@ final class ForgetIdentityTest extends TestCase
 
         $user->delete();
 
-        self::assertSame(array_fill_keys($this->tables(), 0), $this->counts($user));
+        self::assertSame($this->eachTableHolding(0), $this->recordCounts($user));
+    }
+
+    /**
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testDeletingAnIdentityKeepsAnotherModelsRecordsUnderTheSameKey(): void
+    {
+        $deleted = $this->createUser('deleted@example.test');
+        $kept    = SecondaryUser::query()->forceCreate(['id' => $deleted->id, 'email' => 'kept@example.test']);
+
+        config()->set('mfa.applications.web', ['types' => ['totp'], 'first_factor' => ['method' => 'password', 'channel' => 'password']]);
+
+        $this->giveRecords($deleted);
+        $this->giveRecords($kept);
+
+        $factor = Factor::query()->create([
+            ...AuthenticatorApp::FACTOR,
+            'authenticatable_type' => $kept->getMorphClass(),
+            'authenticatable_id'   => (string) $kept->id,
+            'status'               => 'confirmed',
+        ]);
+
+        $before = $this->recordCounts($kept);
+
+        $deleted->delete();
+
+        self::assertSame($this->eachTableHolding(0), $this->recordCounts($deleted));
+        self::assertSame($before, $this->recordCounts($kept));
+
+        Auth::login($kept);
+
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)))->isVerified());
     }
 
     /**
@@ -92,7 +125,7 @@ final class ForgetIdentityTest extends TestCase
 
         $model->delete();
 
-        self::assertSame(array_fill_keys($this->tables(), 1), $this->counts($user));
+        self::assertSame($this->eachTableHolding(1), $this->recordCounts($user));
     }
 
     /**
@@ -108,7 +141,7 @@ final class ForgetIdentityTest extends TestCase
 
         $this->container()->make(ForgetIdentity::class)->forget($identity);
 
-        self::assertSame(array_fill_keys($this->tables(), 0), $this->counts($identity));
+        self::assertSame($this->eachTableHolding(0), $this->recordCounts($identity));
     }
 
     /**
@@ -157,95 +190,7 @@ final class ForgetIdentityTest extends TestCase
 
         $this->container()->make(ForgetIdentity::class)->forget($identity);
 
-        self::assertSame(array_fill_keys($this->tables(), 0), $this->counts($identity));
-    }
-
-    /**
-     * One record in every table.
-     *
-     * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
-     * @return void
-     */
-    private function giveRecords(Authenticatable $identity): void
-    {
-        $owner = $this->owner($identity);
-        $now   = CarbonImmutable::now();
-
-        $factor = Factor::query()->create([...$owner, 'type' => 'totp']);
-
-        Enrollment::query()->create([
-            ...$owner,
-            'factor_id'   => $factor->id,
-            'grant_hash'  => hash('sha256', $factor->id),
-            'application' => 'web',
-            'session_id'  => 'sign-in-digest',
-            'generation'  => 0,
-            'authority'   => EnrollmentAuthorization::STEP_UP,
-            'expires_at'  => $now,
-        ]);
-        Code::query()->create([
-            ...$owner,
-            'factor_id'        => $factor->id,
-            'purpose'          => 'sign_in',
-            'application'      => 'web',
-            'destination_hash' => hash('sha256', 'd' . $factor->id),
-            'code_hash'        => hash('sha256', 'c' . $factor->id),
-            'sent_at'          => $now,
-            'sent_times'       => [$now->getTimestamp()],
-            'expires_at'       => $now,
-        ]);
-        RecoveryCode::query()->create([...$owner, 'code_hash' => 'hash', 'generation' => 1]);
-        PasskeyAssociation::query()->create([
-            ...$owner,
-            'factor_id'          => $factor->id,
-            'credential_id_hash' => hash('sha256', 'p' . $factor->id),
-            'credential_id'      => 'credential',
-        ]);
-        IdentityState::query()->create($owner);
-    }
-
-    /**
-     * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
-     * @return array<string, int>
-     */
-    private function counts(Authenticatable $identity): array
-    {
-        $counts = [];
-
-        foreach ($this->tables() as $table) {
-            $counts[$table] = DB::table($table)->where($this->owner($identity))->count();
-        }
-
-        return $counts;
-    }
-
-    /**
-     * The tables that hold records by owner.
-     *
-     * @return list<string>
-     */
-    private function tables(): array
-    {
-        return array_map(TableNames::of(...), [
-            TableNames::FACTORS,
-            TableNames::ENROLLMENTS,
-            TableNames::CODES,
-            TableNames::RECOVERY_CODES,
-            TableNames::PASSKEY_ASSOCIATIONS,
-            TableNames::IDENTITY_STATES,
-        ]);
-    }
-
-    /**
-     * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
-     * @return array{authenticatable_type: string, authenticatable_id: string}
-     */
-    private function owner(Authenticatable $identity): array
-    {
-        /** @var int|string $key */
-        $key = $identity->getAuthIdentifier();
-
-        return ['authenticatable_type' => IdentityType::of($identity), 'authenticatable_id' => (string) $key];
+        self::assertSame($this->eachTableHolding(0), $this->recordCounts($identity));
     }
 
     /**

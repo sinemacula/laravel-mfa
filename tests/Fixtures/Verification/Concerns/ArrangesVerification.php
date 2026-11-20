@@ -14,6 +14,7 @@ use SineMacula\Laravel\Mfa\Attempts\AttemptKeys;
 use SineMacula\Laravel\Mfa\Attempts\AttemptStore;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\MfaEvent;
+use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\PasskeyGateway;
 use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
@@ -135,13 +136,13 @@ trait ArrangesVerification
     }
 
     /**
-     * @param  \Tests\Fixtures\Identities\TestUser  $user
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $session
      * @return void
      */
-    protected function beginSignIn(TestUser $user, string $session = self::SESSION): void
+    protected function beginSignIn(MultiFactorAuthenticatable $identity, string $session = self::SESSION): void
     {
-        $this->container()->make(ProofStore::class)->begin($user, self::APPLICATION, $session);
+        $this->container()->make(ProofStore::class)->begin($identity, self::APPLICATION, $session);
     }
 
     /**
@@ -323,15 +324,15 @@ trait ArrangesVerification
     }
 
     /**
-     * @param  \Tests\Fixtures\Identities\TestUser  $user
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  string  $session
      * @return void
      */
-    protected function recordFirstFactor(TestUser $user, string $session = self::SESSION): void
+    protected function recordFirstFactor(MultiFactorAuthenticatable $identity, string $session = self::SESSION): void
     {
-        $proofs = SignInProofs::of($user)->inSession($session)->underGeneration(VerificationGeneration::current($user));
+        $proofs = SignInProofs::of($identity)->inSession($session)->underGeneration(VerificationGeneration::current($identity));
 
-        $this->container()->make(ProofStore::class)->record($user, $proofs->password(60));
+        $this->container()->make(ProofStore::class)->record($identity, $proofs->password(60));
     }
 
     /**

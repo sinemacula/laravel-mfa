@@ -4,14 +4,25 @@ declare(strict_types = 1);
 
 namespace Tests\Integration;
 
+use Carbon\Carbon;
+use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
+use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Verification\Submission;
 use Tests\Fixtures\Context\Callers;
+use Tests\Fixtures\Enrollment\Concerns\ArrangesEnrollment;
+use Tests\Fixtures\Identities\FactorHolder;
 use Tests\Fixtures\Identities\SecondaryUser;
 use Tests\Fixtures\Identities\TestUser;
+use Tests\Fixtures\Identities\UlidIdentity;
+use Tests\Fixtures\Identities\UuidIdentity;
+use Tests\Fixtures\Lifecycle\Concerns\HoldsIdentityRecords;
 use Tests\TestCase;
 
 /**
@@ -23,7 +34,30 @@ use Tests\TestCase;
 #[CoversClass(MfaManager::class)]
 final class PolymorphicIdentityTest extends TestCase
 {
-    use RefreshDatabase;
+    use ArrangesEnrollment, HoldsIdentityRecords, RefreshDatabase;
+
+    /**
+     * @return void
+     */
+    #[\Override]
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->arrangeVerification();
+    }
+
+    /**
+     * @return void
+     */
+    #[\Override]
+    protected function tearDown(): void
+    {
+        Relation::requireMorphMap(false);
+        Relation::morphMap([], false);
+
+        parent::tearDown();
+    }
 
     /**
      * @return void
@@ -122,5 +156,62 @@ final class PolymorphicIdentityTest extends TestCase
 
         $this->actingAs($secondary);
         self::assertTrue(Mfa::requirement(Callers::current())->isEmpty());
+    }
+
+    /**
+     * The owner type each is stored under, and how to make one.
+     *
+     * @return iterable<string, array{string, \Closure(): (\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable)}>
+     */
+    public static function identityShapes(): iterable
+    {
+        yield 'an alias under an enforced morph map' => ['person', static function (): FactorHolder {
+            Relation::enforceMorphMap(['person' => FactorHolder::class]);
+
+            return FactorHolder::query()->create(['email' => self::ACCOUNT]);
+        }];
+
+        yield 'a UUID key' => [UuidIdentity::class, static fn (): UuidIdentity => UuidIdentity::query()->create(['email' => self::ACCOUNT])];
+        yield 'a ULID key' => [UlidIdentity::class, static fn (): UlidIdentity => UlidIdentity::query()->create(['email' => self::ACCOUNT])];
+    }
+
+    /**
+     * @param  string  $type
+     * @param  \Closure(): (\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable)  $make
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    #[DataProvider('identityShapes')]
+    public function testAnIdentityEnrollsVerifiesAndIsForgottenUnderItsOwnerTypeAndKey(string $type, \Closure $make): void
+    {
+        $identity = $make();
+
+        $this->reauthenticated($identity);
+
+        $start        = $this->startedTotp();
+        $confirmation = $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $this->appCode($start));
+        $factor       = $this->pendingFactorOf($start);
+
+        $key = $identity->getKey();
+
+        self::assertTrue($confirmation->isConfirmed());
+        self::assertTrue(is_int($key) || is_string($key));
+        self::assertSame([$type, (string) $key], [$factor->authenticatable_type, $factor->authenticatable_id]);
+        self::assertSame([$factor->id], $identity->authFactors()->pluck('id')->all());
+        self::assertTrue($identity->isMfaEnabled());
+        self::assertSame([$factor->id], array_map(static fn (FactorSummary $summary): string => $summary->id, Mfa::factors(Callers::current())));
+        self::assertSame($factor->id, (new Factor)->resolveRouteBinding($factor->id)?->getKey());
+        self::assertSame(10, Mfa::recoveryCodeStatus(Callers::current())?->remaining);
+
+        Carbon::setTestNow(CarbonImmutable::now()->addSeconds(30));
+
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::factor($factor->id, $this->appCode($start)))->isVerified());
+
+        $this->giveRecords($identity);
+
+        $identity->delete();
+
+        self::assertSame($this->eachTableHolding(0), $this->recordCounts($identity));
     }
 }
