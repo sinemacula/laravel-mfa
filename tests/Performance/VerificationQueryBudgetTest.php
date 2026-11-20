@@ -185,9 +185,10 @@ final class VerificationQueryBudgetTest extends PerformanceContractTestCase
         $user   = $this->signedInPerson();
         $factor = $this->emailFactor($user);
 
-        // Reads: factor 1, request 5, gateway 5, send 1, sends and open code 2.
+        // Reads: factor 1, request 5, gateway 5, send 1, sends 1; the first
+        // send has no challenge to read.
         // Writes: slot 2, returned 1, locks 3, code and its send 2.
-        $result = $this->assertQueryBudget(14, 8, fn () => $this->mfa()->sendCode(Callers::current(), $factor->id));
+        $result = $this->assertQueryBudget(13, 8, fn () => $this->mfa()->sendCode(Callers::current(), $factor->id));
 
         self::assertTrue($result->wasSent());
     }

@@ -16,6 +16,7 @@ use SineMacula\Laravel\Mfa\Attempts\AttemptOutcome;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
 use SineMacula\Laravel\Mfa\Attempts\AttemptStore;
 use SineMacula\Laravel\Mfa\Codes\CodeService;
+use SineMacula\Laravel\Mfa\Codes\DeliveredCodes;
 use SineMacula\Laravel\Mfa\Codes\SendLedger;
 use SineMacula\Laravel\Mfa\Enums\AttemptScope;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
@@ -42,6 +43,7 @@ use Tests\TestCase;
  */
 #[CoversClass(AttemptService::class)]
 #[CoversClass(CodeService::class)]
+#[CoversClass(DeliveredCodes::class)]
 #[CoversClass(SendLedger::class)]
 final class FactorLockoutSnapshotTest extends TestCase
 {
@@ -267,6 +269,38 @@ final class FactorLockoutSnapshotTest extends TestCase
         DB::connection()->commit();
 
         self::assertSame(FailureReason::SENDING_CAPPED, $result->reason);
+        $this->assertSentOnce();
+    }
+
+    /**
+     * A plain read misses the challenge committed in the same sign-in; the send
+     * resends it, so its cooldown holds.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAnOlderMysqlSnapshotCannotHideTheChallengeASendResends(): void
+    {
+        $this->requireDriver('mysql');
+
+        [, $factor] = $this->arrangeSends();
+
+        config()->set('mfa.codes.factor_send_limit', 5);
+
+        $this->openTransaction('REPEATABLE READ');
+        $this->takeSnapshot($factor);
+        $this->commitSendElsewhere($factor);
+        $this->requestFrom('203.0.113.2');
+
+        self::assertSame(0, Code::query()->count());
+
+        $result = $this->mfa()->sendCode(Callers::current(), $factor->id);
+
+        DB::connection()->commit();
+
+        self::assertSame(FailureReason::SENDING_CAPPED, $result->reason);
+        self::assertSame(60, $result->retryAfter);
         $this->assertSentOnce();
     }
 

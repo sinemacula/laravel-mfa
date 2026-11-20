@@ -83,11 +83,11 @@ final class EnrollmentQueryBudgetTest extends PerformanceContractTestCase
     {
         $this->reauthenticatedPerson();
 
-        // Reads: TOTP start 8, admission 4, send, sends and open code 3.
+        // Reads: TOTP start 8, admission 4, send and sends 2.
         // Writes: TOTP start 6, admission and send locks 2, code, its send and
         // challenge 3.
         $caller = Callers::current();
-        $start  = $this->assertQueryBudget(15, 11, fn (): EnrollmentStart => $this->mfa()->startEnrollment($caller, EnrollmentRequest::delivered('email', self::ADDRESS)));
+        $start  = $this->assertQueryBudget(14, 11, fn (): EnrollmentStart => $this->mfa()->startEnrollment($caller, EnrollmentRequest::delivered('email', self::ADDRESS)));
 
         self::assertTrue($start->hasStarted());
     }

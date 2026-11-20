@@ -42,7 +42,7 @@ final class MigrationSmokeTest extends TestCase
         ]];
         yield 'mfa_identity_states' => ['mfa_identity_states', [
             'id', ...$owner, 'verification_generation', 'reenrollment_required', 'consecutive_failures', 'locked_until',
-            'recovery_codes_generation', 'recovery_codes_generated_at', 'code_sends', 'created_at', 'updated_at',
+            'recovery_codes_generation', 'recovery_codes_generated_at', 'code_sends', 'code_challenges', 'created_at', 'updated_at',
         ]];
         yield 'mfa_enrollments' => ['mfa_enrollments', [
             'id', 'factor_id', ...$owner, 'grant_hash', 'application', 'session_id', 'expires_at', 'attempts', 'created_at', 'updated_at',

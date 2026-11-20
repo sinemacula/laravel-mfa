@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\RecordsNotFoundException;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Codes\CodeSettings;
 use SineMacula\Laravel\Mfa\Codes\SendLedger;
 use SineMacula\Laravel\Mfa\Database\IdentityStateRow;
@@ -265,7 +266,103 @@ final class SendLedgerTest extends TestCase
     {
         $this->expectException(RecordsNotFoundException::class);
 
-        SendLedger::read(new CodeSettings(config()), new ProofBinding('user', '3', 'web', 'session-a', Purpose::SIGN_IN));
+        SendLedger::read(new CodeSettings(config()), new ProofBinding('user', '3', 'web', 'session-a', Purpose::SIGN_IN), 'factor-a', 'session-a');
+    }
+
+    /**
+     * @return iterable<string, array{string, string, \SineMacula\Laravel\Mfa\Proofs\ProofBinding}>
+     */
+    public static function otherBindings(): iterable
+    {
+        yield 'another factor' => ['factor-b', 'session-a', self::binding()];
+        yield 'another session' => ['factor-a', 'session-b', self::binding()];
+        yield 'another purpose' => ['factor-a', 'session-a', self::binding(purpose: Purpose::STEP_UP)];
+        yield 'another application' => ['factor-a', 'session-a', self::binding(application: 'admin')];
+        yield 'another identity' => ['factor-a', 'session-a', self::binding(identity: '2')];
+    }
+
+    /**
+     * @param  string  $factorId
+     * @param  string  $session
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @return void
+     *
+     * @throws \JsonException
+     */
+    #[DataProvider('otherBindings')]
+    public function testAStartedChallengeIsFoundOnlyForItsOwnBinding(string $factorId, string $session, ProofBinding $binding): void
+    {
+        $now = CarbonImmutable::now();
+
+        $this->ledger()->record('destination-a', Purpose::SIGN_IN, $now, 'challenge-a');
+
+        self::assertSame('challenge-a', $this->ledger()->challenge($now));
+        self::assertNull(SendLedger::read(new CodeSettings(config()), $binding, $factorId, $session)->challenge($now));
+    }
+
+    /**
+     * A resend records no challenge, and the one it resends stays.
+     *
+     * @return void
+     *
+     * @throws \JsonException
+     */
+    public function testAStartedChallengeIsKeptUntilAnotherReplacesIt(): void
+    {
+        $now = CarbonImmutable::now();
+
+        $this->ledger()->record('destination-a', Purpose::SIGN_IN, $now->subMinute(), 'challenge-a');
+        $this->ledger()->record('destination-a', Purpose::SIGN_IN, $now);
+
+        self::assertSame('challenge-a', $this->ledger()->challenge($now));
+
+        $this->ledger()->record('destination-a', Purpose::SIGN_IN, $now, 'challenge-b');
+
+        self::assertSame('challenge-b', $this->ledger()->challenge($now));
+    }
+
+    /**
+     * @return void
+     *
+     * @throws \JsonException
+     */
+    public function testAChallengeIsNotFoundOnceTooOldToBeOpen(): void
+    {
+        config()->set('mfa.codes.challenge_ttl_minutes', 30);
+
+        $started = CarbonImmutable::now();
+
+        $this->ledger()->record('destination-a', Purpose::SIGN_IN, $started, 'challenge-a');
+
+        self::assertSame('challenge-a', $this->ledger()->challenge($started->addMinutes(30)->subSecond()));
+        self::assertNull($this->ledger()->challenge($started->addMinutes(30)));
+    }
+
+    /**
+     * Any send drops them, so the row holds only challenges that may be open.
+     *
+     * @return void
+     *
+     * @throws \JsonException
+     */
+    public function testARecordDropsChallengesTooOldToBeOpen(): void
+    {
+        config()->set('mfa.codes.challenge_ttl_minutes', 30);
+
+        $now = CarbonImmutable::now();
+
+        $this->ledger()->record('destination-a', Purpose::SIGN_IN, $now->subMinutes(30), 'challenge-a');
+        self::ledgerFor('factor-b')->record('destination-a', Purpose::SIGN_IN, $now->subMinutes(30)->addSecond(), 'challenge-b');
+        self::ledgerFor('factor-c')->record('destination-a', Purpose::SIGN_IN, $now);
+
+        $challenges = IdentityStateRow::of(new ProofOwner('user', '1'))->value('code_challenges');
+
+        self::assertIsString($challenges);
+
+        /** @var array<string, array{id: string, at: int}> $kept */
+        $kept = json_decode($challenges, true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertSame(['challenge-b'], array_column($kept, 'id'));
     }
 
     /**
@@ -324,6 +421,30 @@ final class SendLedgerTest extends TestCase
      */
     private function ledger(): SendLedger
     {
-        return SendLedger::read(new CodeSettings(config()), new ProofBinding('user', '1', 'web', 'session-a', Purpose::SIGN_IN));
+        return self::ledgerFor('factor-a');
+    }
+
+    /**
+     * The first identity's ledger for a send of the factor.
+     *
+     * @param  string  $factorId
+     * @return \SineMacula\Laravel\Mfa\Codes\SendLedger
+     *
+     * @throws \JsonException
+     */
+    private static function ledgerFor(string $factorId): SendLedger
+    {
+        return SendLedger::read(new CodeSettings(config()), self::binding(), $factorId, 'session-a');
+    }
+
+    /**
+     * @param  \SineMacula\Laravel\Mfa\Enums\Purpose  $purpose
+     * @param  string  $application
+     * @param  string  $identity
+     * @return \SineMacula\Laravel\Mfa\Proofs\ProofBinding
+     */
+    private static function binding(Purpose $purpose = Purpose::SIGN_IN, string $application = 'web', string $identity = '1'): ProofBinding
+    {
+        return new ProofBinding('user', $identity, $application, 'session-a', $purpose);
     }
 }

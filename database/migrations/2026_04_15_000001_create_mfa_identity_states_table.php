@@ -57,6 +57,10 @@ return new class extends Migration {
             // A JSON list of the recent code sends the send caps count.
             $blueprint->json('code_sends')->nullable();
 
+            // A JSON object of each code binding's latest challenge, so a send
+            // finds the challenge it resends under the row's lock.
+            $blueprint->json('code_challenges')->nullable();
+
             $blueprint->datetimes();
         });
     }
