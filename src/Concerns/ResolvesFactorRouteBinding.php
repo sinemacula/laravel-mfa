@@ -33,7 +33,9 @@ trait ResolvesFactorRouteBinding
     #[\Override]
     public function resolveRouteBinding(mixed $value, mixed $field = null): ?Model
     {
-        return Container::getInstance()->make(FactorRouteBinding::class)->resolve($this, fn (): mixed => parent::resolveRouteBinding($value, $field));
+        $lookup = fn (): mixed => $this->isNonIntegerKey($value, $field, 'resolveRouteBinding') ? null : parent::resolveRouteBinding($value, $field);
+
+        return Container::getInstance()->make(FactorRouteBinding::class)->resolve($this, $lookup);
     }
 
     /**
@@ -46,6 +48,25 @@ trait ResolvesFactorRouteBinding
     #[\Override]
     public function resolveSoftDeletableRouteBinding(mixed $value, mixed $field = null): ?Model
     {
-        return Container::getInstance()->make(FactorRouteBinding::class)->resolve($this, fn (): mixed => parent::resolveSoftDeletableRouteBinding($value, $field));
+        $lookup = fn (): mixed => $this->isNonIntegerKey($value, $field, 'resolveSoftDeletableRouteBinding') ? null : parent::resolveSoftDeletableRouteBinding($value, $field);
+
+        return Container::getInstance()->make(FactorRouteBinding::class)->resolve($this, $lookup);
+    }
+
+    /**
+     * PostgreSQL fails comparing an integer key with a non-integer string. A
+     * parent's own binding may decode the value, so it is left to that.
+     *
+     * @param  mixed  $value
+     * @param  mixed  $field
+     * @param  string  $method
+     * @return bool
+     */
+    private function isNonIntegerKey(mixed $value, mixed $field, string $method): bool
+    {
+        return ($field ?? $this->getRouteKeyName()) === $this->getKeyName()
+            && in_array($this->getKeyType(), ['int', 'integer'], true)
+            && filter_var($value, FILTER_VALIDATE_INT)                === false
+            && (new \ReflectionMethod(parent::class, $method))->class === Model::class;
     }
 }
