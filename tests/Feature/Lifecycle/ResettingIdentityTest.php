@@ -32,6 +32,7 @@ use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Lifecycle\FactorRemoval;
 use SineMacula\Laravel\Mfa\Lifecycle\IdentityReset;
 use SineMacula\Laravel\Mfa\MfaManager;
+use SineMacula\Laravel\Mfa\Models\Code;
 use SineMacula\Laravel\Mfa\Models\Enrollment;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
@@ -179,6 +180,47 @@ final class ResettingIdentityTest extends TestCase
         self::assertSame(0, $state->consecutive_failures);
         self::assertGreaterThan($generation, VerificationGeneration::current($user));
         self::assertSame([], $this->container()->make(ProofStore::class)->proofs($user, self::APPLICATION, self::SESSION));
+    }
+
+    /**
+     * Whichever application made them; the delivered code rows the send caps
+     * read stay.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAResetRemovesEveryApplicationsFactorsAndKeepsDeliveredCodes(): void
+    {
+        $user  = $this->signedInPerson();
+        $admin = $this->confirmedFactor($user);
+        $web   = $this->confirmedFactor($user);
+
+        [$pending, $enrollment] = $this->pendingEnrollmentOf($user);
+
+        $admin->update(['application' => 'admin']);
+        $pending->update(['application' => 'admin']);
+        $enrollment->update(['application' => 'admin']);
+
+        $code = Code::query()->create([
+            'factor_id'            => $web->id,
+            'authenticatable_type' => $user->getMorphClass(),
+            'authenticatable_id'   => (string) $user->id,
+            'purpose'              => 'sign_in',
+            'application'          => self::APPLICATION,
+            'session_id'           => self::SESSION,
+            'destination_hash'     => hash('sha256', 'destination'),
+            'code_hash'            => hash('sha256', 'code'),
+            'sent_at'              => CarbonImmutable::now(),
+            'sent_times'           => [CarbonImmutable::now()->getTimestamp()],
+            'expires_at'           => CarbonImmutable::now()->addMinutes(10),
+        ]);
+
+        Mfa::resetIdentity($user, self::actor(), self::REASON);
+
+        self::assertSame(0, Factor::query()->count());
+        self::assertSame(0, Enrollment::query()->count());
+        self::assertTrue(Code::query()->whereKey($code->getKey())->exists());
     }
 
     /**

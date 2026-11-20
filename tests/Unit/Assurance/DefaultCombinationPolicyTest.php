@@ -19,6 +19,7 @@ use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\Enums\KeyProtection;
 use SineMacula\Laravel\Mfa\Enums\RequirementPart;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
+use SineMacula\Laravel\Mfa\Proofs\ProviderEvidence;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use Tests\Fixtures\Assurance\SessionProofs;
 
@@ -397,6 +398,30 @@ final class DefaultCombinationPolicyTest extends TestCase
 
         self::assertFalse($evaluation->phishingResistant);
         self::assertSame(['pwd', 'pop', 'mfa'], $evaluation->amr);
+    }
+
+    /**
+     * Its reported methods and context are left to a rebound policy.
+     *
+     * @return void
+     */
+    public function testAProvidersReportedEvidenceRaisesNothing(): void
+    {
+        $requirement = Requirement::none()->withMultifactor()->withMinimumLevel(AssuranceLevel::AAL2);
+        $reported    = SessionProofs::externalProvider(new ProviderEvidence(['pwd', 'mfa', 'hwk'], 'urn:example:acr:3'));
+
+        $alone = $this->evaluate($requirement, $reported);
+        $after = $this->evaluate($requirement, $reported, SessionProofs::totp());
+
+        self::assertSame(AssuranceLevel::UNCLASSIFIED, $alone->level);
+        self::assertFalse($alone->multifactor);
+        self::assertSame([], $alone->amr);
+        self::assertSame($requirement->parts(), $alone->unmet);
+
+        self::assertSame(AssuranceLevel::AAL1, $after->level);
+        self::assertFalse($after->multifactor);
+        self::assertSame(['otp', 'mca'], $after->amr);
+        self::assertEquals($this->evaluate($requirement, SessionProofs::externalProvider(), SessionProofs::totp()), $after);
     }
 
     /**

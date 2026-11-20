@@ -426,6 +426,28 @@ final class VerifiedSignInTest extends TestCase
     }
 
     /**
+     * The route's guard is read even after acting on another.
+     *
+     * @return void
+     */
+    public function testActingOnASecondGuardPassesThatGuardsRoute(): void
+    {
+        config()->set('mfa.applications.secondary', ['types' => ['totp'], 'requirement' => 'never']);
+
+        $other = $this->secondaryPerson();
+
+        $this->actingAsVerified($other, guard: 'secondary');
+        $this->actingAsVerified($this->person(), AssuranceLevel::AAL1, guard: 'web');
+
+        $this->getJson('verified/aal2')->assertUnauthorized();
+        $this->getJson('verified/secondary')->assertOk();
+
+        $this->actingAsVerified($other, AssuranceLevel::AAL1, guard: 'secondary');
+
+        $this->getJson('verified/secondary')->assertUnauthorized();
+    }
+
+    /**
      * The application named does not choose what the next request resolves.
      *
      * @return void
@@ -960,6 +982,7 @@ final class VerifiedSignInTest extends TestCase
             $router->get('verified/aal2', self::reached(...))->middleware('mfa:level=aal2');
             $router->get('verified/aal3', self::reached(...))->middleware('mfa:level=aal3');
             $router->get('verified/operation', self::reached(...))->middleware('mfa:operation=' . self::OPERATION);
+            $router->get('verified/secondary', self::reached(...))->middleware(['auth:secondary', 'mfa:level=aal2']);
         });
     }
 
