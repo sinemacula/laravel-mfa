@@ -131,6 +131,30 @@ final class MigrationSmokeTest extends TestCase
     }
 
     /**
+     * The time columns hold no offset, so a session time zone does not shift
+     * what was stored.
+     *
+     * @return void
+     */
+    public function testAStoredTimeIgnoresTheSessionTimeZone(): void
+    {
+        DB::table('mfa_identity_states')->insert([
+            'id'                   => '01JSTATE000000000000000000',
+            'authenticatable_type' => 'user',
+            'authenticatable_id'   => '1',
+            'locked_until'         => '2026-10-25 01:30:00',
+        ]);
+
+        match (DB::connection()->getDriverName()) {
+            'mysql', 'mariadb' => DB::statement('set time_zone = \'+05:00\''),
+            'pgsql'            => DB::statement('set time zone \'Asia/Karachi\''),
+            default            => null,
+        };
+
+        self::assertSame('2026-10-25 01:30:00', DB::table('mfa_identity_states')->value('locked_until'));
+    }
+
+    /**
      * A table that already exists is refused with its setting's name.
      *
      * @return void

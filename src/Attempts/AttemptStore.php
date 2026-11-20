@@ -269,7 +269,7 @@ final readonly class AttemptStore
     }
 
     /**
-     * In the application's timezone.
+     * In UTC, whatever the application's timezone.
      *
      * @param  int  $timestamp
      * @return string
@@ -278,7 +278,7 @@ final readonly class AttemptStore
      */
     private function format(int $timestamp): string
     {
-        return CarbonImmutable::createFromTimestamp($timestamp, date_default_timezone_get())
+        return CarbonImmutable::createFromTimestamp($timestamp, 'UTC')
             ->format($this->connection()->getQueryGrammar()->getDateFormat());
     }
 
@@ -299,6 +299,6 @@ final readonly class AttemptStore
      */
     private static function timestamp(mixed $value): int
     {
-        return is_string($value) && $value !== '' ? CarbonImmutable::parse($value, date_default_timezone_get())->getTimestamp() : 0;
+        return is_string($value) && $value !== '' ? CarbonImmutable::parse($value, 'UTC')->getTimestamp() : 0;
     }
 }

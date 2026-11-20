@@ -404,6 +404,28 @@ final class ActsAsFactorTest extends TestCase
     }
 
     /**
+     * Without a cast on the columns, in a timezone that is not UTC.
+     *
+     * @return void
+     */
+    public function testACustomModelStoresItsConfirmedAndLastUsedTimesInUtc(): void
+    {
+        $this->useTimezone('Europe/London');
+
+        $user   = TestUser::query()->create(['email' => 'utc@example.test']);
+        $factor = new RemappedLockoutFactor(['authenticatable_type' => $user::class, 'authenticatable_id' => (string) $user->id, 'type' => 'totp']);
+        $at     = CarbonImmutable::parse('2026-07-01 09:00:00', 'UTC')->setTimezone('Europe/London');
+
+        $factor->confirm($at);
+        $factor->recordVerification($at);
+        $factor->persist();
+
+        $stored = Factor::query()->toBase()->first(['confirmed_at', 'last_used_at']);
+
+        self::assertEquals((object) ['confirmed_at' => '2026-07-01 09:00:00', 'last_used_at' => '2026-07-01 09:00:00'], $stored);
+    }
+
+    /**
      * @return void
      */
     public function testPersistSavesToTheDatabase(): void

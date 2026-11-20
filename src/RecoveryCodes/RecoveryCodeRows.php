@@ -106,7 +106,7 @@ final readonly class RecoveryCodeRows
 
         $this->owned($model, $owner)
             ->whereNull($model->getReplacedAtName())
-            ->update([$model->getReplacedAtName() => $now]);
+            ->update([$model->getReplacedAtName() => $model->fromDateTime($now)]);
 
         [$typeColumn, $keyColumn] = self::ownerColumns($model);
 
@@ -167,7 +167,7 @@ final readonly class RecoveryCodeRows
             ->whereKey($code->getKey())
             ->whereNull($code->getUsedAtName())
             ->whereNull($code->getReplacedAtName())
-            ->update([$code->getUsedAtName() => CarbonImmutable::now()]) === 1;
+            ->update([$code->getUsedAtName() => $code->freshTimestampString()]) === 1;
     }
 
     /**
@@ -209,12 +209,13 @@ final readonly class RecoveryCodeRows
     public function prune(CarbonInterface $before): int
     {
         $code = $this->codeModel();
+        $at   = $code->fromDateTime($before);
 
         return BoundedDelete::run($code->newQuery()
             ->toBase()
-            ->where(static function (QueryBuilder $query) use ($code, $before): void {
-                $query->where($code->getUsedAtName(), '<', $before)
-                    ->orWhere($code->getReplacedAtName(), '<', $before);
+            ->where(static function (QueryBuilder $query) use ($code, $at): void {
+                $query->where($code->getUsedAtName(), '<', $at)
+                    ->orWhere($code->getReplacedAtName(), '<', $at);
             }));
     }
 

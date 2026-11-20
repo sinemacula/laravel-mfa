@@ -13,6 +13,9 @@ factors starts with.
   except the attempt throttles, which are keyed by a hash of what they count. Owners are plain string polymorphic
   columns, `authenticatable_type` and `authenticatable_id`, so integer, UUID and ULID identity keys all fit. The
   migrations run at deploy time; at runtime the package needs only `SELECT`, `INSERT`, `UPDATE` and `DELETE`.
+- Every time is a `datetime` column holding UTC, written and read through `Concerns\StoresTimesInUtc`, which the
+  package's models and the two model traits use, so the application timezone and a daylight saving change cannot put
+  stored times out of order. The attempt throttles format their window ends in UTC themselves.
 - `mfa_factors`, one row per factor: owner, `type` (the name its driver is registered under), `label`, `destination`
   (SMS and email, captured at enrolment), `credential_reference` (passkey), `secret` (encrypted), the TOTP
   `totp_algorithm`, `totp_digits` and `totp_period` stored with the factor, `last_accepted_step`, `status` (`pending`
@@ -100,7 +103,8 @@ factors starts with.
 ## Implementation Anchors
 
 - `database/migrations/`: one migration per table, each through `TableNames`, `IndexName` and `MigrationCollisionGuard`.
-- `src/Models/`, `src/Concerns/ActsAsFactor.php`, `src/Concerns/ActsAsRecoveryCode.php`, `src/Concerns/HasFactors.php`.
+- `src/Models/`, `src/Concerns/ActsAsFactor.php`, `src/Concerns/ActsAsRecoveryCode.php`, `src/Concerns/HasFactors.php`,
+  `src/Concerns/StoresTimesInUtc.php`.
 - `src/Contracts/Factor.php`, `src/Contracts/EloquentFactor.php`, `src/Contracts/RecoveryCode.php`,
   `src/Contracts/MultiFactorAuthenticatable.php`.
 - `src/Database/ConfiguredModels.php`, `src/Database/TableNames.php`.
@@ -112,7 +116,7 @@ factors starts with.
 - `tests/Unit/Factors/OperationGuardTest.php`
 - `tests/Unit/Lifecycle/ForgetIdentityTest.php`
 - `tests/Unit/Concerns/HasFactorsTest.php`, `tests/Unit/Concerns/ActsAsFactorStateTest.php`,
-  `tests/Unit/Concerns/ActsAsRecoveryCodeTest.php`
+  `tests/Unit/Concerns/ActsAsRecoveryCodeTest.php`, `tests/Unit/Concerns/StoresTimesInUtcTest.php`
 - `tests/Unit/Models/FactorTest.php`, `tests/Unit/Models/StoredRecordModelsTest.php`
 - `tests/Unit/Database/ConfiguredModelsTest.php`, `tests/Unit/Database/TableNamesTest.php`
 

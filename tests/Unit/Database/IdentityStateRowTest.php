@@ -72,6 +72,27 @@ final class IdentityStateRowTest extends TestCase
     /**
      * @return void
      */
+    public function testLockingStampsTheRowInUtc(): void
+    {
+        $this->useTimezone('Europe/London');
+
+        Carbon::setTestNow(Carbon::parse('2026-07-01 12:00:00', 'UTC'));
+
+        try {
+            IdentityStateRow::lock(new ProofOwner('users', '42'), DB::connection());
+        } finally {
+            Carbon::setTestNow();
+        }
+
+        $row = IdentityStateRow::of(new ProofOwner('users', '42'))->sole();
+
+        self::assertSame('2026-07-01 12:00:00', (string) $row->created_at);
+        self::assertSame('2026-07-01 12:00:00', (string) $row->updated_at);
+    }
+
+    /**
+     * @return void
+     */
     public function testRunsOnTheStorageConnectionUnlessGivenOne(): void
     {
         config()->set('database.connections.other', config('database.connections.testing'));

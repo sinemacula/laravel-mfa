@@ -59,8 +59,6 @@ before anything relies on it.
   of the subject that needs it, not an escape from the report. It reads configuration and the container only and opens
   no database connection. The storage checks (the connection, and the factor model on it) are part of it, so
   `mfa:check` reports them like any other problem.
-- `app.timezone` and the PHP default timezone are `UTC`, reported under `storage`: the package stores and compares its
-  times as wall-clock strings, which a daylight saving change would put out of order.
 - In the console the boot check runs only as a worker starts (queue, Horizon, scheduler or Octane), matched by the
   name Artisan resolved, so any other command, `mfa:check` or a composing package's own check included, can run on a
   bad configuration. The manager's factory checks whatever resolves it, and `mfa:prune` checks before it deletes.

@@ -48,7 +48,7 @@ return new class extends Migration {
             $blueprint->unique('credential_id_hash', IndexName::for($table, '_credential_unique'));
             $blueprint->index(['authenticatable_type', 'authenticatable_id'], IndexName::for($table, '_owner_index'));
 
-            $blueprint->timestamps();
+            $blueprint->datetimes();
         });
     }
 

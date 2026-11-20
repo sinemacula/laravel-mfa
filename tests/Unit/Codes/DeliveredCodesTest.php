@@ -199,6 +199,46 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
+     * Issued at 01:55 BST as the clocks go back, it expires at 01:05 GMT.
+     *
+     * @return void
+     *
+     * @throws \Random\RandomException
+     */
+    public function testACodeLivesItsWholeLifetimeAcrossTheClocksGoingBack(): void
+    {
+        $this->useTimezone('Europe/London');
+
+        $codes  = $this->codes(['ttl_minutes' => 10], [self::CODE]);
+        $now    = self::clocksGoBack()->subMinutes(5);
+        $issued = self::issued($codes->issue(self::FACTOR, self::binding(), $now));
+
+        self::assertSame(CodeCheck::EXPIRED, $codes->check(self::FACTOR, self::binding(), self::CODE, $now->addMinutes(10), $issued->challengeId));
+        self::assertSame(CodeCheck::ACCEPTED, $codes->check(self::FACTOR, self::binding(), self::CODE, $now->addMinutes(3), $issued->challengeId));
+    }
+
+    /**
+     * Sent at 01:00 GMT, just after the clocks went back, the challenge is
+     * still open half a minute later.
+     *
+     * @return void
+     *
+     * @throws \Random\RandomException
+     */
+    public function testAResendCooldownHoldsAcrossTheClocksGoingBack(): void
+    {
+        $this->useTimezone('Europe/London');
+
+        $codes = $this->codes(['resend_cooldown_seconds' => 60], [self::CODE, self::NEXT_CODE]);
+        $now   = self::clocksGoBack();
+
+        $first = self::issued($codes->issue(self::FACTOR, self::binding(), $now));
+
+        self::assertSame(30, $codes->issue(self::FACTOR, self::binding(), $now->addSeconds(30)));
+        self::assertSame($first->challengeId, self::issued($codes->issue(self::FACTOR, self::binding(), $now->addSeconds(60)))->challengeId);
+    }
+
+    /**
      * Then it sends a new code for the same challenge.
      *
      * @return void
@@ -695,6 +735,17 @@ final class DeliveredCodesTest extends TestCase
     private static function now(): CarbonImmutable
     {
         return CarbonImmutable::parse('2026-11-01 12:00:00');
+    }
+
+    /**
+     * 01:00 UTC on 25 October 2026, when Europe/London goes from BST to GMT, as
+     * the application's clock reads it.
+     *
+     * @return \Carbon\CarbonImmutable
+     */
+    private static function clocksGoBack(): CarbonImmutable
+    {
+        return CarbonImmutable::parse('2026-10-25 01:00:00', 'UTC')->setTimezone('Europe/London');
     }
 
     /**

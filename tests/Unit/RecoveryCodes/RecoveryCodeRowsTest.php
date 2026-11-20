@@ -207,6 +207,34 @@ final class RecoveryCodeRowsTest extends TestCase
     }
 
     /**
+     * In Europe/London in summer, an hour ahead of UTC, the times are stored
+     * and cut off in UTC.
+     *
+     * @return void
+     */
+    public function testTimesAreWrittenAndPrunedInUtc(): void
+    {
+        $this->useTimezone('Europe/London');
+
+        $owner = $this->stateOwner('holder@example.test');
+
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-07-01 08:00:00', 'UTC'));
+
+        $this->rows()->replace($owner, ['replaced']);
+        $this->rows()->replace($owner, ['used', 'usable']);
+        $this->rows()->markUsed(RecoveryCode::query()->where('code_hash', 'used')->firstOrFail());
+
+        $stored = RecoveryCode::query()->toBase()->whereIn('code_hash', ['replaced', 'used'])->orderBy('code_hash')->get(['used_at', 'replaced_at']);
+
+        self::assertEquals([
+            (object) ['used_at' => null, 'replaced_at' => '2026-07-01 08:00:00'],
+            (object) ['used_at' => '2026-07-01 08:00:00', 'replaced_at' => null],
+        ], $stored->all());
+        self::assertSame(0, $this->rows()->prune(CarbonImmutable::now()->subSecond()));
+        self::assertSame(2, $this->rows()->prune(CarbonImmutable::now()->addSecond()));
+    }
+
+    /**
      * The caller's factor state lock creates it.
      *
      * @return void

@@ -4,7 +4,6 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Testing\Seams;
 
-use Carbon\CarbonImmutable;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Database\Eloquent\Model;
@@ -266,7 +265,7 @@ final class ChallengeCountersContract
      */
     public static function assertADisabledFactorIsNotChallenged(EloquentFactor&Model $factor, \Closure $failChallenge): void
     {
-        $factor->newQuery()->whereKey($factor->getKey())->update([$factor->getDisabledAtName() => CarbonImmutable::now()]);
+        $factor->newQuery()->whereKey($factor->getKey())->update([$factor->getDisabledAtName() => $factor->freshTimestampString()]);
 
         $before = self::failures($factor);
 

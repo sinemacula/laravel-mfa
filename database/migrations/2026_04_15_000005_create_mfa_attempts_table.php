@@ -40,7 +40,7 @@ return new class extends Migration {
 
             $blueprint->unsignedInteger('hits');
 
-            $blueprint->timestamp('window_ends_at')->index(IndexName::for($table, '_window_index'));
+            $blueprint->dateTime('window_ends_at')->index(IndexName::for($table, '_window_index'));
         });
     }
 

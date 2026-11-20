@@ -244,6 +244,25 @@ final class AttemptStoreTest extends TestCase
     }
 
     /**
+     * Opened at 01:50 BST as the clocks go back, the window ends 15 minutes
+     * later at 01:05 GMT, and is still full a minute in.
+     *
+     * @return void
+     */
+    public function testAWindowHoldsAcrossTheClocksGoingBack(): void
+    {
+        $this->useTimezone('Europe/London');
+
+        $store = $this->store();
+        $now   = CarbonImmutable::parse('2026-10-25 00:50:00', 'UTC')->getTimestamp();
+
+        $store->take(self::KEY, AttemptScope::IP, 1, $now, $now + 900);
+
+        self::assertSame($now + 900, $store->take(self::KEY, AttemptScope::IP, 1, $now + 60, $now + 960));
+        self::assertSame(['hits' => 1, 'ends' => $now + 900], $store->read([self::KEY])[self::KEY]);
+    }
+
+    /**
      * @param  string  $key
      * @param  int  $hits
      * @param  int  $ends
@@ -255,7 +274,7 @@ final class AttemptStoreTest extends TestCase
             'key'            => $key,
             'scope'          => AttemptScope::IP->value,
             'hits'           => $hits,
-            'window_ends_at' => CarbonImmutable::createFromTimestamp($ends, date_default_timezone_get())->format('Y-m-d H:i:s'),
+            'window_ends_at' => CarbonImmutable::createFromTimestamp($ends, 'UTC')->format('Y-m-d H:i:s'),
         ]);
     }
 
@@ -282,13 +301,13 @@ final class AttemptStoreTest extends TestCase
     }
 
     /**
-     * A Unix time as the storage connection stores it.
+     * A Unix time as the storage connection stores it, in UTC.
      *
      * @param  int  $timestamp
      * @return string
      */
     private function formatted(int $timestamp): string
     {
-        return CarbonImmutable::createFromTimestamp($timestamp, date_default_timezone_get())->format(DB::connection()->getQueryGrammar()->getDateFormat());
+        return CarbonImmutable::createFromTimestamp($timestamp, 'UTC')->format(DB::connection()->getQueryGrammar()->getDateFormat());
     }
 }

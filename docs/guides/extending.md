@@ -37,6 +37,8 @@ application current at the time, not the one it was registered on, so it reads i
 A custom factor or recovery code model lives on the storage connection with the package's other tables (see
 [Storage](configuration.md#storage)): one on another connection is refused when the package boots. The recovery code
 model is set with `mfa.recovery_codes.model`. Identity models are described in [Identity models](identity-models.md).
+`Concerns\ActsAsFactor` and `Concerns\ActsAsRecoveryCode` store and read every time on the model in UTC, whatever
+`app.timezone` is, as the package's own models do.
 
 A custom factor model keeps its temporary lockout on its own row, in the column `getLockedUntilName()` names
 (`locked_until` by default), and when the failure ceiling disabled it in the column `getDisabledAtName()` names
