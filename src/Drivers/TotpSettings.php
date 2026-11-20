@@ -113,8 +113,8 @@ final readonly class TotpSettings
     {
         $issuer = $this->configuredIssuer() ?? $this->config->get('app.name');
 
-        if (!is_string($issuer)) {
-            throw new \InvalidArgumentException(sprintf('Set %sissuer or app.name: an authenticator app must show an issuer.', self::PREFIX));
+        if (!is_string($issuer) || trim($issuer) === '' || str_contains($issuer, ':')) {
+            throw new \InvalidArgumentException(sprintf('Set %sissuer, or a non-empty app.name without a colon: an authenticator app must show an issuer.', self::PREFIX));
         }
 
         return $issuer;
@@ -153,8 +153,8 @@ final readonly class TotpSettings
     {
         $issuer = $this->config->get(self::PREFIX . 'issuer');
 
-        if ($issuer !== null && (!is_string($issuer) || trim($issuer) === '')) {
-            throw new \InvalidArgumentException(sprintf('%sissuer must be a non-empty string.', self::PREFIX));
+        if ($issuer !== null && (!is_string($issuer) || trim($issuer) === '' || str_contains($issuer, ':'))) {
+            throw new \InvalidArgumentException(sprintf('%sissuer must be a non-empty string without a colon.', self::PREFIX));
         }
 
         return $issuer;

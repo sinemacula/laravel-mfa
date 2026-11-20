@@ -451,14 +451,15 @@ final class ActsAsFactorTest extends TestCase
      *
      * @return void
      *
-     * @throws \SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException
+     * @throws \Throwable
      */
     public function testAFailedPersistIsMaskedOfWhatItWasGiven(): void
     {
         $factor = new Factor(['type' => 'email', 'destination' => 'secret-destination@example.com']);
 
         try {
-            $factor->persist();
+            // A savepoint keeps PostgreSQL's test transaction usable.
+            $factor->getConnection()->transaction(static fn () => $factor->persist());
 
             self::fail('A factor with no owner must not be saved.');
         } catch (QueryException $failure) {

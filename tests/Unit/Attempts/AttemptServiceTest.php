@@ -387,8 +387,11 @@ final class AttemptServiceTest extends TestCase
         config()->set('mfa.attempts.identity_limit', 2);
         config()->set('mfa.attempts.lockout_seconds', 300);
 
+        Event::fake([LockoutApplied::class]);
+
         $user   = $this->user();
         $factor = $this->factor($user);
+        $until  = CarbonImmutable::now()->addSeconds(300);
 
         $this->attempt($user, $factor, false);
 
@@ -396,7 +399,10 @@ final class AttemptServiceTest extends TestCase
 
         self::assertNotNull($this->fresh($factor)->getLockedUntil());
         self::assertSame(AttemptScope::IDENTITY, $locking->caused?->scope);
-        self::assertEquals(CarbonImmutable::now()->addSeconds(300), $locking->caused->until);
+        self::assertEquals($until, $locking->caused->until);
+        Event::assertDispatchedTimes(LockoutApplied::class, 2);
+        Event::assertDispatched(LockoutApplied::class, static fn (LockoutApplied $event): bool => $event->factor?->id === $factor->id && $event->lockedUntil->equalTo($until));
+        Event::assertDispatched(LockoutApplied::class, static fn (LockoutApplied $event): bool => $event->factor === null && $event->lockedUntil->equalTo($until));
 
         config()->set('mfa.attempts.identity_limit', 100);
         config()->set('mfa.attempts.failure_ceiling', 2);
@@ -633,6 +639,34 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
+     * Each failure while the window is live locks it again.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAnEndedIdentityLockoutKeepsItsWindow(): void
+    {
+        config()->set('mfa.attempts.identity_limit', 2);
+        config()->set('mfa.attempts.lockout_seconds', 60);
+
+        $user = $this->user();
+
+        $this->attempt($user, null, false);
+        $this->attempt($user, null, false);
+
+        Carbon::setTestNow('2026-11-01 12:01:01');
+
+        self::assertNull($this->service()->lockout($user));
+        self::assertEquals(CarbonImmutable::parse('2026-11-01 12:02:01'), $this->attempt($user, null, false)->caused?->until);
+
+        Carbon::setTestNow('2026-11-01 12:15:01');
+
+        self::assertNull($this->attempt($user, null, false)->caused);
+        self::assertNull($this->service()->lockout($user));
+    }
+
+    /**
      * Failures spread wider than the window never lock the identity.
      *
      * @return void
@@ -862,6 +896,33 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
+     * A recovery code or a factor that keeps no state resets the identity's
+     * run, but proves no factor of its own.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testASuccessWithoutAStoredFactorEnablesNoDisabledFactor(): void
+    {
+        $user     = $this->user();
+        $disabled = $this->factor($user, failures: 100, disabled: true);
+
+        foreach ([null, new InMemoryFactor] as $proved) {
+            $this->attempt($user, null, false);
+            $this->attempt($user, null, false);
+            $this->attempt($user, null, false);
+
+            self::assertSame(3, $this->state($user)?->consecutive_failures);
+            self::assertTrue($this->attempt($user, $proved, true)->passed);
+            self::assertSame(0, $this->state($user)?->consecutive_failures);
+            self::assertNotNull($this->fresh($disabled)->getDisabledAt());
+            self::assertSame(100, $this->fresh($disabled)->getConsecutiveFailures());
+            self::assertTrue($this->service()->lockout($user, $disabled)?->isDisabled());
+        }
+    }
+
+    /**
      * Its lockout ends on its own; a factor that is not disabled is left alone.
      *
      * @return void
@@ -1074,8 +1135,8 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
-     * It clears the window too and reports with no factor; lifting it again
-     * lifts nothing.
+     * It clears the window too, so the next failure starts a new count, and
+     * reports with no factor; lifting it again lifts nothing.
      *
      * @return void
      *
@@ -1083,12 +1144,13 @@ final class AttemptServiceTest extends TestCase
      */
     public function testLiftingTheIdentityLockout(): void
     {
-        config()->set('mfa.attempts.identity_limit', 1);
+        config()->set('mfa.attempts.identity_limit', 2);
 
         Event::fake([LockoutLifted::class]);
 
         $user = $this->user();
 
+        $this->attempt($user, null, false);
         $this->attempt($user, null, false);
 
         self::assertSame(AttemptScope::IDENTITY, $this->service()->lockout($user)?->scope);
@@ -1098,6 +1160,7 @@ final class AttemptServiceTest extends TestCase
         self::assertFalse($this->service()->liftLockout($user));
         Event::assertDispatchedTimes(LockoutLifted::class, 1);
         Event::assertDispatched(LockoutLifted::class, static fn (LockoutLifted $event): bool => $event->factor === null && $event->actor === null);
+        self::assertNull($this->attempt($user, null, false)->caused);
     }
 
     /**
@@ -1176,7 +1239,8 @@ final class AttemptServiceTest extends TestCase
 
     /**
      * Attempts naming no factor of its own are refused without verifying; its
-     * factors may still be attempted, and proving one resets the run.
+     * factors may still be attempted, and proving one resets the run. Reaching
+     * it disables no factor, so nothing is reported.
      *
      * @return void
      *
@@ -1185,6 +1249,8 @@ final class AttemptServiceTest extends TestCase
     public function testTheIdentityRunAtTheCeilingRefusesAttemptsWithoutAFactor(): void
     {
         config()->set('mfa.attempts.failure_ceiling', 3);
+
+        Event::fake([FactorDisabled::class, LockoutApplied::class]);
 
         $user      = $this->user();
         $factor    = $this->factor($user);
@@ -1197,6 +1263,8 @@ final class AttemptServiceTest extends TestCase
 
         self::assertSame(AttemptScope::IDENTITY, $reaching->caused?->scope);
         self::assertTrue($reaching->caused->isDisabled());
+        Event::assertNotDispatched(FactorDisabled::class);
+        Event::assertNotDispatched(LockoutApplied::class);
 
         $refused = $this->service()->throttled(self::IP, fn (): AttemptOutcome => $this->service()->attempt(
             new Attempt($user, null, Purpose::SIGN_IN),

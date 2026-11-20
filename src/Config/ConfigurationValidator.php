@@ -130,6 +130,7 @@ final readonly class ConfigurationValidator
                 fn () => $this->checkDelivery($application),
                 fn () => $this->checkPasskeys($application),
                 fn () => $this->checkFirstFactor($application),
+                fn () => $this->checkIssuer($application),
             ];
         }
 
@@ -286,6 +287,23 @@ final readonly class ConfigurationValidator
         if (!$this->container->bound(FirstFactorResolver::class) || $this->container->make(FirstFactorResolver::class) instanceof DeclaredFirstFactorResolver) {
             throw new \LogicException(sprintf('The application declares no first_factor, and no %s is bound to report it.', FirstFactorResolver::class));
         }
+    }
+
+    /**
+     * `app.name` stands in for the issuer only where TOTP is offered.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Applications\ApplicationSettings  $application
+     * @return void
+     *
+     * @throws \InvalidArgumentException
+     */
+    private function checkIssuer(ApplicationSettings $application): void
+    {
+        if (!$application->enables('totp')) {
+            return;
+        }
+
+        (new TotpSettings($this->config))->issuer();
     }
 
     /**

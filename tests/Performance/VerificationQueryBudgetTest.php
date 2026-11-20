@@ -157,6 +157,29 @@ final class VerificationQueryBudgetTest extends PerformanceContractTestCase
     /**
      * @return void
      */
+    public function testATotpSubmissionFromAThrottledAddress(): void
+    {
+        config()->set('mfa.attempts.ip_limit', 1);
+
+        $user   = $this->signedInPerson();
+        $factor = $this->totpFactor($user);
+
+        self::assertSame(FailureReason::INVALID_CODE, $this->mfa()->verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor, 5)))->reason);
+
+        $code = AuthenticatorApp::code($factor);
+
+        // Reads: factor 1, window 1. Writes: refused slot 3; no identity or
+        // factor state is locked or counted.
+        $result = $this->assertQueryBudget(2, 3, fn (): VerificationResult => $this->mfa()->verify(Callers::current(), Submission::factor($factor->id, $code)));
+
+        self::assertSame(FailureReason::LOCKED, $result->reason);
+        self::assertSame(1, $this->factorRun($factor));
+        self::assertSame(1, $this->identityRun($user));
+    }
+
+    /**
+     * @return void
+     */
     public function testADeliveredCodeSend(): void
     {
         $user   = $this->signedInPerson();
