@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Exceptions\TableAlreadyExistsException;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use Tests\TestCase;
 
 /**
@@ -32,7 +33,7 @@ final class MigrationSmokeTest extends TestCase
      */
     public static function tables(): iterable
     {
-        $owner = ['authenticatable_type', 'authenticatable_id'];
+        $owner = ['authenticatable_type', 'authenticatable_id', 'owner_hash'];
 
         yield 'mfa_factors' => ['mfa_factors', [
             'id', ...$owner, 'type', 'label', 'destination', 'credential_reference', 'secret', 'totp_algorithm', 'totp_digits',
@@ -117,8 +118,10 @@ final class MigrationSmokeTest extends TestCase
      */
     public function testNewRowsTakeTheSafeDefaults(): void
     {
-        DB::table('mfa_factors')->insert(['id' => '01JFACTOR00000000000000000', 'authenticatable_type' => 'user', 'authenticatable_id' => '1', 'type' => 'totp']);
-        DB::table('mfa_identity_states')->insert(['id' => '01JSTATE000000000000000000', 'authenticatable_type' => 'user', 'authenticatable_id' => '1']);
+        $owner = ['authenticatable_type' => 'user', 'authenticatable_id' => '1', 'owner_hash' => (new ProofOwner('user', '1'))->hash()];
+
+        DB::table('mfa_factors')->insert(['id' => '01JFACTOR00000000000000000', ...$owner, 'type' => 'totp']);
+        DB::table('mfa_identity_states')->insert(['id' => '01JSTATE000000000000000000', ...$owner]);
 
         $factor = (array) DB::table('mfa_factors')->first();
         $state  = (array) DB::table('mfa_identity_states')->first();
@@ -142,6 +145,7 @@ final class MigrationSmokeTest extends TestCase
             'id'                   => '01JSTATE000000000000000000',
             'authenticatable_type' => 'user',
             'authenticatable_id'   => '1',
+            'owner_hash'           => (new ProofOwner('user', '1'))->hash(),
             'locked_until'         => '2026-10-25 01:30:00',
         ]);
 
@@ -189,30 +193,27 @@ final class MigrationSmokeTest extends TestCase
     }
 
     /**
-     * Every factor read filters on the owner's type and identifier.
+     * @return iterable<string, array{string}>
+     */
+    public static function ownerKeyedTables(): iterable
+    {
+        foreach (['mfa_factors', 'mfa_enrollments', 'mfa_codes', 'mfa_recovery_codes', 'mfa_passkey_associations', 'mfa_identity_states'] as $table) {
+            yield $table => [$table];
+        }
+    }
+
+    /**
+     * Every owner lookup compares the hash.
      *
+     * @param  string  $table
      * @return void
      */
-    public function testFactorsTableHasPolymorphicLookupIndex(): void
+    #[DataProvider('ownerKeyedTables')]
+    public function testEveryOwnerKeyedTableIndexesTheOwnerHash(string $table): void
     {
-        $columns = Schema::getIndexes('mfa_factors');
+        $leading = array_filter(Schema::getIndexes($table), static fn (array $index): bool => $index['columns'][0] === 'owner_hash');
 
-        $hasMorphIndex = false;
-
-        foreach ($columns as $index) {
-            $cols = $index['columns'];
-
-            if (in_array('authenticatable_type', $cols, true) && in_array('authenticatable_id', $cols, true)) {
-                $hasMorphIndex = true;
-
-                break;
-            }
-        }
-
-        self::assertTrue(
-            $hasMorphIndex,
-            'Expected a composite index on (authenticatable_type, authenticatable_id) for polymorphic lookup.',
-        );
+        self::assertCount(1, $leading, sprintf('Expected one index on %s led by owner_hash.', $table));
     }
 
     /**
@@ -224,7 +225,7 @@ final class MigrationSmokeTest extends TestCase
     {
         self::assertTrue(Schema::hasTable('mfa_identity_states'));
 
-        foreach (['id', 'authenticatable_type', 'authenticatable_id', 'created_at', 'updated_at'] as $column) {
+        foreach (['id', 'authenticatable_type', 'authenticatable_id', 'owner_hash', 'created_at', 'updated_at'] as $column) {
             self::assertTrue(
                 Schema::hasColumn('mfa_identity_states', $column),
                 sprintf('Missing column [%s] on mfa_identity_states after migration.', $column),
@@ -233,10 +234,10 @@ final class MigrationSmokeTest extends TestCase
 
         $unique = array_filter(
             Schema::getIndexes('mfa_identity_states'),
-            static fn (array $index): bool => $index['unique'] && $index['columns'] === ['authenticatable_type', 'authenticatable_id'],
+            static fn (array $index): bool => $index['unique'] && $index['columns'] === ['owner_hash'],
         );
 
-        self::assertCount(1, $unique, 'Expected one unique index on (authenticatable_type, authenticatable_id).');
+        self::assertCount(1, $unique, 'Expected one unique index on owner_hash.');
         self::assertSame('mfa_identity_states_owner_unique', array_values($unique)[0]['name']);
     }
 
@@ -261,7 +262,7 @@ final class MigrationSmokeTest extends TestCase
         try {
             $unique = array_values(array_filter(
                 Schema::getIndexes($table),
-                static fn (array $index): bool => $index['unique'] && $index['columns'] === ['authenticatable_type', 'authenticatable_id'],
+                static fn (array $index): bool => $index['unique'] && $index['columns'] === ['owner_hash'],
             ));
 
             self::assertCount(1, $unique);

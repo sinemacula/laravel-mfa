@@ -400,6 +400,7 @@ final class PasskeyChangeGateTest extends TestCase
                 'factor_id'            => 'concurrent-factor',
                 'authenticatable_type' => 'concurrent',
                 'authenticatable_id'   => 'concurrent',
+                'owner_hash'           => (new ProofOwner('concurrent', 'concurrent'))->hash(),
                 'credential_id_hash'   => CredentialId::hash(self::CREDENTIAL),
                 'credential_id'        => self::CREDENTIAL,
             ]);

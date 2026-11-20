@@ -10,6 +10,7 @@ use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Models\Code;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 
 /**
  * Waits imposed by the send caps and enrolment restart cooldown, read from the
@@ -53,8 +54,7 @@ final readonly class SendWaits
             ->get();
 
         $identity = WriteConnection::query(Code::query())
-            ->where('authenticatable_type', $binding->identityType)
-            ->where('authenticatable_id', $binding->identityKey)
+            ->where('owner_hash', ProofOwner::boundBy($binding)->hash())
             ->where('sent_at', '>', $since)
             ->get();
 

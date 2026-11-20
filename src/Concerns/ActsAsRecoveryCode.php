@@ -6,7 +6,6 @@ namespace SineMacula\Laravel\Mfa\Concerns;
 
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 /**
  * `RecoveryCode` for an Eloquent model; override a `get*Name()` method to remap
@@ -17,21 +16,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  */
 trait ActsAsRecoveryCode
 {
-    use StoresTimesInUtc;
-
-    /**
-     * @formatter:off
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\MorphTo<\Illuminate\Database\Eloquent\Model, \Illuminate\Database\Eloquent\Model>
-     *
-     * @formatter:on
-     */
-    public function authenticatable(): MorphTo
-    {
-        // The contract widens morphTo()'s `MorphTo<Model, $this>` bound.
-        // @phpstan-ignore return.type
-        return $this->morphTo();
-    }
+    use HashesOwner, StoresTimesInUtc;
 
     /**
      * @return ?string

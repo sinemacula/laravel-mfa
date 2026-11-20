@@ -492,12 +492,9 @@ final readonly class RecoveryCodeService
         $model  = ConfiguredModels::factor($this->config);
         $factor = new $model;
 
-        [$typeColumn, $keyColumn] = FactorOwnerColumns::of($factor);
-
         /** @var \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor> $factors */
         $factors = $factor->newQuery()
-            ->where($typeColumn, $owner->type)
-            ->where($keyColumn, $owner->key)
+            ->where($factor->getOwnerHashName(), $owner->hash())
             ->lockForUpdate()
             ->get();
 

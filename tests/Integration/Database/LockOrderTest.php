@@ -213,8 +213,7 @@ final class LockOrderTest extends TestCase
         self::assertNotSame([], $lookup);
 
         foreach ($lookup as $bindings) {
-            self::assertContains($owner->type, $bindings);
-            self::assertContains($owner->key, $bindings);
+            self::assertContains($owner->hash(), $bindings);
         }
     }
 
@@ -238,7 +237,7 @@ final class LockOrderTest extends TestCase
         self::assertNotSame([], $lookup);
 
         foreach ($lookup as $bindings) {
-            self::assertContains($owner->key, $bindings);
+            self::assertContains($owner->hash(), $bindings);
         }
     }
 

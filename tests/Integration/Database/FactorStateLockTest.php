@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 use Tests\Fixtures\Exceptions\MidRotationFailureException;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
@@ -169,9 +170,10 @@ final class FactorStateLockTest extends TestCase
             'id'                   => Str::lower((string) Str::ulid()),
             'authenticatable_type' => NonEloquentIdentity::class,
             'authenticatable_id'   => self::IDENTITY_KEY,
+            'owner_hash'           => (new ProofOwner(NonEloquentIdentity::class, self::IDENTITY_KEY))->hash(),
             'created_at'           => $now,
             'updated_at'           => $now,
-        ]], ['authenticatable_type', 'authenticatable_id'], ['updated_at']);
+        ]], ['owner_hash'], ['updated_at']);
     }
 
     /**

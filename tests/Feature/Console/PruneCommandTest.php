@@ -14,6 +14,7 @@ use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Console\PruneCommand;
 use SineMacula\Laravel\Mfa\Exceptions\InvalidConfigurationException;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use Tests\TestCase;
 
 /**
@@ -69,6 +70,7 @@ final class PruneCommandTest extends TestCase
             'factor_id'            => (string) Str::ulid(),
             'authenticatable_type' => 'user',
             'authenticatable_id'   => '1',
+            'owner_hash'           => (new ProofOwner('user', '1'))->hash(),
             'grant_hash'           => str_repeat('a', 64),
             'application'          => 'web',
             'session_id'           => 'session',
@@ -133,6 +135,7 @@ final class PruneCommandTest extends TestCase
             'factor_id'            => 'factor',
             'authenticatable_type' => 'user',
             'authenticatable_id'   => '1',
+            'owner_hash'           => (new ProofOwner('user', '1'))->hash(),
             'purpose'              => 'sign_in',
             'application'          => 'web',
             'destination_hash'     => str_repeat('d', 64),
@@ -158,6 +161,7 @@ final class PruneCommandTest extends TestCase
             'id'                   => (string) Str::ulid(),
             'authenticatable_type' => 'user',
             'authenticatable_id'   => '1',
+            'owner_hash'           => (new ProofOwner('user', '1'))->hash(),
             'code_hash'            => 'hash',
             'generation'           => 1,
             'used_at'              => $usedAt,

@@ -40,13 +40,14 @@ return new class extends Migration {
 
             $blueprint->string('authenticatable_type');
             $blueprint->string('authenticatable_id');
+            $blueprint->char('owner_hash', 64);
+            $blueprint->index('owner_hash', IndexName::for($table, '_owner_index'));
 
             // Looked up by digest, as a 1023-byte id is beyond what MySQL
             // indexes. The unique index allows one association per credential.
             $blueprint->char('credential_id_hash', 64);
             $blueprint->text('credential_id');
             $blueprint->unique('credential_id_hash', IndexName::for($table, '_credential_unique'));
-            $blueprint->index(['authenticatable_type', 'authenticatable_id'], IndexName::for($table, '_owner_index'));
 
             $blueprint->datetimes();
         });

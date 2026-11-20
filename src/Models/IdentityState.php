@@ -6,7 +6,9 @@ namespace SineMacula\Laravel\Mfa\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
+use SineMacula\Laravel\Mfa\Concerns\HashesOwner;
 use SineMacula\Laravel\Mfa\Concerns\StoresTimesInUtc;
+use SineMacula\Laravel\Mfa\Contracts\OwnedRecord;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 
@@ -20,6 +22,7 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
  * @property string $id
  * @property string $authenticatable_type
  * @property string $authenticatable_id
+ * @property string $owner_hash
  * @property int $verification_generation
  * @property bool $reenrollment_required
  * @property int $consecutive_failures
@@ -29,14 +32,15 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
  *
  * @internal
  */
-final class IdentityState extends Model
+final class IdentityState extends Model implements OwnedRecord
 {
-    use HasUlids, StoresTimesInUtc;
+    use HashesOwner, HasUlids, StoresTimesInUtc;
 
     /** @var list<string> */
     protected $fillable = [
         'authenticatable_type',
         'authenticatable_id',
+        'owner_hash',
         'verification_generation',
         'reenrollment_required',
         'consecutive_failures',
@@ -79,6 +83,7 @@ final class IdentityState extends Model
         return [
             'authenticatable_type'        => 'string',
             'authenticatable_id'          => 'string',
+            'owner_hash'                  => 'string',
             'verification_generation'     => 'integer',
             'reenrollment_required'       => 'boolean',
             'consecutive_failures'        => 'integer',

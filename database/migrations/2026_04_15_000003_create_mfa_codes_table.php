@@ -39,7 +39,8 @@ return new class extends Migration {
             // So an identity's codes are found without its factors.
             $blueprint->string('authenticatable_type');
             $blueprint->string('authenticatable_id');
-            $blueprint->index(['authenticatable_type', 'authenticatable_id'], IndexName::for($table, '_owner_index'));
+            $blueprint->char('owner_hash', 64);
+            $blueprint->index('owner_hash', IndexName::for($table, '_owner_index'));
 
             // The session is a keyed digest, never the id.
             $blueprint->string('purpose', 32);

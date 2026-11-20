@@ -11,8 +11,12 @@ factors starts with.
 - Every table is named through `Database\TableNames` (`mfa.{block}.table`, defaulting to a name prefixed `mfa_`), lives
   on the storage connection (see [Storage and Transactions](storage-and-transactions.md)), and is keyed by a ULID,
   except the attempt throttles, which are keyed by a hash of what they count. Owners are plain string polymorphic
-  columns, `authenticatable_type` and `authenticatable_id`, so integer, UUID and ULID identity keys all fit. The
-  migrations run at deploy time; at runtime the package needs only `SELECT`, `INSERT`, `UPDATE` and `DELETE`.
+  columns, `authenticatable_type` and `authenticatable_id`, so integer, UUID and ULID identity keys all fit, stored with
+  `owner_hash`, the SHA-256 of the two (`Proofs\ProofOwner::hash()`). Every owner lookup, delete and owner index is on
+  the hash: a case-insensitive collation, such as MySQL's default, would otherwise make two owners whose keys differ
+  only in case one. `Concerns\HashesOwner` sets it from the owner columns on every save, for the package's models and
+  through the two model traits; a write that skips model events sets it itself. The migrations run at deploy time; at
+  runtime the package needs only `SELECT`, `INSERT`, `UPDATE` and `DELETE`.
 - Every time is a `datetime` column holding UTC, written and read through `Concerns\StoresTimesInUtc`, which the
   package's models and the two model traits use, so the application timezone and a daylight saving change cannot put
   stored times out of order. The attempt throttles format their window ends in UTC themselves.
@@ -23,9 +27,9 @@ factors starts with.
   `disabled_at` of the failure ceiling, `locked_until`, when its temporary lockout ends, the `application` it was
   enrolled through, `confirmed_at` and `last_used_at`. A delivered code is never on the factor: it lives in `mfa_codes`.
   A successful verification is recorded as a proof on the session (see the proof store note), not on the factor.
-- `mfa_identity_states`, one row per owner and the lock of every serialised change: `verification_generation`,
-  `reenrollment_required`, the identity's `consecutive_failures` and `locked_until`, and `recovery_codes_generation`
-  and `recovery_codes_generated_at`.
+- `mfa_identity_states`, one row per owner (unique on `owner_hash`) and the lock of every serialised change:
+  `verification_generation`, `reenrollment_required`, the identity's `consecutive_failures` and `locked_until`, and
+  `recovery_codes_generation` and `recovery_codes_generated_at`.
 - `mfa_enrollments`, one row per enrolment in progress: the pending `factor_id` (unique), owner, the SHA-256
   `grant_hash` of its grant (unique), the `application` it started through, the `session_id` (a keyed digest of the
   sign-in's id) and verification `generation` the grant is bound to, the `authority` that authorised it, the
@@ -49,8 +53,9 @@ factors starts with.
 - Two models may be replaced through configuration: the factor model (`mfa.factor.model`, `Contracts\EloquentFactor`,
   through `Concerns\ActsAsFactor`) and the recovery code model (`mfa.recovery_codes.model`, `Contracts\RecoveryCode`,
   through `Concerns\ActsAsRecoveryCode`), resolved by `Database\ConfiguredModels`. Each exposes its columns through
-  `get*Name()` methods so a model can remap one. The models of the other records (`Enrollment`, `Code`,
-  `IdentityState`, `PasskeyAssociation`) are the package's own.
+  `get*Name()` methods so a model can remap one, the owner hash through `getOwnerHashName()` and the owner columns
+  through its `authenticatable` relation. The models of the other records (`Enrollment`, `Code`, `IdentityState`,
+  `PasskeyAssociation`) are the package's own.
 - A factor's status reads as `pending` or `confirmed` only when it is stored as one of them, and as pending on a new
   factor not yet given one. Any other value, or none on a stored factor, throws rather than reads as pending: a factor
   read as not confirmed would let an enrolment start on a first factor's reauthentication rather than a step-up, and a
@@ -59,13 +64,12 @@ factors starts with.
 - The identity contract, `Contracts\MultiFactorAuthenticatable`, asks whether the identity may hold factors
   (`canHoldFactors()`, people only), whether it is active (`isMfaActive()`) and what it requires of its own sign-ins
   (`requiresAdditionalFactor()`, a `Requirements\Requirement` or `null`). `Concerns\HasFactors` answers a person,
-  active, requiring nothing, gives the factors of the configured model by the owner columns of its `authenticatable`
-  relation, counts any factor whose status is not exactly `pending` as enabled (read from the write connection), and
-  forgets the identity on the model's `deleted` event, once its row is gone, unless the delete was soft.
+  active, requiring nothing, gives the factors of the configured model by their owner hash, counts any factor whose
+  status is not exactly `pending` as enabled (read from the write connection), and forgets the identity on the model's
+  `deleted` event, once its row is gone, unless the delete was soft.
 - `Lifecycle\ForgetIdentity` deletes the identity's codes, enrolments, passkey associations, recovery codes, factors and
-  state row in its factor state transaction, by the owner columns of each model (a replaced factor or recovery code
-  model's own relation columns). The attempt throttles are left to expire. `Mfa::forgetIdentity()` is its one-call
-  entry point.
+  state row in its factor state transaction, by the owner hash of each model (a replaced factor or recovery code model's
+  own hash column). The attempt throttles are left to expire. `Mfa::forgetIdentity()` is its one-call entry point.
 - `Models\Factor` binds to a route only within the caller's identity (see
   [Factor Route Binding](factor-route-binding.md)).
 - `Factors\OperationGuard` is the first step of verifying, sending a code, enrolling and issuing or redeeming recovery

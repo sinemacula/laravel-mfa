@@ -40,6 +40,15 @@ abstract class AbstractEloquentFactorStub extends AbstractFactorStub implements 
      * @return string
      */
     #[\Override]
+    public function getOwnerHashName(): string
+    {
+        return 'owner_hash';
+    }
+
+    /**
+     * @return string
+     */
+    #[\Override]
     public function getTypeName(): string
     {
         return 'type';

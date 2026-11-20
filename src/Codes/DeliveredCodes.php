@@ -13,6 +13,7 @@ use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Enums\CodeCheck;
 use SineMacula\Laravel\Mfa\Models\Code;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 
 /**
  * Issues and checks delivered codes, one row per challenge, on the write
@@ -205,6 +206,7 @@ final readonly class DeliveredCodes
             'factor_id'            => $factorId,
             'authenticatable_type' => $binding->identityType,
             'authenticatable_id'   => $binding->identityKey,
+            'owner_hash'           => ProofOwner::boundBy($binding)->hash(),
             'purpose'              => $binding->purpose->value,
             'application'          => $binding->application,
             'session_id'           => $session,
@@ -364,8 +366,7 @@ final readonly class DeliveredCodes
     {
         return WriteConnection::query(Code::query())
             ->where('factor_id', $factorId)
-            ->where('authenticatable_type', $binding->identityType)
-            ->where('authenticatable_id', $binding->identityKey)
+            ->where('owner_hash', ProofOwner::boundBy($binding)->hash())
             ->where('purpose', $binding->purpose->value)
             ->where('application', $binding->application)
             ->where('session_id', $session);

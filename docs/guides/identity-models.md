@@ -115,15 +115,15 @@ The temporary attempt throttles are left to expire: they are keyed by a hash and
 ## Identities that are not Eloquent models
 
 An identity the guard builds from somewhere other than Eloquent implements the contract's methods itself, returning its
-factors as a builder over the configured factor model, an `EloquentFactor`, owned by its class name and its key:
+factors as a builder over the configured factor model, an `EloquentFactor`, owned by its class name and its key. Match
+them by the owner hash, since a case-insensitive collation would also match an owner whose key differs only in case:
 
 ```php
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 
 public function authFactors(): Builder
 {
-    return Factor::query()
-        ->where('authenticatable_type', static::class)
-        ->where('authenticatable_id', (string) $this->getAuthIdentifier());
+    return Factor::query()->where('owner_hash', ProofOwner::of($this)->hash());
 }
 ```

@@ -156,7 +156,7 @@ final class StoredRecordModelsTest extends TestCase
      */
     public function testEveryColumnButTheKeyAndTimestampsIsFillable(): void
     {
-        $owner = ['authenticatable_type', 'authenticatable_id'];
+        $owner = ['authenticatable_type', 'authenticatable_id', 'owner_hash'];
 
         self::assertSame(
             ['factor_id', ...$owner, 'grant_hash', 'application', 'session_id', 'generation', 'authority', 'challenge_id', 'expires_at', 'attempts'],

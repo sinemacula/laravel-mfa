@@ -393,8 +393,7 @@ final class ChallengeCountersContract
     private static function identityFailures(ProofBinding $binding): int
     {
         $count = WriteConnection::query(IdentityState::query())
-            ->where('authenticatable_type', $binding->identityType)
-            ->where('authenticatable_id', $binding->identityKey)
+            ->where('owner_hash', ProofOwner::boundBy($binding)->hash())
             ->value('consecutive_failures');
 
         return is_numeric($count) ? (int) $count : 0;
@@ -441,8 +440,10 @@ final class ChallengeCountersContract
     {
         WriteConnection::query($factor->newQuery())->whereKey($factor->getKey())->increment($factor->getConsecutiveFailuresName());
 
+        $owner = ProofOwner::boundBy($binding);
+
         IdentityState::query()
-            ->firstOrCreate(['authenticatable_type' => $binding->identityType, 'authenticatable_id' => $binding->identityKey])
+            ->firstOrCreate(['owner_hash' => $owner->hash()], ['authenticatable_type' => $owner->type, 'authenticatable_id' => $owner->key])
             ->increment('consecutive_failures');
     }
 

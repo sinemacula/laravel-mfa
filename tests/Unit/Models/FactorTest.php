@@ -142,7 +142,9 @@ final class FactorTest extends TestCase
     {
         $factor = new Factor;
 
-        foreach (['authenticatable_type', 'authenticatable_id', 'type', 'label', 'destination', 'credential_reference', 'totp_algorithm', 'status', 'application'] as $attribute) {
+        $owner = ['authenticatable_type', 'authenticatable_id', 'owner_hash'];
+
+        foreach ([...$owner, 'type', 'label', 'destination', 'credential_reference', 'totp_algorithm', 'status', 'application'] as $attribute) {
             self::assertTrue($factor->hasCast($attribute, 'string'), $attribute);
         }
     }
@@ -239,6 +241,7 @@ final class FactorTest extends TestCase
         self::assertSame([
             'authenticatable_type',
             'authenticatable_id',
+            'owner_hash',
             'type',
             'label',
             'destination',

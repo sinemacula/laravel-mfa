@@ -35,10 +35,11 @@ return new class extends Migration {
             $blueprint->ulid('id')->primary();
 
             // The unique index keeps one row per owner, which the factor state
-            // lock upserts.
+            // lock upserts. It is on the hash, as a collation may ignore case.
             $blueprint->string('authenticatable_type');
             $blueprint->string('authenticatable_id');
-            $blueprint->unique(['authenticatable_type', 'authenticatable_id'], IndexName::for($table, '_owner_unique'));
+            $blueprint->char('owner_hash', 64);
+            $blueprint->unique('owner_hash', IndexName::for($table, '_owner_unique'));
 
             // Advanced to invalidate every earlier proof.
             $blueprint->unsignedBigInteger('verification_generation')->default(0);
