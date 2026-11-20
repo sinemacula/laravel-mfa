@@ -14,6 +14,7 @@ use SineMacula\Laravel\Mfa\Codes\SendResult;
 use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
+use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Models\Factor as FactorModel;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
@@ -208,6 +209,67 @@ final class ChallengeGatewayContractTest extends TestCase
         ChallengeGatewayContract::assertACodeAnswersOnlyItsOwnBinding($gateway, $caller, $this->factor, $binding, self::sent(...));
         ChallengeGatewayContract::assertAnotherCallersBindingIsNotFound($gateway, $caller, $this->factor, $binding, self::sent(...));
         ChallengeGatewayContract::assertAChallengeTakesNoMoreThanItsAttempts($gateway, $caller, $this->factor, $binding, self::sent(...), 5);
+        ChallengeGatewayContract::assertACodeAnswersNoOtherSessionOfTheIdentity($gateway, $caller, $this->factor, $binding, self::sent(...), $this->secondChallengeCaller());
+    }
+
+    /**
+     * It refuses any binding that is not the caller's own, so the binding
+     * checks hold.
+     *
+     * @return void
+     */
+    public function testRejectsAGatewayThatIgnoresTheSessionAndApplicationOnLookup(): void
+    {
+        $gateway = new MemoryChallengeGateway(
+            keyedBy : ['identity_type', 'identity_key', 'purpose'],
+            sessions: [self::CHALLENGE_APPLICATION => self::CHALLENGE_SESSION, 'admin' => 'sign-in-2'],
+        );
+
+        $caller  = Callers::current();
+        $binding = $this->emailBinding($this->user);
+
+        ChallengeGatewayContract::assertACodeAnswersOnlyItsOwnBinding($gateway, $caller, $this->factor, $binding, self::sent(...));
+        ChallengeGatewayContract::assertAnotherCallersBindingIsNotFound($gateway, $caller, $this->factor, $binding, self::sent(...));
+
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('must not answer the identity on another session or application');
+
+        ChallengeGatewayContract::assertACodeAnswersNoOtherSessionOfTheIdentity($gateway, $caller, $this->factor, $binding, self::sent(...), $this->secondChallengeCaller());
+    }
+
+    /**
+     * @return void
+     */
+    public function testRejectsAGatewayThatUsesUpTheCodeOnAnotherSession(): void
+    {
+        $asked   = 0;
+        $gateway = new ScriptedChallengeGateway(static function () use (&$asked): ChallengeOutcome {
+            return ++$asked === 1 ? ChallengeOutcome::failed(FailureReason::NOT_FOUND, 'No.') : ChallengeOutcome::failed(FailureReason::REPLAYED, 'Used.');
+        });
+
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('must not use up the code');
+
+        ChallengeGatewayContract::assertACodeAnswersNoOtherSessionOfTheIdentity(
+            $gateway,
+            Callers::current(),
+            $this->factor,
+            $this->emailBinding($this->user),
+            self::sent(...),
+            $this->secondChallengeCaller(),
+        );
+    }
+
+    /**
+     * @return void
+     */
+    public function testTheKitHoldsWithoutASecondCaller(): void
+    {
+        $kit = new FaultyChallengeGatewayKit('kit');
+
+        $kit->testChallengeGatewayRefusesTheCodeToAnotherSessionOfTheIdentity();
+
+        self::assertSame(1, $kit->numberOfAssertionsPerformed());
     }
 
     /**
@@ -399,6 +461,24 @@ final class ChallengeGatewayContractTest extends TestCase
     protected function challengeCaller(): CallerContext
     {
         return Callers::current();
+    }
+
+    /**
+     * The person signed in to another application on another session.
+     *
+     * @return array{0: \SineMacula\Laravel\Mfa\Context\CallerContext, 1: \SineMacula\Laravel\Mfa\Proofs\ProofBinding}
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    protected function secondChallengeCaller(): array
+    {
+        config()->set('mfa.applications.admin', config('mfa.applications.' . self::CHALLENGE_APPLICATION));
+
+        $this->container()->make(ProofStore::class)->begin($this->user, 'admin', 'sign-in-2');
+
+        $binding = ProofBinding::fromArray(['application' => 'admin', 'session_id' => 'sign-in-2'] + $this->emailBinding($this->user)->toArray());
+
+        return [Callers::of($this->user, 'admin'), $binding];
     }
 
     /**
