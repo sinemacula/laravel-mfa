@@ -2,7 +2,7 @@
     "require": {
         "dealerdirect/phpcodesniffer-composer-installer": "^1.2",
         "larastan/larastan": "^3.9",
-        "laravel/framework": "^12.40|^13.3",
+        "laravel/framework": "^12.40|^13.4",
         "laravel/sanctum": "^4.2",
         "mockery/mockery": "^1.6",
         "orchestra/testbench": "^10.2|^11.0",

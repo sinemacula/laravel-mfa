@@ -11,13 +11,17 @@ on:
         branches: [ master ]
     pull_request:
         types: [ opened, synchronize, reopened, ready_for_review ]
+    schedule:
+        -   cron: 17 5 * * *
     workflow_dispatch:
 
 # ==============================================================================
 # CONCURRENCY
 # ==============================================================================
+# The event name keeps scheduled and manual runs out of the push group, so a
+# merge to master cannot cancel one part way through.
 concurrency:
-    group: tests-${{ github.event.pull_request.number || github.ref }}
+    group: tests-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name }}
     cancel-in-progress: true
 
 # ==============================================================================
@@ -121,12 +125,15 @@ jobs:
     # JOB: DATABASE TESTS (MySQL + PostgreSQL)
     # ==========================================================================
     integration:
-        name: Integration / ${{ matrix.database }}
+        name: Integration / ${{ matrix.database }}${{ matrix.laravel && format(' (Laravel {0})', matrix.laravel) || '' }}
         runs-on: ubuntu-latest
 
+        # Scheduled and manual runs add legs at the lowest supported releases.
         strategy:
             fail-fast: false
             matrix:
+                database: [ mysql, pgsql ]
+                laravel: ${{ fromJSON((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '["", "12.40.0", "13.4.0"]' || '[""]') }}
                 include:
                     -   database: mysql
                         image: mysql:8.4
@@ -184,6 +191,14 @@ jobs:
                 with:
                     php-version: 8.3
                     extensions: pdo_mysql, pdo_pgsql
+
+            -   name: Pin Laravel version
+                if: ${{ matrix.laravel }}
+                env:
+                    LARAVEL_CONSTRAINT: ${{ matrix.laravel }}
+                    COMPOSER_PREFER_LOWEST: 1
+                    COMPOSER_NO_SECURITY_BLOCKING: 1
+                run: composer update --with="laravel/framework:${LARAVEL_CONSTRAINT}" --prefer-dist --no-interaction --no-progress
 
             # Tests create, empty and drop the same tables, so each paratest
             # worker runs against a database of its own, which the test case
