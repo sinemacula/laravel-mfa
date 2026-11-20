@@ -38,8 +38,14 @@ final class FactorBindingsTest extends TestCase
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testSharesTheFactorStateLocks(): void
+    public function testSharesTheFactorStateLocksWithinOneRequestOnly(): void
     {
-        self::assertSame($this->container()->make(FactorStateLocks::class), $this->container()->make(FactorStateLocks::class));
+        $locks = $this->container()->make(FactorStateLocks::class);
+
+        self::assertSame($locks, $this->container()->make(FactorStateLocks::class));
+
+        $this->container()->forgetScopedInstances();
+
+        self::assertNotSame($locks, $this->container()->make(FactorStateLocks::class));
     }
 }
