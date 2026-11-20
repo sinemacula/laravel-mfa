@@ -85,8 +85,14 @@ jobs:
                 laravel:
                     -   constraint: ^12.40
                         label: 12
-                    -   constraint: ^13.3
+                    -   constraint: ^13.4
                         label: 13
+                    -   constraint: 12.40.0
+                        label: 12 (lowest)
+                        lowest: 1
+                    -   constraint: 13.4.0
+                        label: 13 (lowest)
+                        lowest: 1
 
         steps:
             -   name: Checkout
@@ -99,9 +105,13 @@ jobs:
                 with:
                     php-version: 8.3
 
+            # The lowest releases carry security advisories, which Composer
+            # otherwise refuses to install.
             -   name: Pin Laravel version
                 env:
                     LARAVEL_CONSTRAINT: ${{ matrix.laravel.constraint }}
+                    COMPOSER_PREFER_LOWEST: ${{ matrix.laravel.lowest }}
+                    COMPOSER_NO_SECURITY_BLOCKING: ${{ matrix.laravel.lowest }}
                 run: composer update --with="laravel/framework:${LARAVEL_CONSTRAINT}" --prefer-dist --no-interaction --no-progress
 
             -   name: PHPUnit

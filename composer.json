@@ -22,7 +22,7 @@
     "require": {
         "php": "^8.3",
         "ext-mbstring": "*",
-        "laravel/framework": "^12.40|^13.3"
+        "laravel/framework": "^12.40|^13.4"
     },
     "require-dev": {
         "brianium/paratest": "^7.20",

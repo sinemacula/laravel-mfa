@@ -177,7 +177,7 @@ The security and lifecycle contracts behind them, for maintainers and reviewers,
 ## Requirements
 
 - PHP ^8.3 (extensions: mbstring)
-- Laravel ^12.40 || ^13.3
+- Laravel ^12.40 || ^13.4
 
 ## Testing
 
