@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Attempts\Attempt;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
+use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\LockoutLifted;
 use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
@@ -69,6 +70,8 @@ final class UnlockingTest extends TestCase
         self::assertInstanceOf(LockoutLifted::class, $this->reported[0]);
         self::assertSame($factor->id, $this->reported[0]->factor?->id);
         self::assertEquals(self::actor(), $this->reported[0]->actor);
+        self::assertNull($this->reported[0]->context()['ip']);
+        self::assertNull($this->reported[0]->context()['user_agent']);
 
         $stored = Factor::query()->whereKey($factor->id)->sole();
 
@@ -129,6 +132,34 @@ final class UnlockingTest extends TestCase
         self::assertNull($state->locked_until);
         self::assertSame(3, $state->consecutive_failures);
         self::assertFalse(Mfa::unlockIdentity($user, self::actor()));
+    }
+
+    /**
+     * The factor's and the identity's lift both carry it.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAnUnlockCarriesTheClientGiven(): void
+    {
+        $user   = $this->signedInPerson();
+        $factor = $this->confirmedFactor($user);
+        $client = new ClientContext('198.51.100.4', 'Admin/1.0');
+
+        $this->lockFactor($factor);
+
+        self::assertTrue(Mfa::unlockFactor($user, $factor->id, self::actor(), $client));
+
+        $this->state($user)->update(['locked_until' => CarbonImmutable::now()->addHour()]);
+
+        self::assertTrue(Mfa::unlockIdentity($user, self::actor(), $client));
+        self::assertCount(2, $this->reported);
+
+        foreach ($this->reported as $event) {
+            self::assertSame('198.51.100.4', $event->context()['ip']);
+            self::assertSame('Admin/1.0', $event->context()['user_agent']);
+        }
     }
 
     /**

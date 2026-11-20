@@ -15,7 +15,7 @@ Every event the package dispatches is a class in `SineMacula\Laravel\Mfa\Events`
 | `FactorRenamed`                | A factor is given a new label                                               | `factor`, `previousLabel`                                      |
 | `PreferredFactorChanged`       | The identity chooses another preferred factor                               | `factor`, `previous`                                           |
 | `FactorRemoved`                | A factor is removed, by the identity or by someone else                     | `factor`, `actor`                                              |
-| `FactorDisabled`               | A factor, or the identity's run, reaches the failure ceiling                | `factor`, `purpose`                                            |
+| `FactorDisabled`               | A failure disables a factor, its own or the identity's run at the ceiling   | `factor`, `purpose`                                            |
 | `FactorEnabled`                | An actor enables a factor the failure ceiling disabled                      | `factor`, `actor`                                              |
 | `FactorsReset`                 | Someone resets the identity's factors                                       | `actor`, `reason`, `reenrollmentRequired`, `unreadableFactors` |
 | `LockoutApplied`               | Failed attempts lock a factor, or the identity across its factors           | `factor` (null for the identity), `lockedUntil`, `purpose`     |

@@ -14,6 +14,7 @@ use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\CodeSent;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
 use SineMacula\Laravel\Mfa\Models\Factor;
@@ -85,6 +86,33 @@ final class ChallengeRequestsUnderLockTest extends TestCase
 
         self::assertSame(FailureReason::LOCKED, $result->reason);
         self::assertSame(0, $this->gateway->sends);
+    }
+
+    /**
+     * Once for every send, with the gateway's challenge id.
+     *
+     * @return void
+     */
+    public function testACodeTheGatewaySendsIsReported(): void
+    {
+        $user   = $this->signedInPerson();
+        $factor = $this->emailFactor($user);
+
+        self::assertSame('counted-challenge-1', $this->mfa()->sendCode(Callers::current(), $factor->id)->challengeId);
+
+        Carbon::setTestNow('2026-11-01 12:01:01');
+
+        self::assertSame('counted-challenge-2', $this->mfa()->sendCode(Callers::current(), $factor->id)->challengeId);
+        self::assertCount(2, $this->reported);
+
+        foreach ($this->reported as $index => $sent) {
+            self::assertInstanceOf(CodeSent::class, $sent);
+            self::assertSame('counted-challenge-' . ($index + 1), $sent->challengeId);
+            self::assertSame(Purpose::STEP_UP, $sent->purpose);
+            self::assertSame($factor->id, $sent->factor->id);
+            self::assertNotNull($sent->factor->maskedDestination);
+            self::assertNotSame(self::ADDRESS, $sent->factor->maskedDestination);
+        }
     }
 
     /**
