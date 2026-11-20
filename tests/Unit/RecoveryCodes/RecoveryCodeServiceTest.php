@@ -10,6 +10,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
+use SineMacula\Laravel\Mfa\Assurance\Channel;
+use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
+use SineMacula\Laravel\Mfa\Contracts\ProofStore;
+use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\Actor;
@@ -25,6 +29,8 @@ use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 use Tests\Fixtures\Identities\FactorHolder;
+use Tests\Fixtures\Requirements\FixedFirstFactorResolver;
+use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\TestCase;
 use Tests\Unit\Concerns\InteractsWithRecoveryCodes;
 
@@ -445,6 +451,36 @@ final class RecoveryCodeServiceTest extends TestCase
         self::assertCount(10, $set['codes']);
         self::assertSame(10, $this->recoveryCodes()->status($holder)->remaining);
         Event::assertNotDispatched(RecoveryCodesGenerated::class);
+    }
+
+    /**
+     * @return iterable<string, array{?\SineMacula\Laravel\Mfa\Assurance\Channel, ?\SineMacula\Laravel\Mfa\Enums\FailureReason}>
+     */
+    public static function provideFirstFactorChannels(): iterable
+    {
+        yield 'a known first factor' => [new Channel(ChannelKind::PASSWORD), null];
+        yield 'an unknown first factor' => [Channel::unknown(), FailureReason::NOT_ACCEPTED];
+        yield 'no first factor' => [null, FailureReason::NOT_ACCEPTED];
+    }
+
+    /**
+     * @param  ?\SineMacula\Laravel\Mfa\Assurance\Channel  $channel
+     * @param  ?\SineMacula\Laravel\Mfa\Enums\FailureReason  $reason
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    #[DataProvider('provideFirstFactorChannels')]
+    public function testACodeIsTriedOnlyAfterAKnownFirstFactor(?Channel $channel, ?FailureReason $reason): void
+    {
+        $holder      = $this->signInHolder();
+        $binding     = self::redemptionBinding($holder);
+        $firstFactor = $channel === null ? null : SignInProofs::of($holder)->inSession($binding->sessionId)->firstFactorOn($channel);
+
+        $this->container()->make(ProofStore::class)->begin($holder, $binding->application, $binding->sessionId);
+        $this->container()->instance(FirstFactorResolver::class, new FixedFirstFactorResolver($firstFactor));
+
+        self::assertSame($reason, $this->recoveryCodes()->admission($holder, $binding, null)->reason);
     }
 
     /**
