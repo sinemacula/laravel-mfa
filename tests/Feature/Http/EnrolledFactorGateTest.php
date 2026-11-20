@@ -13,6 +13,7 @@ use SineMacula\Laravel\Mfa\Enrollment\EnrollmentConfirmer;
 use SineMacula\Laravel\Mfa\Exceptions\InsufficientAuthenticationException;
 use SineMacula\Laravel\Mfa\Exceptions\InvalidModelException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
+use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Http\Middleware\EnsureMfaRequirementIsMet;
 use SineMacula\Laravel\Mfa\Http\MiddlewareSessionTransition;
 use SineMacula\Laravel\Mfa\Models\Factor;
@@ -82,6 +83,48 @@ final class EnrolledFactorGateTest extends TestCase
         self::assertTrue($refusal->hasConfirmedFactor);
         self::assertCount(1, $refusal->offered);
         self::assertSame($factor->id, $refusal->offered[0]->id);
+
+        Carbon::setTestNow(CarbonImmutable::now()->addSeconds(30));
+
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::factor($factor->id, $this->appCode($start)))->isVerified());
+
+        $this->get(self::GATED)->assertOk();
+    }
+
+    /**
+     * The model overrides nothing, so the trait decides what is enabled and
+     * offered.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAnIdentityOnTheTraitDefaultsIsGatedOnceConfirmedUntilItVerifies(): void
+    {
+        $holder = FactorHolder::query()->create(['email' => self::ACCOUNT]);
+        $other  = FactorHolder::query()->create(['email' => 'other@example.test']);
+
+        Factor::query()->create([
+            ...AuthenticatorApp::FACTOR,
+            'authenticatable_type' => $other->getMorphClass(),
+            'authenticatable_id'   => (string) $other->id,
+            'status'               => 'confirmed',
+            'application'          => self::APPLICATION,
+        ]);
+
+        $this->reauthenticated($holder);
+
+        $start = $this->startedTotp();
+
+        $this->get(self::GATED)->assertOk();
+
+        self::assertTrue($this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $this->appCode($start))->isConfirmed());
+
+        $factor  = $this->pendingFactorOf($start);
+        $refusal = $this->get(self::GATED)->exception;
+
+        self::assertInstanceOf(InsufficientAuthenticationException::class, $refusal);
+        self::assertSame([$factor->id], array_map(static fn (FactorSummary $offer): string => $offer->id, $refusal->offered));
 
         Carbon::setTestNow(CarbonImmutable::now()->addSeconds(30));
 

@@ -143,6 +143,24 @@ final class ConfiguredFactorChangeGateTest extends TestCase
     }
 
     /**
+     * The sign-in's own password proof, or a reauthentication of another
+     * identity or application.
+     *
+     * @return void
+     */
+    public function testAFirstFactorIsRefusedAProofThatIsNotThisSignInsReauthentication(): void
+    {
+        $user   = $this->steppedUp();
+        $signIn = SignInProofs::of($user);
+
+        foreach ([$signIn->password(60), $signIn->ofIdentity('999')->reauthentication(60), $signIn->onApplication('admin')->reauthentication(60)] as $proof) {
+            $this->container()->instance(Reauthenticator::class, new FixedReauthenticator($proof));
+
+            $this->assertRefused($this->changeRequest($user, FactorChange::ADD_FIRST_ADDITIONAL_FACTOR, null));
+        }
+    }
+
+    /**
      * Made before the identity's proofs were last revoked.
      *
      * @return void
