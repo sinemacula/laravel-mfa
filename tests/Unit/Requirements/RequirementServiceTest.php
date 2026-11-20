@@ -11,12 +11,15 @@ use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Context\CallerContext;
+use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\ActiveTenantResolver;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Contracts\IdentityRequirement;
-use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
+use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
+use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\TenantRequirement;
 use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
+use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 use SineMacula\Laravel\Mfa\Requirements\IdentityContractRequirement;
 use SineMacula\Laravel\Mfa\Requirements\NoActiveTenant;
@@ -25,11 +28,14 @@ use SineMacula\Laravel\Mfa\Requirements\ReenrollmentObligation;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 use Tests\Fixtures\Context\Callers;
+use Tests\Fixtures\Context\FixedPendingSessionResolver;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\NonScalarIdentifierUser;
 use Tests\Fixtures\Identities\PlainUser;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\Fixtures\Requirements\FixedActiveTenant;
+use Tests\Fixtures\Requirements\FixedTenantRequirement;
+use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\TestCase;
 
 /**
@@ -98,7 +104,7 @@ final class RequirementServiceTest extends TestCase
             config()->set('mfa.applications.' . self::APPLICATION, ['requirement' => $mode]);
         }
 
-        $this->container()->instance(TenantRequirement::class, self::tenantRequiring(Requirement::none()->withMinimumLevel(AssuranceLevel::AAL2)));
+        $this->container()->instance(TenantRequirement::class, new FixedTenantRequirement(Requirement::none()->withMinimumLevel(AssuranceLevel::AAL2)));
 
         $identity = new NonEloquentIdentity(self::IDENTITY, mfaEnabled: $enabled, requirement: $own ? self::identityRequirement() : null);
 
@@ -122,7 +128,7 @@ final class RequirementServiceTest extends TestCase
     {
         config()->set('mfa.applications.' . self::APPLICATION, ['requirement' => 'always']);
 
-        $this->container()->instance(TenantRequirement::class, self::tenantRequiring(Requirement::none()->withMinimumLevel(AssuranceLevel::AAL2)));
+        $this->container()->instance(TenantRequirement::class, new FixedTenantRequirement(Requirement::none()->withMinimumLevel(AssuranceLevel::AAL2)));
         $this->activate(self::TENANT);
 
         $identity = new NonEloquentIdentity(self::IDENTITY);
@@ -143,7 +149,7 @@ final class RequirementServiceTest extends TestCase
 
         $tenant = Requirement::none()->withMinimumLevel(AssuranceLevel::AAL2, 300);
 
-        $this->container()->instance(TenantRequirement::class, self::tenantRequiring($tenant));
+        $this->container()->instance(TenantRequirement::class, new FixedTenantRequirement($tenant));
 
         self::oblige(NonEloquentIdentity::class, self::IDENTITY);
 
@@ -274,6 +280,95 @@ final class RequirementServiceTest extends TestCase
         $this->actingAs(TestUser::query()->create(['email' => 'current@example.test', 'mfa_enabled' => false]));
 
         self::assertSame(['additional_verification' => ['max_age' => null]], $this->service()->requirement(Callers::current())->toArray());
+    }
+
+    /**
+     * The guard's user with a pending session asks for nothing, whatever the
+     * application's mode; its requirement is the pending session's.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAPendingCallersRequirementIsEmpty(): void
+    {
+        config()->set('mfa.applications.' . self::APPLICATION, ['requirement' => 'always']);
+
+        $user    = TestUser::query()->create(['email' => 'pending@example.test', 'mfa_enabled' => true]);
+        $signIn  = SignInProofs::of($user)->inSession('pending-1');
+        $pending = new PendingContext(
+            $user,
+            self::APPLICATION,
+            'pending-1',
+            $signIn->password(),
+            Requirement::none()->withAdditionalVerification(),
+            [PendingAction::VERIFY],
+            CarbonImmutable::now()->addMinutes(10),
+        );
+
+        $this->actingAs($user);
+        $this->container()->instance(PendingSessionResolver::class, new FixedPendingSessionResolver($pending));
+
+        self::assertTrue($this->service()->requirement(CallerContext::forPending($pending))->isEmpty());
+        self::assertTrue($this->service()->requirement(Callers::current())->isEmpty());
+        self::assertSame(['additional_verification' => ['max_age' => null]], $this->service()->requirement(CallerContext::forIdentity($user, self::APPLICATION))->toArray());
+    }
+
+    /**
+     * Each read from the caller's own application, for the same identity.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testTheRequirementAndFreshnessFollowTheCallersApplication(): void
+    {
+        config()->set('mfa.applications.web', ['requirement' => 'never', 'freshness' => ['billing.close' => 60]]);
+        config()->set('mfa.applications.admin', ['requirement' => 'always', 'freshness' => ['billing.close' => 900]]);
+
+        $user  = TestUser::query()->create(['email' => 'applications@example.test', 'mfa_enabled' => false]);
+        $store = $this->container()->make(ProofStore::class);
+
+        foreach (['web', 'admin'] as $application) {
+            $signIn = SignInProofs::of($user)->onApplication($application)->inSession($application . '-sign-in');
+
+            $store->begin($user, $application, $signIn->sessionId);
+            $store->record($user, $signIn->password(3600));
+            $store->record($user, $signIn->totp(300));
+        }
+
+        $web   = CallerContext::forIdentity($user, 'web');
+        $admin = CallerContext::forIdentity($user, 'admin');
+
+        self::assertTrue($this->service()->requirement($web)->isEmpty());
+        self::assertSame(['additional_verification' => ['max_age' => null]], $this->service()->requirement($admin)->toArray());
+        self::assertFalse($this->service()->isFresh($web, 'billing.close'));
+        self::assertTrue($this->service()->isFresh($admin, 'billing.close'));
+    }
+
+    /**
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testFreshnessReadsOnlyTheCallersApplicationsProofs(): void
+    {
+        config()->set('mfa.applications.web', ['freshness' => ['billing.close' => 900]]);
+        config()->set('mfa.applications.admin', ['freshness' => ['billing.close' => 900]]);
+
+        $user  = TestUser::query()->create(['email' => 'proofs@example.test', 'mfa_enabled' => true]);
+        $store = $this->container()->make(ProofStore::class);
+
+        foreach (['web' => 300, 'admin' => 3600] as $application => $factorAge) {
+            $signIn = SignInProofs::of($user)->onApplication($application)->inSession($application . '-sign-in');
+
+            $store->begin($user, $application, $signIn->sessionId);
+            $store->record($user, $signIn->password(3600));
+            $store->record($user, $signIn->totp($factorAge));
+        }
+
+        self::assertTrue($this->service()->isFresh(CallerContext::forIdentity($user, 'web'), 'billing.close'));
+        self::assertFalse($this->service()->isFresh(CallerContext::forIdentity($user, 'admin'), 'billing.close'));
     }
 
     /**
@@ -527,36 +622,6 @@ final class RequirementServiceTest extends TestCase
             'created_at'            => $now,
             'updated_at'            => $now,
         ]);
-    }
-
-    /**
-     * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
-     * @return \SineMacula\Laravel\Mfa\Contracts\TenantRequirement
-     */
-    private static function tenantRequiring(Requirement $requirement): TenantRequirement
-    {
-        return new readonly class ($requirement) implements TenantRequirement {
-            /**
-             * @param  \SineMacula\Laravel\Mfa\Requirements\Requirement  $requirement
-             */
-            public function __construct(
-
-                /** The requirement every tenant has. */
-                private Requirement $requirement,
-            ) {}
-
-            /**
-             * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
-             * @param  string  $application
-             * @param  string  $tenant
-             * @return \SineMacula\Laravel\Mfa\Requirements\Requirement
-             */
-            #[\Override]
-            public function requirementFor(MultiFactorAuthenticatable $identity, string $application, string $tenant): Requirement
-            {
-                return $this->requirement;
-            }
-        };
     }
 
     /**

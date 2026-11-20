@@ -26,13 +26,16 @@ use SineMacula\Laravel\Mfa\Enrollment\EnrollmentStart;
 use SineMacula\Laravel\Mfa\Enrollment\EnrollmentStarter;
 use SineMacula\Laravel\Mfa\Enrollment\GrantAuthority;
 use SineMacula\Laravel\Mfa\Enrollment\PendingEnrollments;
+use SineMacula\Laravel\Mfa\Enums\AbandonmentCause;
 use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
+use SineMacula\Laravel\Mfa\Events\EnrollmentAbandoned;
 use SineMacula\Laravel\Mfa\Exceptions\CodeNotSentException;
 use SineMacula\Laravel\Mfa\Exceptions\SecretNotRevealedException;
 use SineMacula\Laravel\Mfa\Factors\FactorChannel;
 use SineMacula\Laravel\Mfa\Factors\FactorLabel;
 use SineMacula\Laravel\Mfa\MfaManager;
+use SineMacula\Laravel\Mfa\Models\Enrollment;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Proofs\ProofStoreCompletion;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeIssuance;
@@ -248,6 +251,38 @@ final class TotpEnrollmentStarterTest extends TestCase
         self::assertSame(1, Factor::query()->count());
         self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($first), $oldCode)->reason);
         self::assertSame(FailureReason::INVALID_CODE, $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($second), $oldCode)->reason);
+    }
+
+    /**
+     * Its grant is not found when that sign-in comes back.
+     *
+     * @return void
+     */
+    public function testARestartFromAnotherSignInDiscardsThePendingFactor(): void
+    {
+        $user  = $this->reauthenticatedPerson();
+        $first = $this->startedTotp();
+        $code  = $this->appCode($first);
+
+        $this->beginSignIn($user, 'sign-in-b');
+        $this->recordFirstFactor($user, 'sign-in-b');
+        $this->forgetReports();
+
+        $this->startedTotp();
+
+        $abandoned = array_values(array_filter($this->reported, static fn (object $event): bool => $event instanceof EnrollmentAbandoned));
+
+        self::assertSame(1, Factor::query()->count());
+        self::assertSame(1, Enrollment::query()->count());
+        self::assertFalse(Factor::query()->whereKey($first->factor?->id)->exists());
+        self::assertCount(1, $abandoned);
+        self::assertSame(AbandonmentCause::RESTARTED, $abandoned[0]->cause);
+        self::assertSame($first->factor?->id, $abandoned[0]->factor->id);
+
+        $this->beginSignIn($user);
+        $this->recordFirstFactor($user);
+
+        self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($first), $code)->reason);
     }
 
     /**
