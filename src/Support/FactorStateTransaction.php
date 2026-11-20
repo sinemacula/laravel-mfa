@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Support;
 
+use Illuminate\Container\Container;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -155,9 +156,14 @@ final class FactorStateTransaction
 
         return StorageTransaction::run(static function () use ($connection, $type, $key, $factorModel, $callback): mixed {
 
-            IdentityStateRow::lock(new ProofOwner($type, $key), $connection);
+            $owner = new ProofOwner($type, $key);
 
-            return $callback(self::owned($factorModel->newQuery()->lockForUpdate(), $type, $key, $factorModel));
+            IdentityStateRow::lock($owner, $connection);
+
+            return Container::getInstance()->make(FactorStateLocks::class)->hold(
+                $owner,
+                static fn (): mixed => $callback(self::owned($factorModel->newQuery()->lockForUpdate(), $type, $key, $factorModel)),
+            );
         });
     }
 

@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Proofs;
 
+use Illuminate\Container\Container;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Facades\DB;
@@ -11,6 +12,7 @@ use SineMacula\Laravel\Mfa\Database\IdentityStateRow;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\StorageTransaction;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
+use SineMacula\Laravel\Mfa\Support\FactorStateLocks;
 
 /**
  * A durable counter stamped on every proof; advancing it invalidates every
@@ -28,7 +30,8 @@ final class VerificationGeneration
     private const string COLUMN = 'verification_generation';
 
     /**
-     * 0 for an identity with no row.
+     * 0 for an identity with no row. Under the identity's factor state lock it
+     * is a locking read, which an older repeatable-read snapshot cannot answer.
      *
      * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
      * @return int
@@ -38,8 +41,13 @@ final class VerificationGeneration
     public static function current(Authenticatable $identity): int
     {
         $owner = ProofOwner::of($identity);
+        $query = WriteConnection::query(IdentityStateRow::of($owner));
 
-        $generation = WriteConnection::query(IdentityStateRow::of($owner))->value(self::COLUMN);
+        if (Container::getInstance()->make(FactorStateLocks::class)->holds($owner)) {
+            $query->lockForUpdate();
+        }
+
+        $generation = $query->value(self::COLUMN);
 
         return is_numeric($generation) ? (int) $generation : 0;
     }

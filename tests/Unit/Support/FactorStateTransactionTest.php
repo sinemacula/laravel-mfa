@@ -14,6 +14,8 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Exceptions\ModelOffStorageConnectionException;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
+use SineMacula\Laravel\Mfa\Support\FactorStateLocks;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 use Tests\Fixtures\Factors\SecondaryConnectionFactor;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
@@ -349,6 +351,24 @@ final class FactorStateTransactionTest extends TestCase
     {
         self::assertTrue(FactorStateTransaction::snapshot(new NonScalarIdentifierUser, new Factor)->isEmpty());
         self::assertTrue(FactorStateTransaction::snapshot(new NonEloquentIdentity(''), new Factor)->isEmpty());
+    }
+
+    /**
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testHoldsTheOwnerOnlyWhileItsCallbackRuns(): void
+    {
+        $user  = $this->createUser('one@example.test');
+        $owner = ProofOwner::of($user);
+        $other = ProofOwner::of($this->createUser('two@example.test'));
+        $locks = $this->container()->make(FactorStateLocks::class);
+
+        $held = FactorStateTransaction::forIdentity($user, new Factor, static fn (): array => [$locks->holds($owner), $locks->holds($other)]);
+
+        self::assertSame([true, false], $held);
+        self::assertFalse($locks->holds($owner));
     }
 
     /**

@@ -33,7 +33,10 @@ cannot interleave.
   factors, read `FOR UPDATE` from the write connection by the owner hash, and hands the callback those factors as stored
   under the lock, whose owner columns match the owner exactly. Every change takes the locks in that order, so two
   changes for one identity never wait on each other in opposite orders: the second waits for the first to commit, then
-  sees what it left, and checks its preconditions again on it.
+  sees what it left, and checks its preconditions again on it. While the callback runs, the identity's verification
+  generation is read `FOR UPDATE` from the row already locked (the callback's owner is held in
+  `Support\FactorStateLocks`, one per request), so an application's older `REPEATABLE READ` snapshot cannot hide an
+  advance committed since.
 - `Database\StorageTransaction` is every transaction the package opens on the storage connection, that one included.
   When its commit fails, the work waiting for that commit (`Database\AfterStorageCommit`: a proof, an event, a queued
   cookie) ends with it. Laravel 13 discards that work itself; Laravel 12 keeps it and runs it on the connection's next
@@ -169,7 +172,7 @@ which stays with the tests CI runs on MySQL and PostgreSQL (`tests/Integration/D
 - `src/Database/WriteConnection.php`: `query()`; `src/Factors/FactorService.php`: `factors()`, `factor()`.
 - `src/Database/IdentityStateRow.php`: `lock()`; `src/Database/StorageTransaction.php`.
 - `src/Support/FactorStateTransaction.php`: `forIdentity()`, `forFactor()`, `forOwner()`, `snapshot()`, the lock order
-  in `run()`; `src/Support/FactorOwnerColumns.php`: `of()`, `owns()`.
+  in `run()`; `src/Support/FactorStateLocks.php`; `src/Support/FactorOwnerColumns.php`: `of()`, `owns()`.
 - The constructor of every model under `src/Models/`; `getConnection()` in every migration under `database/migrations/`.
 - `src/RecoveryCodes/RecoveryCodeService.php`: `generate()`, `redeem()`, `removeSet()`.
 
@@ -184,7 +187,8 @@ which stays with the tests CI runs on MySQL and PostgreSQL (`tests/Integration/D
 - `tests/Integration/Database/LockOrderTest.php`
 - `tests/Unit/Database/WriteConnectionTest.php`
 - `tests/Unit/Support/FactorOwnerColumnsTest.php`
-- `tests/Unit/Support/FactorStateTransactionTest.php`
+- `tests/Unit/Support/FactorStateTransactionTest.php`, `tests/Unit/Support/FactorStateLocksTest.php`
+- `tests/Integration/Database/GenerationSnapshotTest.php` (MySQL)
 - `tests/Unit/Database/StorageConnectionTest.php`
 - `tests/Unit/Config/ConfigurationValidatorTest.php` `testAFactorModelOnTheStorageConnectionHasNoProblem`
 - `tests/Unit/Models/FactorTest.php` `testTakesTheStorageConnection`, `testKeepsAConnectionTheClassNames`
