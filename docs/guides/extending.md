@@ -472,17 +472,27 @@ final class SessionProofStoreAdapterTest extends TestCase
 
 A kit for a seam that is handed the caller asks for one through a hook, built as the seam would be handed it, with
 `Context\CallerContext::forIdentity()` for an active session: `freshnessCaller()`, whose session the fresh gate must
-find fresh for the fresh operation; `challengeCaller()`, the caller the challenged binding is for; and `stepUpCaller()`,
-on an active session whose own result would be accepted. The session revoker's kit asks for the application the
-identity's sessions are on, with `revokedApplication()`. The pending completion's kit hands every result through
-`pendingCaller()`, the pending session's caller, which by default knows nothing of the client: a completion that judges
-the client, such as one that checks a cookie-borne request is same-site, overrides it with a client carrying what that
-check needs, so each refusal the kit asserts is the one it means. It also asks for `resultOfThePendingSession()`, a
-successful result the completion accepts, which it must take from that caller and refuse from the same identity with no
-pending session. The event context resolver's kit checks that a subject naming no sign-in, or one the resolver does not
-know, leaves the session, principal and tenant unknown: override `arrangeServedEventSession()` to sign the identity in
-through the authentication layer first, so a resolver that read the session being served is caught, and
-`knownEventSignIn()` to return an application and a sign-in on it the resolver maps, whose session it must then name.
+find fresh for the fresh operation, on additional verifications made over 10 seconds ago, so that a caller asking for
+one within 10 seconds finds it not fresh; `challengeCaller()`, the caller the challenged binding is for; and
+`stepUpCaller()`, on an active session whose own result would be accepted. The challenge gateway's kit checks that a
+code answers no other purpose, session, application or identity, that another identity's binding, or its own asked by a
+caller who is nobody, is not found and not counted, and that the code sent fails once its challenge has taken
+`challengeMaxAttempts()` wrong codes (by default `mfa.codes.max_attempts`; a gateway with a limit of its own overrides
+it). The pending session resolver's kit asks for `requestWithPendingCredential()`, a request carrying a valid pending
+credential, and `endPendingSession()`, which ends that session as the authentication layer does when it is satisfied,
+expires or is revoked; the session must revalidate as itself until then and not after. By default the resolver has no
+pending credentials, so a resolver that has them overrides both. The requirement policy's kit asks for two identities it
+requires different things of, `policyIdentity()` and `otherPolicyIdentity()`, and for each one's first factor through
+`policyFirstFactor()`. The session revoker's kit asks for the application the identity's sessions are on, with
+`revokedApplication()`. The pending completion's kit hands every result through `pendingCaller()`, the pending session's
+caller, which by default knows nothing of the client: a completion that judges the client, such as one that checks a
+cookie-borne request is same-site, overrides it with a client carrying what that check needs, so each refusal the kit
+asserts is the one it means. It also asks for `resultOfThePendingSession()`, a successful result the completion accepts,
+which it must take from that caller and refuse from the same identity with no pending session. The event context
+resolver's kit checks that a subject naming no sign-in, or one the resolver does not know, leaves the session, principal
+and tenant unknown: override `arrangeServedEventSession()` to sign the identity in through the authentication layer
+first, so a resolver that read the session being served is caught, and `knownEventSignIn()` to return an application and
+a sign-in on it the resolver maps, whose session it must then name.
 
 The kits check safety guarantees, not capabilities a default lacks: a refusing reauthenticator passes, and a revoker
 passes when other sessions stop counting whether or not it ends them. The factor change gate's kit hands its hooks each

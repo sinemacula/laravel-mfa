@@ -83,6 +83,30 @@ final class CompletionContractTest extends TestCase
     /**
      * @return void
      */
+    public function testRejectsAPendingCompletionThatAcceptsAFailedResult(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('A failed result must be refused with a reason.');
+
+        PendingCompletionContract::assertRefusesAFailedResult(new CheckingCompletion('sign-in-1', false), $this->pendingCaller());
+    }
+
+    /**
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testRejectsAStepUpThatAcceptsAResultOfAnotherBinding(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('A result bound elsewhere must be refused with a reason.');
+
+        StepUpContract::assertRefusesAResultOfAnotherBinding(new CheckingCompletion('sign-in-1', false), Callers::current(), $this->resultOfAnotherBinding());
+    }
+
+    /**
+     * @return void
+     */
     public function testRejectsAStepUpThatAcceptsAFailedResult(): void
     {
         $this->expectException(AssertionFailedError::class);
