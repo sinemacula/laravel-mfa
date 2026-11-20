@@ -140,9 +140,9 @@ final readonly class AttemptService
 
             try {
                 $this->ipThrottle->giveBack($slot);
-            } catch (\Throwable) {
-                // A transaction the failure aborted refuses this, which must
-                // not hide the failure.
+            } catch (\Throwable $failure) {
+                // A database failure can abort the transaction this runs in.
+                throw $exception instanceof \PDOException ? $exception : $failure;
             }
 
             throw $exception;

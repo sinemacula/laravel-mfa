@@ -137,8 +137,8 @@ separate operations, and all are described here.
 - A verification that throws rolls the transaction back, counting nothing, and the address's slot is given back before
   the exception propagates; the same holds when recording a success fails, a model event cancelling one of its saves
   included, so a code is never used up without its count. A database error is never read as a refusal or a pass. When
-  the failure leaves a transaction the application holds aborted, the give-back fails and the original exception still
-  propagates; rolling that transaction back returns the slot.
+  a database failure leaves a transaction the application holds aborted, the give-back fails and the database failure
+  still propagates; rolling that transaction back returns the slot.
 - The identity's window is counted with one upsert, never an `UPDATE` that may find no row: inside the transaction,
   such an update holds a gap lock on MySQL until the commit, and two identities recording their first failure in the
   same gap would deadlock on each other's insert.
