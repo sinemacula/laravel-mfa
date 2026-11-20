@@ -5,7 +5,6 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Contracts;
 
 use Carbon\CarbonInterface;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 /**
  * One code of an identity's recovery code set, stored as a salted hash and
@@ -16,17 +15,8 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
  */
-interface RecoveryCode
+interface RecoveryCode extends OwnedRecord
 {
-    /**
-     * @formatter:off
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\MorphTo<\Illuminate\Database\Eloquent\Model, \Illuminate\Database\Eloquent\Model>
-     *
-     * @formatter:on
-     */
-    public function authenticatable(): MorphTo;
-
     /**
      * The salted hash, never the code.
      *

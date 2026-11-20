@@ -23,16 +23,14 @@ final class IdentityStateRowTest extends TestCase
     /**
      * @return void
      */
-    public function testMatchesTheOwnersTypeAndKey(): void
+    public function testMatchesTheOwnersHash(): void
     {
-        $query = IdentityStateRow::of(new ProofOwner('users', '42'));
+        $owner = new ProofOwner('users', '42');
+        $query = IdentityStateRow::of($owner);
 
         self::assertSame('mfa_identity_states', $query->from);
-        self::assertSame(['users', '42'], $query->getBindings());
-        self::assertSame(
-            ['authenticatable_type', 'authenticatable_id'],
-            array_column($query->wheres, 'column'),
-        );
+        self::assertSame([$owner->hash()], $query->getBindings());
+        self::assertSame(['owner_hash'], array_column($query->wheres, 'column'));
     }
 
     /**
@@ -49,6 +47,7 @@ final class IdentityStateRowTest extends TestCase
 
         $row = IdentityStateRow::of($owner)->sole();
 
+        self::assertSame(['users', '42'], [$row->authenticatable_type, $row->authenticatable_id]);
         self::assertIsString($row->id);
         self::assertSame(strtolower($row->id), $row->id);
         self::assertSame('2026-11-01 12:00:00', (string) $row->created_at);

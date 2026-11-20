@@ -62,7 +62,7 @@ final class PasskeyChangeGateContract
         Assert::assertNotNull($outcome, 'A registration the gate refuses must fail.');
         Assert::assertFalse($isStored($identity, self::CREDENTIAL), 'A registration the gate refuses must keep no credential.');
         Assert::assertFalse(
-            PasskeyAssociation::query()->where('authenticatable_type', $owner->type)->where('authenticatable_id', $owner->key)->exists(),
+            PasskeyAssociation::query()->where('owner_hash', $owner->hash())->exists(),
             'A registration the gate refuses must associate nothing.',
         );
     }

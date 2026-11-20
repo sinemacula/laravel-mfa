@@ -21,6 +21,7 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
  * @property string $id
  * @property string $authenticatable_type
  * @property string $authenticatable_id
+ * @property string $owner_hash
  * @property string $code_hash
  * @property int $generation
  * @property ?\Carbon\CarbonInterface $used_at
@@ -36,6 +37,7 @@ class RecoveryCode extends Model implements RecoveryCodeContract
     protected $fillable = [
         'authenticatable_type',
         'authenticatable_id',
+        'owner_hash',
         'code_hash',
         'generation',
         'used_at',
@@ -81,6 +83,7 @@ class RecoveryCode extends Model implements RecoveryCodeContract
         return [
             'authenticatable_type' => 'string',
             'authenticatable_id'   => 'string',
+            'owner_hash'           => 'string',
             'code_hash'            => 'string',
             'generation'           => 'integer',
             'used_at'              => 'datetime',

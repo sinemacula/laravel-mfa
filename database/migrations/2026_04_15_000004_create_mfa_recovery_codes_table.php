@@ -36,7 +36,8 @@ return new class extends Migration {
 
             $blueprint->string('authenticatable_type');
             $blueprint->string('authenticatable_id');
-            $blueprint->index(['authenticatable_type', 'authenticatable_id', 'generation'], IndexName::for($table, '_owner_index'));
+            $blueprint->char('owner_hash', 64);
+            $blueprint->index(['owner_hash', 'generation'], IndexName::for($table, '_owner_index'));
 
             // Long enough for any of Laravel's hashers.
             $blueprint->string('code_hash');

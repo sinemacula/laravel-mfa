@@ -8,6 +8,7 @@ use Illuminate\Auth\GenericUser;
 use Illuminate\Database\Eloquent\Builder;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Models\Factor;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use Tests\Fixtures\Exceptions\UnexpectedBuilderTypeException;
 
@@ -88,9 +89,7 @@ final class GenericIdentity extends GenericUser implements MultiFactorAuthentica
     #[\Override]
     public function authFactors(): Builder
     {
-        $builder = Factor::query()
-            ->where('authenticatable_type', self::class)
-            ->where('authenticatable_id', (string) $this->getAuthIdentifier());
+        $builder = Factor::query()->where('owner_hash', ProofOwner::of($this)->hash());
 
         return self::coerceFactorBuilder($builder);
     }

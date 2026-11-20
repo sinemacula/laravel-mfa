@@ -23,6 +23,7 @@ return new class extends Migration {
             $blueprint->id();
             $blueprint->string('owner_type');
             $blueprint->string('owner_id');
+            $blueprint->char('owner_digest', 64);
             $blueprint->string('hash');
             $blueprint->unsignedInteger('set_number');
             $blueprint->timestamp('redeemed_at')->nullable();

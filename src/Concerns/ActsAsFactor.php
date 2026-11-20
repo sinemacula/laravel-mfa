@@ -6,7 +6,6 @@ namespace SineMacula\Laravel\Mfa\Concerns;
 
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\QueryException;
 use SineMacula\Laravel\Mfa\Enums\FactorStatus;
@@ -23,7 +22,7 @@ use SineMacula\Laravel\Mfa\Secrets\QueryExceptionMask;
  */
 trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMethods
 {
-    use StoresTimesInUtc;
+    use HashesOwner, StoresTimesInUtc;
 
     /**
      * Casts the lockout and disabled columns a refusal reads as datetimes,
@@ -41,20 +40,6 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
 
             $this->mergeCasts([$column => 'datetime']);
         }
-    }
-
-    /**
-     * @formatter:off
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\MorphTo<\Illuminate\Database\Eloquent\Model, \Illuminate\Database\Eloquent\Model>
-     *
-     * @formatter:on
-     */
-    public function authenticatable(): MorphTo
-    {
-        // The contract widens morphTo()'s `MorphTo<Model, $this>` bound.
-        // @phpstan-ignore return.type
-        return $this->morphTo();
     }
 
     /**

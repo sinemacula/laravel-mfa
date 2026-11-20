@@ -16,6 +16,7 @@ use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Support\FactorOwnerColumns;
 use SineMacula\Laravel\Mfa\Support\IdentityType;
 
@@ -115,18 +116,15 @@ final readonly class OperationGuard
             return null;
         }
 
-        [$typeColumn, $keyColumn] = FactorOwnerColumns::of($blank);
-
-        $type = IdentityType::of($identity);
+        $owner = new ProofOwner(IdentityType::of($identity), (string) $key);
 
         /** @var (\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor)|null $factor */
         $factor = WriteConnection::query($blank->newQuery())
-            ->where($typeColumn, $type)
-            ->where($keyColumn, (string) $key)
+            ->where($blank->getOwnerHashName(), $owner->hash())
             ->whereKey($factorId)
             ->first();
 
-        if ($factor === null || !FactorOwnerColumns::owns($factor, $type, (string) $key)) {
+        if ($factor === null || !FactorOwnerColumns::owns($factor, $owner->type, $owner->key)) {
             return null;
         }
 

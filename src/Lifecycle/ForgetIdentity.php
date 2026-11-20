@@ -6,15 +6,12 @@ namespace SineMacula\Laravel\Mfa\Lifecycle;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Config\Repository;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
-use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
-use SineMacula\Laravel\Mfa\Contracts\RecoveryCode;
 use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
 use SineMacula\Laravel\Mfa\Models\Code;
 use SineMacula\Laravel\Mfa\Models\Enrollment;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 use SineMacula\Laravel\Mfa\Support\IdentityType;
 
@@ -50,40 +47,17 @@ final readonly class ForgetIdentity
         $factorModel       = ConfiguredModels::factor($this->config);
         $recoveryCodeModel = ConfiguredModels::recoveryCode($this->config);
 
-        $type = IdentityType::of($identity);
-
         /** @var int|string $key The transaction refuses any other type. */
-        $key = $identity->getAuthIdentifier();
+        $key  = $identity->getAuthIdentifier();
+        $hash = (new ProofOwner(IdentityType::of($identity), (string) $key))->hash();
 
-        FactorStateTransaction::forIdentity($identity, new $factorModel, static function () use ($factorModel, $recoveryCodeModel, $type, $key): void {
+        FactorStateTransaction::forIdentity($identity, new $factorModel, static function () use ($factorModel, $recoveryCodeModel, $hash): void {
 
             foreach ([Code::class, Enrollment::class, PasskeyAssociation::class, $recoveryCodeModel, $factorModel, IdentityState::class] as $model) {
-                self::owned(new $model, $type, (string) $key)->delete();
+                $owned = new $model;
+
+                $owned->newQuery()->where($owned->getOwnerHashName(), $hash)->delete();
             }
         });
-    }
-
-    /**
-     * Records owned by the identity; an application's factor or recovery code
-     * model may name its owner columns differently, so its relation names them.
-     *
-     * @param  \Illuminate\Database\Eloquent\Model  $model
-     * @param  string  $type
-     * @param  string  $key
-     * @return \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model>
-     */
-    private static function owned(Model $model, string $type, string $key): Builder
-    {
-        [$typeColumn, $keyColumn] = ['authenticatable_type', 'authenticatable_id'];
-
-        if ($model instanceof EloquentFactor || $model instanceof RecoveryCode) {
-            $relation = $model->authenticatable();
-
-            [$typeColumn, $keyColumn] = [$relation->getMorphType(), $relation->getForeignKeyName()];
-        }
-
-        return $model->newQuery()
-            ->where($typeColumn, $type)
-            ->where($keyColumn, $key);
     }
 }

@@ -23,6 +23,7 @@ return new class extends Migration {
             $blueprint->id();
             $blueprint->string('authenticatable_type');
             $blueprint->string('authenticatable_id');
+            $blueprint->char('owner_hash', 64);
             $blueprint->string('type', 64);
             $blueprint->string('label')->nullable();
             $blueprint->string('status', 16)->default('pending');

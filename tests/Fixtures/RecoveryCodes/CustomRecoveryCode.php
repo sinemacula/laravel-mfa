@@ -43,6 +43,15 @@ final class CustomRecoveryCode extends Model implements RecoveryCode
      * @return string
      */
     #[\Override]
+    public function getOwnerHashName(): string
+    {
+        return 'owner_digest';
+    }
+
+    /**
+     * @return string
+     */
+    #[\Override]
     public function getCodeHashName(): string
     {
         return 'hash';
