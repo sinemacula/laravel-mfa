@@ -118,12 +118,21 @@ An identity the guard builds from somewhere other than Eloquent implements the c
 factors as a builder over the configured factor model, an `EloquentFactor`, owned by its class name and its key:
 
 ```php
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Models\Factor;
 
 public function authFactors(): Builder
 {
-    return Factor::query()
+    /** @var class-string<Model&EloquentFactor> $model */
+    $model = Factor::class;
+
+    return $model::query()
         ->where('authenticatable_type', static::class)
         ->where('authenticatable_id', (string) $this->getAuthIdentifier());
 }
 ```
+
+The `@var` widens the builder to the model type the contract declares, as PHPStan reads a builder of `Factor` as a
+different type.
