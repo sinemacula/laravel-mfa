@@ -15,6 +15,7 @@ use SineMacula\Laravel\Mfa\Drivers\SmsDriver;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
+use SineMacula\Laravel\Mfa\Events\CodeSent;
 use SineMacula\Laravel\Mfa\Exceptions\CodeDeliveryFailedException;
 use SineMacula\Laravel\Mfa\Exceptions\SenderNotConfiguredException;
 use SineMacula\Laravel\Mfa\Facades\Mfa;
@@ -23,6 +24,7 @@ use SineMacula\Laravel\Mfa\Models\Code;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Testing\FakeSmsSender;
 use SineMacula\Laravel\Mfa\Verification\Submission;
+use Tests\Fixtures\Codes\RecordingCodeDriver;
 use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 use Tests\TestCase;
@@ -206,6 +208,43 @@ final class OtpLifecycleTest extends TestCase
         self::assertNotSame($first, $second);
         self::assertSame(FailureReason::INVALID_CODE, Mfa::verify(Callers::current(), Submission::challenge($factor->id, $resent, $first))->reason);
         self::assertTrue(Mfa::verify(Callers::current(), Submission::challenge($factor->id, $resent, $second))->isVerified());
+    }
+
+    /**
+     * No send is counted and the code already delivered still verifies.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAFailedResendKeepsTheOpenChallengeAndItsCode(): void
+    {
+        $driver = new RecordingCodeDriver;
+
+        Mfa::extend('email', static fn (): RecordingCodeDriver => $driver);
+
+        $factor    = $this->emailFactor($this->signedInPerson());
+        $challenge = Mfa::sendCode(Callers::current(), $factor->id)->challengeId;
+        $code      = $driver->lastCode();
+        $row       = Code::query()->sole()->getAttributes();
+
+        self::assertNotNull($challenge);
+        self::assertNotNull($code);
+
+        Carbon::setTestNow(CarbonImmutable::now()->addSeconds(60));
+
+        $driver->fail = true;
+
+        try {
+            Mfa::sendCode(Callers::current(), $factor->id);
+
+            self::fail('Expected the resend to fail.');
+        } catch (CodeDeliveryFailedException) {
+            self::assertSame($row, Code::query()->sole()->getAttributes());
+        }
+
+        self::assertCount(1, array_filter($this->reported, static fn (object $event): bool => $event instanceof CodeSent));
+        self::assertTrue(Mfa::verify(Callers::current(), Submission::challenge($factor->id, $challenge, $code))->isVerified());
     }
 
     /**

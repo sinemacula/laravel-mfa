@@ -24,8 +24,10 @@ use SineMacula\Laravel\Mfa\Contracts\PasskeyGateway;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
+use SineMacula\Laravel\Mfa\Events\CodeSent;
 use SineMacula\Laravel\Mfa\Events\VerificationFailed;
 use SineMacula\Laravel\Mfa\Exceptions\OperationRefusedException;
+use SineMacula\Laravel\Mfa\Models\Code;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertion;
@@ -43,6 +45,7 @@ use SineMacula\Laravel\Mfa\Verification\SubmissionRoutes;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
 use Tests\Fixtures\Context\Callers;
+use Tests\Fixtures\Factors\IntegerKeyedFactor;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\RecoveryCodes\CountingHasher;
 use Tests\Fixtures\Requirements\FixedFirstFactorResolver;
@@ -139,6 +142,29 @@ final class FailureReasonsVerificationServiceTest extends TestCase
     }
 
     /**
+     * Nothing is delivered to the other person and nothing is spent.
+     *
+     * @return void
+     */
+    public function testASendForAMissingOrForeignFactorSendsNothing(): void
+    {
+        $other   = $this->person('other@example.test');
+        $foreign = $this->emailFactor($other, 'other@example.test');
+
+        $this->signedInPerson();
+
+        $missing = $this->mfa()->sendCode(Callers::current(), '01HZZZZZZZZZZZZZZZZZZZZZZZ');
+        $found   = $this->mfa()->sendCode(Callers::current(), $foreign->id);
+
+        self::assertSame(FailureReason::NOT_FOUND, $missing->reason);
+        self::assertNull($missing->retryAfter);
+        self::assertEquals($missing, $found);
+        self::assertSame([], $this->mailbox->sent());
+        self::assertSame(0, Code::query()->count());
+        self::assertSame([], array_filter($this->reported, static fn (object $event): bool => $event instanceof CodeSent));
+    }
+
+    /**
      * Neither a string nor an integer.
      *
      * @return void
@@ -148,6 +174,24 @@ final class FailureReasonsVerificationServiceTest extends TestCase
         $this->signedInPerson();
 
         self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->verify(Callers::current(), Submission::factor(['1'], '000000'))->reason);
+    }
+
+    /**
+     * PostgreSQL would refuse to compare the id with an integer key.
+     *
+     * @return void
+     */
+    public function testANonIntegerIdOnAnIntegerKeyIsNotFound(): void
+    {
+        config()->set('mfa.factor.model', IntegerKeyedFactor::class);
+        config()->set('mfa.factor.table', 'test_integer_keyed_factors');
+
+        $this->signedInPerson();
+
+        foreach (['abc', '1abc'] as $id) {
+            self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->verify(Callers::current(), Submission::factor($id, '000000'))->reason);
+            self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->sendCode(Callers::current(), $id)->reason);
+        }
     }
 
     /**
