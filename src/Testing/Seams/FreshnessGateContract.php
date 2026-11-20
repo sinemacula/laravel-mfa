@@ -12,7 +12,7 @@ use SineMacula\Laravel\Mfa\Requirements\Requirement;
 /**
  * What every `FreshnessGate` must guarantee: an invalid name or an operation
  * with no requirement is never fresh, an unbounded caller requirement throws, a
- * deadline is absent or ahead, and its requirement asks at least the caller's.
+ * deadline is absent or ahead, and it asks at least what the caller asks.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -90,6 +90,24 @@ final class FreshnessGateContract
         Assert::assertNotNull($until, 'A session fresh for the operation must say until when.');
         Assert::assertFalse($until->isPast(), 'A deadline must not be in the past.');
         Assert::assertTrue($gate->isFresh($caller, $operation), 'A session with a deadline must be fresh.');
+    }
+
+    /**
+     * A session fresh for the operation on its own is not fresh for a caller
+     * asking for an additional verification in the last 10 seconds.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\FreshnessGate  $gate
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
+     * @param  string  $operation
+     * @return void
+     */
+    public static function assertTheCallersStricterRequirementApplies(FreshnessGate $gate, CallerContext $caller, string $operation): void
+    {
+        $asked = Requirement::none()->withAdditionalVerification(10);
+
+        Assert::assertTrue($gate->isFresh($caller, $operation), 'A session fresh for the operation must be fresh without a caller\'s requirement.');
+        Assert::assertFalse($gate->isFresh($caller, $operation, $asked), 'A session must not be fresh for a stricter requirement the caller asks.');
+        Assert::assertNull($gate->freshUntil($caller, $operation, $asked), 'A session not fresh for the caller\'s requirement must have no deadline.');
     }
 
     /**

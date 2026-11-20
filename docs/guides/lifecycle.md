@@ -190,9 +190,9 @@ An id that is not one of the identity's factors answers `false`, reporting nothi
 `machine_identity` before anything is read, here and by `enableFactor()`. `false` from `unlockIdentity()` does
 not mean nothing changed: the identity's count within the current window is cleared even with no lockout live.
 
-Only temporary lockouts lift. Failures in a row are kept, since only a success resets them, so the next failure locks
-again, and a factor disabled at the failure ceiling stays disabled until another factor is proved, it is rebound, the
-identity is reset, or it is enabled for an actor:
+Only temporary lockouts lift. Failures in a row are kept, since only a success resets them, so a factor's next failure
+locks it again, while the identity's window starts afresh. A factor disabled at the failure ceiling stays disabled until
+another factor is proved, it is rebound, the identity is reset, or it is enabled for an actor:
 
 ```php
 Mfa::enableFactor($user, $factorId, Actor::of($agent));
