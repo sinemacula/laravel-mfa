@@ -18,9 +18,9 @@ Driver-based multi-factor authentication for Laravel. Adds factors (TOTP, email 
 recovery codes, step-up verification and a route gate to any guard, and says what a session's proofs add up to on the
 scale NIST SP 800-63B-4 defines.
 
-Works alone behind any Laravel guard and any `Authenticatable` model, or with `sinemacula/laravel-authentication`
-through adapters you or `sinemacula/laravel-iam` bind: this package references no class of another. Routes, controllers
-and user interfaces stay yours.
+Works alone behind any Laravel guard and any `Authenticatable` model, or with
+[`sinemacula/laravel-authentication`][laravel-authentication] through adapters you or `sinemacula/laravel-iam` bind:
+this package references no class of another. Routes, controllers and user interfaces stay yours.
 
 ## Core Concept
 
@@ -213,3 +213,5 @@ disclosure policy and contact details.
 ## License
 
 Licensed under the [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+
+[laravel-authentication]: https://github.com/sinemacula/laravel-authentication/blob/master/README.md

@@ -18,10 +18,10 @@ repository can tell which. Any new work keeps all three working.
   proofs are in the Laravel session (`Proofs\SessionProofStore`, per device by construction), one sign-in per identity
   and application, begun on Laravel's `Login` event and forgotten on `Logout` or `CurrentDeviceLogout`. It works behind
   the session guard, Sanctum, Passport or any custom guard.
-- With `laravel-authentication`, one identity model implements that package's `Identity` and this package's contract.
-  Both extend Laravel's `Authenticatable`, so a single class satisfies both. That package is stateless, so a session's
-  proofs live with its session record, through a rebound `ProofStore`, and the adapters are constructed in the
-  application's service provider or in `laravel-iam`.
+- With `laravel-authentication`, one identity model implements that package's [`Identity`][auth-identity] and this
+  package's contract. Both extend Laravel's `Authenticatable`, so a single class satisfies both. That package is
+  stateless, so a session's proofs live with its [session record][auth-session-record], through a rebound `ProofStore`,
+  and the adapters are constructed in the application's service provider or in `laravel-iam`.
 - Within `laravel-iam`, the parent provides the `ProofStore` over the authentication session, its own requirement seams
   (`RequirementPolicy`, `IdentityRequirement`, `TenantRequirement`) and freshness gate, and the cross-package listeners
   that audit. The seams here are expressive enough that it has no need to reach around them, and this repository holds
@@ -64,3 +64,6 @@ repository can tell which. Any new work keeps all three working.
 - Anything that would import a sibling's class, or detect whether one is installed.
 - A flow that cannot be served by a seam's default working alone.
 - A new mode of running, or a change in which seams a mode rebinds.
+
+[auth-identity]: https://github.com/sinemacula/laravel-authentication/blob/master/src/Contracts/Identity.php
+[auth-session-record]: https://github.com/sinemacula/laravel-authentication/blob/master/docs/design/session-record.md

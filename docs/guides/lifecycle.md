@@ -102,10 +102,11 @@ the ceiling disabled does.
 
 `$result->outstanding` is the whole requirement the session no longer meets, not what is left of it, as this package
 assesses it. An authentication layer that judged the session itself, through its revoker or its transition (see
-[Seams with an authentication layer](extending.md#seams-with-an-authentication-layer)), may have ended it or returned it
-to pending by rules of its own; what it returned, from `$result->completion()`, is the outcome to answer with. It may
-hold a credential, so no dump shows it. Nothing is promoted when the preferred factor goes: removing it leaves none
-preferred, and offers fall back to the oldest.
+[Seams with an authentication layer](extending.md#seams-with-an-authentication-layer), and `laravel-authentication`'s
+[sign-in factors][auth-sign-in-factors]), may have ended it or returned it to pending by rules of its own; what it
+returned, from `$result->completion()`, is the outcome to answer with. It may hold a credential, so no dump shows it.
+Nothing is promoted when the preferred factor goes: removing it leaves none preferred, and offers fall back to the
+oldest.
 
 Forgetting the proofs happens at once and is not undone if the change rolls back, which leaves the session to verify
 again. Restoring them could undo a later invalidation.
@@ -257,3 +258,5 @@ Every one goes through `Events\EventDispatcher`, once its change commits, and no
 | `SessionTransition`    | `Http\MiddlewareSessionTransition`     | Judge an active session again after a factor change       |
 | `ActiveTenantResolver` | `Requirements\NoActiveTenant`          | Name the tenant from validated session context            |
 | `FreshnessGate`        | `Requirements\ConfiguredFreshnessGate` | Hold a session to your own freshness                      |
+
+[auth-sign-in-factors]: https://github.com/sinemacula/laravel-authentication/blob/master/docs/guides/sessions.md#sign-in-factors

@@ -63,10 +63,10 @@ refused.
 ## Applications
 
 An application is the app being signed into: an admin web app, a mobile app. Without an authentication layer that names
-it, the application is the name of the guard that authenticated the request. Factors, the recovery code set, attempt
-state and lockouts belong to the identity and are the same in every application; what an application chooses is what it
-accepts and offers, and its limits on enrolments made through it. Each has a block under `applications`, keyed by its
-name:
+it, the application is the name of the guard that authenticated the request; each of `laravel-authentication`'s
+[applications][auth-applications] is a guard as well. Factors, the recovery code set, attempt state and lockouts belong
+to the identity and are the same in every application; what an application chooses is what it accepts and offers, and
+its limits on enrolments made through it. Each has a block under `applications`, keyed by its name:
 
 ```php
 'applications' => [
@@ -146,11 +146,12 @@ generating recovery codes for `mfa.generate_recovery_codes`; `Mfa::removeFactor(
 name, such as `password`) and its `channel`, one of the channel kinds (`password`, `sms`, `email`,
 `authenticator_app`, `passkey`, `external_provider`, `recovery`). An unknown first factor accepts no further factor and establishes
 no level, so every configured application must either declare one or have a `Contracts\FirstFactorResolver` of its own
-bound, which an authentication layer's adapter provides; with neither, the configuration check fails. The default
-resolver reports the declaration as the first factor of the identity's current sign-in, dated at the Unix epoch since
-when it was made is not known: it decides which further factors are independent of it, and never makes a session fresh
-on its own. A declared `passkey` channel names no credential, so no passkey is accepted after it. The channel `unknown`
-is refused, as it declares nothing.
+bound, which an authentication layer's adapter provides (over `laravel-authentication`'s
+[`firstFactor()`][auth-first-factor]); with neither, the configuration check fails. The default resolver reports the
+declaration as the first factor of the identity's current sign-in, dated at the Unix epoch since when it was made is not
+known: it decides which further factors are independent of it, and never makes a session fresh on its own. A declared
+`passkey` channel names no credential, so no passkey is accepted after it. The channel `unknown` is refused, as it
+declares nothing.
 
 The `passkey` type needs a `Contracts\PasskeyGateway`: this package stores no WebAuthn credentials and runs no
 ceremonies, so its default gateway reports passkeys unavailable, and an application that enables `passkey` while it is
@@ -426,3 +427,6 @@ the boot check runs only as a worker starts (`queue:work`, `horizon`, `schedule:
 `mfa:check` reports every problem rather than failing on the first, and any other command can still inspect or clear a
 bad configuration. Resolving the `mfa` manager checks it whatever command runs, and `mfa:prune` checks it before
 deleting. It reads configuration and the container only, and opens no database connection.
+
+[auth-applications]: https://github.com/sinemacula/laravel-authentication/blob/master/docs/guides/configuration.md#applications
+[auth-first-factor]: https://github.com/sinemacula/laravel-authentication/blob/master/docs/guides/sessions.md#reading-a-sessions-proofs

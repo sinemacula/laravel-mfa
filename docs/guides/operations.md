@@ -56,8 +56,8 @@ Queue::before(static function (JobProcessing $event): void {
 });
 ```
 
-Paired with the authentication package, its own reset on `JobProcessing` covers its guards only, so a plain Laravel
-guard in the same application still needs the above.
+Paired with the authentication package, its own [reset on `JobProcessing`][auth-long-running] covers its guards only, so
+a plain Laravel guard in the same application still needs the above.
 
 A fake sender installed at boot, `Testing\FakeSmsSender::fake()` or `Testing\FakeEmailSender::fake()`, survives the
 worker's reset between jobs, as the package binds nothing with `scoped()`.
@@ -97,3 +97,5 @@ At run time the package needs only `SELECT`, `INSERT`, `UPDATE` and `DELETE`, an
 
 Nothing the package does uses the cache. Attempts, lockouts, replay state and codes live in the database, so a cache
 that is down or answers falsely changes nothing, and no secret is ever in one.
+
+[auth-long-running]: https://github.com/sinemacula/laravel-authentication/blob/master/docs/guides/operations.md#long-running-processes
