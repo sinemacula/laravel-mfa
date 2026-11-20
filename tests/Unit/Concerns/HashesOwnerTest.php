@@ -78,6 +78,7 @@ final class HashesOwnerTest extends TestCase
 
     /**
      * The column refuses the row rather than storing a hash of half an owner.
+     * The savepoint keeps PostgreSQL's test transaction usable.
      *
      * @param  array<string, string>  $owner
      * @return void
@@ -87,7 +88,7 @@ final class HashesOwnerTest extends TestCase
     {
         $state = new IdentityState($owner);
 
-        $this->assertThrows(static fn () => $state->save(), QueryException::class);
+        $this->assertThrows(static fn () => $state->getConnection()->transaction(static fn (): bool => $state->save()), QueryException::class);
 
         self::assertNull($state->getAttribute('owner_hash'));
     }
