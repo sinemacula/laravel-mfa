@@ -29,8 +29,9 @@ factors starts with.
   A successful verification is recorded as a proof on the session (see the proof store note), not on the factor.
 - `mfa_identity_states`, one row per owner (unique on `owner_hash`) and the lock of every serialised change:
   `verification_generation`, `reenrollment_required`, the identity's `consecutive_failures` and `locked_until`,
-  `recovery_codes_generation` and `recovery_codes_generated_at`, and `code_sends`, the recent sends of delivered codes
-  the send caps count (see [Delivered Codes](delivered-codes.md)).
+  `recovery_codes_generation` and `recovery_codes_generated_at`, `code_sends`, the recent sends of delivered codes
+  the send caps count, and `code_challenges`, the latest challenge of each binding a send resends (see
+  [Delivered Codes](delivered-codes.md)).
 - `mfa_enrollments`, one row per enrolment in progress: the pending `factor_id` (unique), owner, the SHA-256
   `grant_hash` of its grant (unique), the `application` it started through, the `session_id` (a keyed digest of the
   sign-in's id) and verification `generation` the grant is bound to, the `authority` that authorised it, the

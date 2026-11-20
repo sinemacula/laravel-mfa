@@ -41,15 +41,18 @@ concurrency, who delivers a code, and why a code is never kept or queued in clea
   with the seconds until enough sends have left the window for one more.
 - Sending runs in the identity's factor state transaction (see [Storage and Transactions](storage-and-transactions.md)),
   so the sends of one identity are serialised and the counts the caps read cannot be overrun by parallel requests. The
-  caps and the restart cooldown read the sends `FOR UPDATE` from the state row the transaction already holds, so a send
-  inside a transaction the application opened on the storage connection, after it has read, still counts a send
-  committed since: MySQL answers a locking read with the row as committed, under `REPEATABLE READ` too, and PostgreSQL's
-  `REPEATABLE READ` raises a serialisation failure at the identity's lock instead, for the application to retry. The
-  open challenge is found with a plain read, so under such an older snapshot a send in the same sign-in may start a new
-  challenge rather than resend one committed since, skipping its resend cooldown, or the wait of an exhausted one; the
-  caps still count it. The factor is read again under the lock; one a concurrent change removed answers `not_found`. The
-  send's time is read once the locks are held, so a send that waited for them starts its cooldown and its code's
-  lifetime from when it was made, not from when it began waiting.
+  caps and the restart cooldown read the sends `FOR UPDATE` from the state row the transaction already holds. The same
+  read gives the challenge to resend: the row names each binding's latest challenge (`code_challenges`, keyed by a
+  digest of the factor, purpose, application and session), which is then read by its id `FOR UPDATE`. So a send inside
+  a transaction the application opened on the storage connection, after it has read, still counts a send committed
+  since and resends a challenge committed since, keeping its cooldown and an exhausted one's wait: MySQL answers a
+  locking read with the row as committed, under `REPEATABLE READ` too, and PostgreSQL's `REPEATABLE READ` raises a
+  serialisation failure at the identity's lock instead, for the application to retry. A challenge is never looked up by
+  its binding under a lock, which would lock gaps of the codes table that other identities insert into. A challenge the
+  state row does not name is never resent. A send drops the named challenges too old to be open, so raising
+  `challenge_ttl_minutes` brings none of them back. The factor is read again under the lock; one a concurrent change
+  removed answers `not_found`. The send's time is read once the locks are held, so a send that waited for them starts
+  its cooldown and its code's lifetime from when it was made, not from when it began waiting.
 - The code is stored first, then delivered by the factor's driver (`Contracts\CodeDeliveryDriver::deliver()`) inside
   the same transaction, so a delivery that throws keeps no code and spends no cooldown or cap. `CodeSent` is dispatched
   by `Verification\ChallengeRequests` once the transaction commits, whichever gateway sent the code, with the factor's

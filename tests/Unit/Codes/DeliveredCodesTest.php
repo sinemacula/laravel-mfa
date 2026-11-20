@@ -409,6 +409,51 @@ final class DeliveredCodesTest extends TestCase
     }
 
     /**
+     * A challenge the identity's row does not name is left to end.
+     *
+     * @return void
+     *
+     * @throws \Random\RandomException
+     */
+    public function testASendResendsOnlyTheChallengeTheIdentityRowNames(): void
+    {
+        $codes = $this->codes(['resend_cooldown_seconds' => 60], ['111111', '222222', '333333']);
+        $now   = self::now();
+        $first = self::issued($codes->issue(self::FACTOR, self::binding(), $now));
+
+        IdentityStateRow::of(new ProofOwner(TestUser::class, '1'))->update(['code_challenges' => null]);
+
+        $second = self::issued($codes->issue(self::FACTOR, self::binding(), $now));
+        $resent = self::issued($codes->issue(self::FACTOR, self::binding(), $now->addSeconds(60)));
+
+        self::assertNotSame($first->challengeId, $second->challengeId);
+        self::assertSame($second->challengeId, $resent->challengeId);
+        self::assertSame(1, self::row($first)->sends);
+    }
+
+    /**
+     * The new one is resent from then on.
+     *
+     * @return void
+     *
+     * @throws \Random\RandomException
+     */
+    public function testASendWhoseChallengeIsGoneStartsAnother(): void
+    {
+        $codes = $this->codes(['resend_cooldown_seconds' => 60], ['111111', '222222', '333333']);
+        $now   = self::now();
+        $first = self::issued($codes->issue(self::FACTOR, self::binding(), $now));
+
+        Code::query()->whereKey($first->challengeId)->delete();
+
+        $second = self::issued($codes->issue(self::FACTOR, self::binding(), $now));
+
+        self::assertNotSame($first->challengeId, $second->challengeId);
+        self::assertSame(30, $codes->issue(self::FACTOR, self::binding(), $now->addSeconds(30)));
+        self::assertSame($second->challengeId, self::issued($codes->issue(self::FACTOR, self::binding(), $now->addSeconds(60)))->challengeId);
+    }
+
+    /**
      * Across every session, until the oldest send leaves the window.
      *
      * @return void
