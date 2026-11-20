@@ -5,10 +5,12 @@ declare(strict_types = 1);
 namespace Tests\Integration\Database;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\CoversTrait;
 use SineMacula\Laravel\Mfa\Attempts\AttemptService;
+use SineMacula\Laravel\Mfa\Concerns\HasFactors;
 use SineMacula\Laravel\Mfa\Concerns\HashesOwner;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Database\IdentityStateRow;
@@ -26,6 +28,7 @@ use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use SineMacula\Laravel\Mfa\Verification\Submission;
 use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Identities\GenericIdentity;
+use Tests\Fixtures\Identities\UlidIdentity;
 use Tests\Fixtures\Lifecycle\Concerns\HoldsIdentityRecords;
 use Tests\Fixtures\Verification\Concerns\ArrangesVerification;
 use Tests\TestCase;
@@ -43,6 +46,7 @@ use Tests\TestCase;
 #[CoversClass(ForgetIdentity::class)]
 #[CoversClass(FactorStateTransaction::class)]
 #[CoversTrait(HashesOwner::class)]
+#[CoversTrait(HasFactors::class)]
 final class OwnerCollationIdentityStateTest extends TestCase
 {
     use ArrangesVerification, HoldsIdentityRecords;
@@ -104,6 +108,7 @@ final class OwnerCollationIdentityStateTest extends TestCase
         Mfa::verify(Callers::current(), Submission::factor($mine->id, AuthenticatorApp::code($mine, 5)));
 
         self::assertSame(FailureReason::LOCKED, Mfa::verify(Callers::current(), Submission::factor($mine->id, AuthenticatorApp::code($mine)))->reason);
+        self::assertNull($this->container()->make(AttemptService::class)->lockout($other));
 
         Mfa::resetIdentity($locked, new Actor('admin', '9'), 'Lost device');
 
@@ -139,6 +144,26 @@ final class OwnerCollationIdentityStateTest extends TestCase
 
     /**
      * @return void
+     */
+    public function testEachEloquentOwnerReadsOnlyItsOwnFactors(): void
+    {
+        $mine  = new UlidIdentity;
+        $other = new UlidIdentity;
+
+        $mine->setAttribute('id', '01jab12cd0000000000000000a');
+        $other->setAttribute('id', '01JAB12CD0000000000000000A');
+
+        $this->authenticatorAppOf($mine);
+
+        $theirs = $this->authenticatorAppOf($other, ['status' => 'pending']);
+
+        self::assertSame([$theirs->id], $other->authFactors()->pluck('id')->all());
+        self::assertFalse($other->isMfaEnabled());
+        self::assertTrue($mine->isMfaEnabled());
+    }
+
+    /**
+     * @return void
      *
      * @throws \Throwable
      */
@@ -157,17 +182,16 @@ final class OwnerCollationIdentityStateTest extends TestCase
     }
 
     /**
-     * @param  \Tests\Fixtures\Identities\GenericIdentity  $identity
+     * @param  \Illuminate\Contracts\Auth\Authenticatable  $identity
      * @param  array<string, mixed>  $attributes
      * @return \SineMacula\Laravel\Mfa\Models\Factor
      */
-    private function authenticatorAppOf(GenericIdentity $identity, array $attributes = []): Factor
+    private function authenticatorAppOf(Authenticatable $identity, array $attributes = []): Factor
     {
         return Factor::query()->create([
-            'authenticatable_type' => GenericIdentity::class,
-            'authenticatable_id'   => $identity->getAuthIdentifier(),
-            'status'               => 'confirmed',
-            'confirmed_at'         => CarbonImmutable::now(),
+            ...$this->ownerOf($identity),
+            'status'       => 'confirmed',
+            'confirmed_at' => CarbonImmutable::now(),
             ...AuthenticatorApp::FACTOR,
             ...$attributes,
         ]);
