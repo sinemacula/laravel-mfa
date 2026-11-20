@@ -24,6 +24,7 @@ use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\RecoveryCode;
 use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
 use SineMacula\Laravel\Mfa\Database\OpenTransaction;
+use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Events\Actor;
@@ -234,7 +235,7 @@ final readonly class RecoveryCodeService
 
         $settings = new ApplicationSettings($this->config, $binding->application);
         $owner    = ProofOwner::of($identity);
-        $known    = $this->firstFactors->forBinding($identity, $binding, $pending) !== null;
+        $known    = ($this->firstFactors->forBinding($identity, $binding, $pending)->channel->kind ?? ChannelKind::UNKNOWN) !== ChannelKind::UNKNOWN;
 
         return match (true) {
             !$settings->acceptsRecoveryCodes() => ChallengeAdmission::refuse(FailureReason::TYPE_NOT_ENABLED, 'The application does not accept recovery codes.'),

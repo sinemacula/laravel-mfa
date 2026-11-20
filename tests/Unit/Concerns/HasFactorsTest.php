@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\CoversTrait;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Concerns\HasFactors;
+use SineMacula\Laravel\Mfa\Database\StorageConnection;
+use SineMacula\Laravel\Mfa\Database\TableNames;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Factors\CustomFactor;
 use Tests\Fixtures\Factors\EnumStatusFactor;
@@ -20,6 +22,7 @@ use Tests\Fixtures\Factors\RemappedOwnerFactor;
 use Tests\Fixtures\Identities\FactorHolder;
 use Tests\Fixtures\Identities\FactorHoldingRecord;
 use Tests\Fixtures\Identities\SoftDeletingFactorHolder;
+use Tests\Fixtures\Lifecycle\Concerns\HoldsIdentityRecords;
 use Tests\TestCase;
 
 /**
@@ -31,7 +34,7 @@ use Tests\TestCase;
 #[CoversTrait(HasFactors::class)]
 final class HasFactorsTest extends TestCase
 {
-    use RefreshDatabase;
+    use HoldsIdentityRecords, RefreshDatabase;
 
     /**
      * @return void
@@ -254,6 +257,65 @@ final class HasFactorsTest extends TestCase
 
         self::assertTrue(FactorHolder::query()->whereKey($identity->id)->exists());
         self::assertSame([$factor->id], Factor::query()->pluck('id')->all());
+    }
+
+    /**
+     * Codes and enrolments are forgotten before the missing table fails it.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAFailedForgettingInsideATransactionUndoesTheDelete(): void
+    {
+        $identity = $this->createHolder('one@example.test');
+
+        $this->giveRecords($identity);
+
+        $setting = TableNames::setting(TableNames::PASSKEY_ASSOCIATIONS);
+        $config  = $this->container()->make(Repository::class);
+
+        $config->set($setting, 'missing_passkey_associations');
+
+        try {
+            DB::connection(StorageConnection::name())->transaction(static fn (): ?bool => $identity->delete());
+            self::fail('The forgetting was expected to fail.');
+        } catch (QueryException) {
+            $config->set($setting, null);
+        }
+
+        self::assertTrue(FactorHolder::query()->whereKey($identity->id)->exists());
+        self::assertSame($this->eachTableHolding(1), $this->recordCounts($identity));
+    }
+
+    /**
+     * The forgetting joins the transaction, so it is undone with the delete.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testADeleteRolledBackAfterForgettingKeepsTheRecords(): void
+    {
+        $identity = $this->createHolder('one@example.test');
+
+        $this->giveRecords($identity);
+
+        try {
+            DB::connection(StorageConnection::name())->transaction(function () use ($identity): never {
+                $identity->delete();
+
+                self::assertFalse(FactorHolder::query()->whereKey($identity->id)->exists());
+                self::assertSame($this->eachTableHolding(0), $this->recordCounts($identity));
+
+                throw new \RuntimeException('Rolled back.');
+            });
+        } catch (\RuntimeException $exception) {
+            self::assertSame('Rolled back.', $exception->getMessage());
+        }
+
+        self::assertTrue(FactorHolder::query()->whereKey($identity->id)->exists());
+        self::assertSame($this->eachTableHolding(1), $this->recordCounts($identity));
     }
 
     /**

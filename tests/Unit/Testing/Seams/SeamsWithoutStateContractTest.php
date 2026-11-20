@@ -4,33 +4,30 @@ declare(strict_types = 1);
 
 namespace Tests\Unit\Testing\Seams;
 
-use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\CoversTrait;
-use PHPUnit\Framework\Attributes\DataProvider;
-use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\DefaultEventContextResolver;
 use SineMacula\Laravel\Mfa\Context\IdentityContractActiveState;
 use SineMacula\Laravel\Mfa\Context\IdentityContractSubjectType;
 use SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver;
 use SineMacula\Laravel\Mfa\Contracts\ApplicationResolver;
 use SineMacula\Laravel\Mfa\Contracts\EventContextResolver;
-use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Contracts\IdentityRequirement;
 use SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
+use SineMacula\Laravel\Mfa\Contracts\RequirementPolicy;
 use SineMacula\Laravel\Mfa\Contracts\SessionTransition;
 use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 use SineMacula\Laravel\Mfa\Contracts\TenantRequirement;
 use SineMacula\Laravel\Mfa\Enums\FactorChangeMade;
 use SineMacula\Laravel\Mfa\Enums\FactorStatus;
-use SineMacula\Laravel\Mfa\Enums\Operation;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Http\MiddlewareSessionTransition;
-use SineMacula\Laravel\Mfa\Requirements\ConfiguredFreshnessGate;
+use SineMacula\Laravel\Mfa\Proofs\Proof;
+use SineMacula\Laravel\Mfa\Requirements\ConfiguredRequirementPolicy;
 use SineMacula\Laravel\Mfa\Requirements\IdentityContractRequirement;
 use SineMacula\Laravel\Mfa\Requirements\NoTenantRequirement;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
@@ -40,23 +37,19 @@ use SineMacula\Laravel\Mfa\Testing\Seams\ApplicationResolverContract;
 use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\ActiveStateResolverTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\ApplicationResolverTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\EventContextResolverTests;
-use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\FreshnessGateTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\IdentityRequirementTests;
+use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\RequirementPolicyTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\SessionTransitionTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\SubjectTypeResolverTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\Concerns\TenantRequirementTests;
 use SineMacula\Laravel\Mfa\Testing\Seams\EventContextResolverContract;
-use SineMacula\Laravel\Mfa\Testing\Seams\FreshnessGateContract;
 use SineMacula\Laravel\Mfa\Testing\Seams\RequirementSeamContract;
 use SineMacula\Laravel\Mfa\Testing\Seams\SeamAssert;
 use SineMacula\Laravel\Mfa\Testing\Seams\SessionTransitionContract;
 use SineMacula\Laravel\Mfa\Testing\Seams\SubjectTypeResolverContract;
-use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Drivers\HeaderApplicationResolver;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
-use Tests\Fixtures\Lifecycle\FixedFreshnessGate;
-use Tests\Fixtures\Requirements\FreshOnceGate;
 use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\Fixtures\Seams\AmbientSessionContextResolver;
 use Tests\Fixtures\Seams\DriftingSeams;
@@ -64,7 +57,6 @@ use Tests\Fixtures\Seams\FaultySeams;
 use Tests\Fixtures\Seams\FixedActiveState;
 use Tests\Fixtures\Seams\ObjectContextResolver;
 use Tests\Fixtures\Seams\RecordingSessionTransition;
-use Tests\Fixtures\Seams\ScriptedFreshnessGate;
 use Tests\TestCase;
 
 /**
@@ -77,7 +69,6 @@ use Tests\TestCase;
  *
  * @internal
  */
-#[CoversClass(FreshnessGateContract::class)]
 #[CoversClass(RequirementSeamContract::class)]
 #[CoversClass(ApplicationResolverContract::class)]
 #[CoversClass(SubjectTypeResolverContract::class)]
@@ -88,15 +79,15 @@ use Tests\TestCase;
 #[CoversClass(IdentityContractSubjectType::class)]
 #[CoversClass(IdentityContractActiveState::class)]
 #[CoversClass(MiddlewareSessionTransition::class)]
-#[CoversClass(ConfiguredFreshnessGate::class)]
+#[CoversClass(ConfiguredRequirementPolicy::class)]
 #[CoversClass(IdentityContractRequirement::class)]
 #[CoversClass(NoTenantRequirement::class)]
 #[CoversClass(DefaultEventContextResolver::class)]
 #[CoversTrait(ActiveStateResolverTests::class)]
 #[CoversTrait(ApplicationResolverTests::class)]
 #[CoversTrait(EventContextResolverTests::class)]
-#[CoversTrait(FreshnessGateTests::class)]
 #[CoversTrait(IdentityRequirementTests::class)]
+#[CoversTrait(RequirementPolicyTests::class)]
 #[CoversTrait(SessionTransitionTests::class)]
 #[CoversTrait(SubjectTypeResolverTests::class)]
 #[CoversTrait(TenantRequirementTests::class)]
@@ -105,135 +96,11 @@ final class SeamsWithoutStateContractTest extends TestCase
     use ActiveStateResolverTests,
         ApplicationResolverTests,
         EventContextResolverTests,
-        FreshnessGateTests,
         IdentityRequirementTests,
+        RequirementPolicyTests,
         SessionTransitionTests,
         SubjectTypeResolverTests,
         TenantRequirementTests;
-
-    /**
-     * @return void
-     */
-    public function testRejectsAGateThatFindsEverythingFresh(): void
-    {
-        $this->expectException(AssertionFailedError::class);
-
-        FreshnessGateContract::assertANameThatIsNoOperationIsNeverFresh(new FaultySeams, Callers::current());
-    }
-
-    /**
-     * One that always asks nothing, one with a requirement where neither side
-     * has any, one with none for a caller who asks, and one that asks less than
-     * the caller.
-     *
-     * @return iterable<string, array{\SineMacula\Laravel\Mfa\Contracts\FreshnessGate}>
-     */
-    public static function gatesAskingTheWrongThing(): iterable
-    {
-        yield 'asks for nothing' => [new FaultySeams];
-        yield 'has a requirement of its own for anything' => [new FixedFreshnessGate(Requirement::none()->withAdditionalVerification(60))];
-        yield 'has none for a caller who asks' => [new FixedFreshnessGate(null)];
-        yield 'asks less than the caller' => [
-            new class implements FreshnessGate {
-                /**
-                 * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
-                 * @param  string  $operation
-                 * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
-                 * @return bool
-                 */
-                #[\Override]
-                public function isFresh(CallerContext $caller, string $operation, ?Requirement $callerRequirement = null): bool
-                {
-                    return true;
-                }
-
-                /**
-                 * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
-                 * @param  string  $operation
-                 * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
-                 * @return ?\Carbon\CarbonImmutable
-                 */
-                #[\Override]
-                public function freshUntil(CallerContext $caller, string $operation, ?Requirement $callerRequirement = null): ?CarbonImmutable
-                {
-                    return null;
-                }
-
-                /**
-                 * Nothing for no caller, and less than a caller asks.
-                 *
-                 * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
-                 * @param  string  $operation
-                 * @param  ?\SineMacula\Laravel\Mfa\Requirements\Requirement  $callerRequirement
-                 * @return ?\SineMacula\Laravel\Mfa\Requirements\Requirement
-                 */
-                #[\Override]
-                public function requirement(CallerContext $caller, string $operation, ?Requirement $callerRequirement = null): ?Requirement
-                {
-                    return $callerRequirement === null ? null : Requirement::none();
-                }
-            },
-        ];
-    }
-
-    /**
-     * @param  \SineMacula\Laravel\Mfa\Contracts\FreshnessGate  $gate
-     * @return void
-     */
-    #[DataProvider('gatesAskingTheWrongThing')]
-    public function testRejectsAGateThatAsksTheWrongThing(FreshnessGate $gate): void
-    {
-        $this->expectException(AssertionFailedError::class);
-
-        FreshnessGateContract::assertTheRequirementAsksWhatTheCallerAsks($gate, Callers::current());
-    }
-
-    /**
-     * One whose deadline has passed, and one with a deadline for an operation
-     * it does not find fresh.
-     *
-     * @return void
-     */
-    public function testRejectsAGateWithADeadlineThatIsNoDeadline(): void
-    {
-        try {
-            FreshnessGateContract::assertADeadlineIsAheadAndMeansFresh(new FaultySeams, Callers::current(), Operation::ADD_FACTOR->value);
-
-            self::fail('A deadline already past was expected to be rejected.');
-        } catch (AssertionFailedError $failure) {
-            self::assertStringContainsString('must not be in the past', $failure->getMessage());
-        }
-
-        $this->expectException(AssertionFailedError::class);
-
-        FreshnessGateContract::assertADeadlineIsAheadAndMeansFresh(new FreshOnceGate, Callers::current(), Operation::ADD_FACTOR->value);
-    }
-
-    /**
-     * @return void
-     */
-    public function testRejectsAGateThatTakesAnUnboundedRequirement(): void
-    {
-        $this->expectException(AssertionFailedError::class);
-
-        FreshnessGateContract::assertAnUnboundedRequirementIsRefused(new FaultySeams, Callers::current());
-    }
-
-    /**
-     * @return void
-     */
-    public function testRejectsARequirementThatKeepsState(): void
-    {
-        $faulty   = new FaultySeams;
-        $identity = new NonEloquentIdentity;
-
-        $this->expectException(AssertionFailedError::class);
-
-        RequirementSeamContract::assertKeepsNoStateBetweenCalls(
-            static fn () => $faulty->requirementFor($identity, 'web'),
-            static fn () => $faulty->requirementFor($identity, 'api'),
-        );
-    }
 
     /**
      * @return void
@@ -347,70 +214,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * The same answer to a question asked twice in a row, but a different one
-     * once another was asked in between.
-     *
-     * @return void
-     */
-    public function testRejectsARequirementThatRemembersTheQuestionBefore(): void
-    {
-        $drifting = new DriftingSeams;
-        $identity = new NonEloquentIdentity;
-
-        $this->expectException(AssertionFailedError::class);
-        $this->expectExceptionMessage('whatever was asked in between');
-
-        RequirementSeamContract::assertKeepsNoStateBetweenCalls(
-            static fn () => $drifting->requirementFor($identity, 'web'),
-            static fn () => $drifting->requirementFor($identity, 'api'),
-        );
-    }
-
-    /**
-     * @return void
-     */
-    public function testRejectsAGateThatFindsAnUnconfiguredOperationFresh(): void
-    {
-        $this->expectException(AssertionFailedError::class);
-        $this->expectExceptionMessage('An operation with no requirement must never be fresh.');
-
-        FreshnessGateContract::assertAnOperationWithNoRequirementIsNeverFresh(new ScriptedFreshnessGate(true, null), Callers::current());
-    }
-
-    /**
-     * Fresh with no deadline, or a deadline without being fresh.
-     *
-     * @return void
-     */
-    public function testRejectsAGateWhoseFreshnessAndDeadlineDisagree(): void
-    {
-        $gates = [
-            'fresh with no deadline'    => new ScriptedFreshnessGate(true, null),
-            'not fresh with a deadline' => new ScriptedFreshnessGate(false, CarbonImmutable::now()->addHour()),
-        ];
-
-        foreach ($gates as $name => $gate) {
-            self::assertNotNull(
-                self::rejection(static fn () => FreshnessGateContract::assertAnOperationThatIsNotFreshHasNoDeadline($gate, Callers::current())),
-                sprintf('A gate %s was expected to be rejected.', $name),
-            );
-        }
-    }
-
-    /**
-     * Failing its assertion rather than erring.
-     *
-     * @return void
-     */
-    public function testRejectsAGateThatNamesNoDeadline(): void
-    {
-        $this->expectException(AssertionFailedError::class);
-        $this->expectExceptionMessage('A session fresh for the operation must say until when.');
-
-        FreshnessGateContract::assertADeadlineIsAheadAndMeansFresh(new ScriptedFreshnessGate(true, null), Callers::current(), Operation::ADD_FACTOR->value);
-    }
-
-    /**
      * @return void
      */
     public function testRejectsATransitionThatFailsWithoutRefusing(): void
@@ -506,51 +309,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     }
 
     /**
-     * Asked for a signed-in person.
-     *
-     * @return \SineMacula\Laravel\Mfa\Contracts\FreshnessGate
-     */
-    #[\Override]
-    protected function freshnessGate(): FreshnessGate
-    {
-        $this->actingAs($this->transitionIdentity());
-
-        return $this->container()->make(FreshnessGate::class);
-    }
-
-    /**
-     * Asked for a person with a step-up just recorded.
-     *
-     * @return \SineMacula\Laravel\Mfa\Contracts\FreshnessGate
-     */
-    #[\Override]
-    protected function freshGate(): FreshnessGate
-    {
-        $identity = TestUser::query()->create(['email' => 'fresh@example.test']);
-        $store    = $this->container()->make(ProofStore::class);
-        $proofs   = SignInProofs::of($identity);
-
-        $this->actingAs($identity);
-
-        $store->begin($identity, SignInProofs::APPLICATION, SignInProofs::SESSION);
-        $store->record($identity, $proofs->password(60));
-        $store->record($identity, $proofs->totp(30));
-
-        return $this->container()->make(FreshnessGate::class);
-    }
-
-    /**
-     * The package's operation, which every application has a freshness for.
-     *
-     * @return string
-     */
-    #[\Override]
-    protected function freshOperation(): string
-    {
-        return Operation::ADD_FACTOR->value;
-    }
-
-    /**
      * @return \SineMacula\Laravel\Mfa\Contracts\IdentityRequirement
      */
     #[\Override]
@@ -588,6 +346,58 @@ final class SeamsWithoutStateContractTest extends TestCase
     protected function requirementApplication(): string
     {
         return 'web';
+    }
+
+    /**
+     * @return \SineMacula\Laravel\Mfa\Contracts\RequirementPolicy
+     */
+    #[\Override]
+    protected function requirementPolicy(): RequirementPolicy
+    {
+        return $this->container()->make(RequirementPolicy::class);
+    }
+
+    /**
+     * A person who requires an additional factor of their own.
+     *
+     * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
+     */
+    #[\Override]
+    protected function policyIdentity(): MultiFactorAuthenticatable
+    {
+        return $this->requiringIdentity();
+    }
+
+    /**
+     * A person who requires nothing of their own.
+     *
+     * @return \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable
+     */
+    #[\Override]
+    protected function otherPolicyIdentity(): MultiFactorAuthenticatable
+    {
+        return $this->otherRequiringIdentity();
+    }
+
+    /**
+     * @return string
+     */
+    #[\Override]
+    protected function policyApplication(): string
+    {
+        return 'web';
+    }
+
+    /**
+     * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
+     * @return \SineMacula\Laravel\Mfa\Proofs\Proof
+     *
+     * @throws \SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException
+     */
+    #[\Override]
+    protected function policyFirstFactor(MultiFactorAuthenticatable $identity): Proof
+    {
+        return SignInProofs::of($identity)->password();
     }
 
     /**
@@ -692,19 +502,6 @@ final class SeamsWithoutStateContractTest extends TestCase
     protected function tenantApplication(): string
     {
         return 'web';
-    }
-
-    /**
-     * As the gate last signed it in.
-     *
-     * @return \SineMacula\Laravel\Mfa\Context\CallerContext
-     *
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    #[\Override]
-    protected function freshnessCaller(): CallerContext
-    {
-        return Callers::current();
     }
 
     /**

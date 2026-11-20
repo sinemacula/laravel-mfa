@@ -19,6 +19,7 @@ use SineMacula\Laravel\Mfa\MfaManager;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
 use SineMacula\Laravel\Mfa\Proofs\ProofService;
+use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use SineMacula\Laravel\Mfa\Testing\FakeEmailSender;
 use SineMacula\Laravel\Mfa\Verification\Submission;
@@ -46,6 +47,7 @@ use Tests\TestCase;
 #[CoversClass(MfaManager::class)]
 #[CoversClass(ProofService::class)]
 #[CoversClass(LifecycleService::class)]
+#[CoversClass(RecoveryCodeService::class)]
 final class PendingActionsTest extends TestCase
 {
     /** @var \Tests\Fixtures\Identities\TestUser Person signing in on the pending session. */
@@ -145,6 +147,33 @@ final class PendingActionsTest extends TestCase
         self::assertSame($this->factor->id, $this->manager()->factor(Callers::current(), $this->factor->id)?->id);
         self::assertNull($this->manager()->factor(Callers::current(), $this->guardedFactor->id));
         self::assertNotNull($this->manager()->recoveryCodeStatus(Callers::current()));
+    }
+
+    /**
+     * Not the guard's user's figures.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testRecoveryCodeStatusServesThePendingPerson(): void
+    {
+        $codes = $this->container()->make(RecoveryCodeService::class);
+
+        $codes->generate(TestUser::query()->where('email', 'guarded@example.test')->sole(), 'web');
+        $codes->generate($this->pending, 'web');
+        $codes->generate($this->pending, 'web');
+
+        $used = RecoveryCode::query()->where('authenticatable_id', (string) $this->pending->id)->whereNull('replaced_at')->limit(3)->pluck('id');
+
+        RecoveryCode::query()->whereKey($used)->update(['used_at' => CarbonImmutable::now()]);
+
+        $this->pendingSession([PendingAction::LIST_FACTORS]);
+
+        $status = $this->manager()->recoveryCodeStatus(Callers::current());
+
+        self::assertSame(7, $status?->remaining);
+        self::assertSame(2, $status->generation);
     }
 
     /**

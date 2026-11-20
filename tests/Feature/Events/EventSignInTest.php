@@ -4,17 +4,21 @@ declare(strict_types = 1);
 
 namespace Tests\Feature\Events;
 
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Contracts\EventContextResolver;
+use SineMacula\Laravel\Mfa\Contracts\MfaEvent;
 use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
+use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\Actor;
 use SineMacula\Laravel\Mfa\Events\CodeSent;
 use SineMacula\Laravel\Mfa\Events\EventDispatcher;
 use SineMacula\Laravel\Mfa\Events\EventSubject;
 use SineMacula\Laravel\Mfa\Events\FactorRenamed;
+use SineMacula\Laravel\Mfa\Events\LockoutApplied;
 use SineMacula\Laravel\Mfa\Events\PreferredFactorChanged;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodesGenerated;
 use SineMacula\Laravel\Mfa\Events\RecoveryCodeUsed;
@@ -99,6 +103,46 @@ final class EventSignInTest extends TestCase
         self::assertSame([self::PENDING], $this->signInsOf(VerificationPassed::class));
         self::assertSame([self::PENDING], array_values(array_unique($this->resolver->signIns())));
         self::assertSame(self::SESSION, $this->currentSignIn($user));
+    }
+
+    /**
+     * The factor's and the identity's carry the failure's application, client
+     * and purpose, and name no sign-in.
+     *
+     * @return void
+     */
+    public function testAPendingVerificationsLockoutsNameNoSignIn(): void
+    {
+        config()->set('mfa.attempts.factor_limit', 1);
+        config()->set('mfa.attempts.identity_limit', 2);
+
+        $this->container()->instance('request', Request::create('/', 'POST', server: ['REMOTE_ADDR' => '203.0.113.9', 'HTTP_USER_AGENT' => 'Agent/3.0']));
+
+        $user   = $this->pendingPerson();
+        $factor = $this->totpFactor($user);
+
+        $this->recoveryCode($user);
+
+        self::assertFalse($this->mfa()->verify(Callers::current(), Submission::factor($factor->id, '000000'))->isVerified());
+        self::assertFalse($this->mfa()->verify(Callers::current(), Submission::recoveryCode('wrong'))->isVerified());
+        self::assertSame([self::PENDING, self::PENDING], $this->signInsOf(VerificationFailed::class));
+        self::assertSame([null, null], $this->signInsOf(LockoutApplied::class));
+
+        $lockouts = array_values(array_filter($this->reported, static fn (MfaEvent $event): bool => $event instanceof LockoutApplied));
+
+        [$factorLockout, $identityLockout] = $lockouts;
+
+        self::assertInstanceOf(LockoutApplied::class, $factorLockout);
+        self::assertInstanceOf(LockoutApplied::class, $identityLockout);
+        self::assertSame($factor->id, $factorLockout->factor?->id);
+        self::assertNull($identityLockout->factor);
+
+        foreach ([$factorLockout, $identityLockout] as $lockout) {
+            self::assertSame(Purpose::SIGN_IN, $lockout->purpose);
+            self::assertSame(self::APPLICATION, $lockout->context()['application']);
+            self::assertSame('203.0.113.9', $lockout->context()['ip']);
+            self::assertSame('Agent/3.0', $lockout->context()['user_agent']);
+        }
     }
 
     /**

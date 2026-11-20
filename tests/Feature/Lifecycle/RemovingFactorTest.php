@@ -10,6 +10,7 @@ use Illuminate\Session\Store;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Assurance\ObservedProperties;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver;
@@ -910,6 +911,41 @@ final class RemovingFactorTest extends TestCase
         $this->stepUpWith($user, $other);
 
         self::assertTrue(Mfa::removeFactor(Callers::current(), $factor->id)->wasMade());
+        self::assertSame(10, RecoveryCode::query()->count());
+        self::assertSame(['FactorRemoved'], $this->reportedNames());
+    }
+
+    /**
+     * @return iterable<string, array{array<string, string>}>
+     */
+    public static function remainingFactors(): iterable
+    {
+        yield 'disabled at the failure ceiling' => [['disabled_at' => '2027-01-15 08:00:00']];
+        yield 'enrolled through another application' => [['application' => 'admin']];
+    }
+
+    /**
+     * It is still confirmed, so the set stays and only the removal is reported.
+     *
+     * @param  array<string, string>  $state
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    #[DataProvider('remainingFactors')]
+    public function testADisabledOrOtherApplicationsFactorKeepsTheRecoveryCodes(array $state): void
+    {
+        $user   = $this->signedInPerson();
+        $factor = $this->confirmedFactor($user);
+        $other  = $this->confirmedFactor($user);
+
+        $other->update($state);
+
+        $this->recoveryCodesOf($user);
+        $this->stepUpWith($user, $other);
+
+        self::assertTrue(Mfa::removeFactor(Callers::current(), $factor->id)->wasMade());
+        self::assertTrue($this->isStored($other));
         self::assertSame(10, RecoveryCode::query()->count());
         self::assertSame(['FactorRemoved'], $this->reportedNames());
     }
