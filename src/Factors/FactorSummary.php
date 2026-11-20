@@ -125,9 +125,9 @@ final readonly class FactorSummary implements \JsonSerializable
     {
         [$local, $domain] = explode('@', $destination, 2);
 
-        $keep   = min(2, (int) max(1, floor(strlen($local) / 2)));
-        $prefix = substr($local, 0, $keep);
-        $masked = $prefix . str_repeat('*', max(1, strlen($local) - $keep));
+        $length = mb_strlen($local);
+        $keep   = min(2, (int) max(1, floor($length / 2)));
+        $masked = mb_substr($local, 0, $keep) . str_repeat('*', max(1, $length - $keep));
 
         return $masked . '@' . $domain;
     }
@@ -141,10 +141,10 @@ final readonly class FactorSummary implements \JsonSerializable
     private static function maskOpaque(#[\SensitiveParameter] string $destination): string
     {
         $keep   = 4;
-        $length = strlen($destination);
+        $length = mb_strlen($destination);
 
         return $length <= $keep
             ? str_repeat('*', $length)
-            : str_repeat('*', $length - $keep) . substr($destination, -$keep);
+            : str_repeat('*', $length - $keep) . mb_substr($destination, -$keep);
     }
 }

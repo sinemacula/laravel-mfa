@@ -16,11 +16,13 @@ use SineMacula\Laravel\Mfa\Attempts\ChallengeOutcome;
 use SineMacula\Laravel\Mfa\Codes\PackageChallengeGateway;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
 use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
+use SineMacula\Laravel\Mfa\Contracts\ActiveTenantResolver;
 use SineMacula\Laravel\Mfa\Contracts\CombinationPolicy;
 use SineMacula\Laravel\Mfa\Contracts\IdentityRequirement;
 use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\StepUp;
+use SineMacula\Laravel\Mfa\Contracts\TenantRequirement;
 use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
@@ -51,7 +53,9 @@ use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
 use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Drivers\RecordingFactorDriver;
+use Tests\Fixtures\Requirements\FixedActiveTenant;
 use Tests\Fixtures\Requirements\FixedIdentityRequirement;
+use Tests\Fixtures\Requirements\FixedTenantRequirement;
 use Tests\Fixtures\Requirements\RecordingCombinationPolicy;
 use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\Fixtures\Requirements\UnacceptingCombinationPolicy;
@@ -333,6 +337,31 @@ final class CompletionVerificationServiceTest extends TestCase
 
         self::assertTrue($second->evaluation?->meetsRequirement());
         self::assertCount(2, $this->furtherProofs($user));
+    }
+
+    /**
+     * Under an application that asks for nothing, and handed to the step-up as
+     * the caller gets it.
+     *
+     * @return void
+     */
+    public function testAStepUpIsEvaluatedAgainstTheActiveTenantsRequirement(): void
+    {
+        $this->enableApplication(['requirement' => 'never']);
+
+        $user   = $this->signedInPerson();
+        $factor = $this->totpFactor($user);
+        $seam   = new CheckingCompletion(self::SESSION);
+
+        $this->container()->instance(StepUp::class, $seam);
+        $this->container()->instance(ActiveTenantResolver::class, new FixedActiveTenant('tenant-1'));
+        $this->container()->instance(TenantRequirement::class, new FixedTenantRequirement(Requirement::none()->withPhishingResistance()));
+
+        $result = $this->mfa()->verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)));
+
+        self::assertTrue($result->isVerified());
+        self::assertSame([RequirementPart::PHISHING_RESISTANCE], $result->evaluation?->unmet);
+        self::assertSame($result->evaluation, $seam->accepted[0]->evaluation);
     }
 
     /**
