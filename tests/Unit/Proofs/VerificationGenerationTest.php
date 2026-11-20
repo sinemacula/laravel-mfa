@@ -13,6 +13,7 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Proofs\VerificationGeneration;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
+use Tests\Fixtures\Hardening\LockMarkingSqliteGrammar;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\NonScalarIdentifierUser;
 use Tests\Fixtures\Identities\SecondaryUser;
@@ -170,6 +171,46 @@ final class VerificationGenerationTest extends TestCase
         }
 
         self::assertSame(0, VerificationGeneration::current($user));
+    }
+
+    /**
+     * A plain read in a MySQL transaction reads its snapshot and can miss an
+     * advance committed after it.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testUnderTheFactorStateLockTheGenerationIsALockingRead(): void
+    {
+        $user = $this->user(7);
+
+        VerificationGeneration::advance($user);
+
+        $connection = DB::connection();
+
+        self::assertInstanceOf(Connection::class, $connection);
+
+        if ($connection->getDriverName() === 'sqlite') {
+            $connection->setQueryGrammar(new LockMarkingSqliteGrammar($connection));
+        }
+
+        $reads = [];
+
+        $connection->beforeExecuting(static function (string $query) use (&$reads): void {
+
+            if (!str_starts_with($query, 'select') || !str_contains($query, 'verification_generation')) {
+                return;
+            }
+
+            $reads[] = $query;
+        });
+
+        self::assertSame(1, VerificationGeneration::current($user));
+        self::assertSame(1, FactorStateTransaction::forIdentity($user, new Factor, static fn (): int => VerificationGeneration::current($user)));
+        self::assertCount(2, $reads);
+        self::assertStringNotContainsStringIgnoringCase('for update', $reads[0]);
+        self::assertStringContainsStringIgnoringCase('for update', $reads[1]);
     }
 
     /**

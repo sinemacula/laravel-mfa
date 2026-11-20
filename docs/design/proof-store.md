@@ -31,9 +31,12 @@ are the evidence every later answer (freshness, levels, requirements) is worked 
   and a stored entry that cannot be read back as a proof, is left out. The proofs come back oldest first, with proofs
   made at the same instant in the order they were recorded, an order a bound store must keep too.
 - The verification generation is `verification_generation` on the identity's row in the identity states table, 0 when
-  it has none, read from the write connection. `Proofs\VerificationGeneration::advance()` creates the row when needed
-  and moves the generation on by one inside a transaction on the storage connection; called inside the identity's
-  factor state transaction it joins it and rolls back with it.
+  it has none, read from the write connection. Inside a callback of the identity's factor state transaction it is read
+  `FOR UPDATE` from the row that transaction holds, so a reset committed after an application's older `REPEATABLE READ`
+  snapshot still revokes every earlier proof and enrolment that callback judges; elsewhere it is a plain read.
+  `Proofs\VerificationGeneration::advance()` creates the row when needed and moves the generation on by one inside a
+  transaction on the storage connection; called inside the identity's factor state transaction it joins it and rolls
+  back with it.
 - An enrolment's confirmation on a pending session is recorded as any further proof is, with purpose `enrollment`; on an
   active session it records nothing (see [Enrolment](enrollment.md)).
 - The default store, `Proofs\SessionProofStore`, keeps each identity's sign-ins and the full records of their proofs
@@ -134,6 +137,7 @@ are the evidence every later answer (freshness, levels, requirements) is worked 
 - `tests/Unit/Proofs/SessionProofStoreTest.php`: sign-ins per application, recording, every fail-closed read, the
   bound, malformed session data.
 - `tests/Unit/Proofs/VerificationGenerationTest.php`, `tests/Unit/Proofs/ProofOwnerTest.php`.
+- `tests/Integration/Database/GenerationSnapshotTest.php` (MySQL).
 - `tests/Unit/Proofs/GuardHooksTest.php`, `tests/Unit/Proofs/BeginSignInOnLoginTest.php`,
   `tests/Unit/Proofs/ForgetSignInOnLogoutTest.php`, `tests/Unit/Proofs/ProofBindingsTest.php`.
 - `tests/Unit/Proofs/ProofServiceTest.php`; `tests/Unit/Proofs/ProofStoreCompletionTest.php` and

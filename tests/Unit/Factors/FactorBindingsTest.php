@@ -7,6 +7,7 @@ namespace Tests\Unit\Factors;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Factors\FactorBindings;
 use SineMacula\Laravel\Mfa\Factors\FactorService;
+use SineMacula\Laravel\Mfa\Support\FactorStateLocks;
 use Tests\TestCase;
 
 /**
@@ -28,5 +29,23 @@ final class FactorBindingsTest extends TestCase
         self::assertFalse($this->container()->isShared(FactorService::class));
         self::assertTrue($this->container()->bound(FactorService::class));
         self::assertNotSame($this->container()->make(FactorService::class), $this->container()->make(FactorService::class));
+    }
+
+    /**
+     * One per request, shared by a factor state callback and its reads.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testSharesTheFactorStateLocksWithinOneRequestOnly(): void
+    {
+        $locks = $this->container()->make(FactorStateLocks::class);
+
+        self::assertSame($locks, $this->container()->make(FactorStateLocks::class));
+
+        $this->container()->forgetScopedInstances();
+
+        self::assertNotSame($locks, $this->container()->make(FactorStateLocks::class));
     }
 }
