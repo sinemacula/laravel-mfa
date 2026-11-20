@@ -54,9 +54,9 @@ final class StoresTimesInUtcTest extends TestCase
     {
         $state = new IdentityState;
 
-        $state->locked_until = CarbonImmutable::parse('2026-10-25 01:30:00', 'UTC')->setTimezone('Europe/London');
+        $state->locked_until = CarbonImmutable::parse('2026-10-25 00:30:00', 'UTC')->setTimezone('Europe/London');
 
-        self::assertSame('2026-10-25 01:30:00', $state->getAttributes()['locked_until']);
+        self::assertSame('2026-10-25 00:30:00', $state->getAttributes()['locked_until']);
     }
 
     /**
