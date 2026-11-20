@@ -69,8 +69,9 @@ final readonly class DeliveredCodes
     {
         $session = $this->keys->session($binding->sessionId);
         $target  = $this->keys->destination($binding, $factorId, $destination);
-        $sends   = SendLedger::read($this->settings, $binding);
-        $open    = $this->open($factorId, $binding, $session, $now);
+        $sends   = SendLedger::read($this->settings, $binding, $factorId, $session);
+        $latest  = $sends->challenge($now);
+        $open    = $latest === null ? null : $this->open($latest, $factorId, $binding, $session);
         $wait    = max(
             $sends->caps($target, $now),
             $open === null ? $sends->restart($target, $binding->purpose, $now) : $this->resendWait($open, $now),
@@ -85,7 +86,7 @@ final readonly class DeliveredCodes
             : $this->resend($open, $factorId, $binding, $now);
 
         if ($issued instanceof IssuedCode) {
-            $sends->record($target, $binding->purpose, $now);
+            $sends->record($target, $binding->purpose, $now, $open === null ? $issued->challengeId : null);
         }
 
         return $issued;
@@ -150,19 +151,18 @@ final readonly class DeliveredCodes
     }
 
     /**
+     * Read by key and `FOR UPDATE`, so an older snapshot cannot hide a
+     * challenge committed since, and no lookup by binding locks a gap.
+     *
+     * @param  string  $challengeId
      * @param  string  $factorId
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  string  $session
-     * @param  \Carbon\CarbonImmutable  $now
      * @return ?\SineMacula\Laravel\Mfa\Models\Code
-     *
-     * @throws \InvalidArgumentException
      */
-    private function open(string $factorId, ProofBinding $binding, string $session, CarbonImmutable $now): ?Code
+    private function open(string $challengeId, string $factorId, ProofBinding $binding, string $session): ?Code
     {
-        $started = (new Code)->fromDateTime($now->subMinutes($this->settings->challengeTtlMinutes()));
-
-        return self::firstOf($this->bound($factorId, $binding, $session)->whereNull('consumed_at')->where('created_at', '>', $started));
+        return $this->bound($factorId, $binding, $session)->whereKey($challengeId)->whereNull('consumed_at')->lockForUpdate()->first();
     }
 
     /**

@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\QueryException;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -1491,6 +1492,38 @@ final class AttemptServiceTest extends TestCase
         self::assertNull($this->state($user));
         self::assertSame(0, $this->fresh($factor)->getConsecutiveFailures());
         self::assertSame(0, $this->hits($this->keys()->ip(self::IP)));
+    }
+
+    /**
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAFailedGiveBackLeavesADatabaseFailureToPropagate(): void
+    {
+        $this->expectExceptionObject(new \PDOException('deadlock detected'));
+
+        $this->service()->throttled(self::IP, static function (): AttemptOutcome {
+            Schema::drop('mfa_attempts');
+
+            throw new \PDOException('deadlock detected');
+        });
+    }
+
+    /**
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testAFailedGiveBackReplacesAnExceptionThatIsNotADatabaseFailure(): void
+    {
+        $this->expectException(QueryException::class);
+
+        $this->service()->throttled(self::IP, static function (): AttemptOutcome {
+            Schema::drop('mfa_attempts');
+
+            throw new MidRotationFailureException('verification failed');
+        });
     }
 
     /**

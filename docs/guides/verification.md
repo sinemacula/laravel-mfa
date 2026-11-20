@@ -112,9 +112,8 @@ The send caps count the identity's recent sends from its state row, read with a 
 made inside a transaction of your own on the storage connection, after it has read, still counts one another request
 committed since: MySQL answers that read with the row as committed, also under its default `REPEATABLE READ`. Under
 PostgreSQL's `REPEATABLE READ` the send raises a serialisation failure instead: retry your whole transaction. The
-challenge a send would resend is found without a lock, so under your snapshot a second send in the same sign-in may
-start a new challenge in place of one committed since, without that challenge's resend cooldown; the caps still count
-it. Send outside a transaction of your own to avoid both.
+challenge a send resends is found through the same row, so a second send in the same sign-in resends one committed
+since and keeps its resend cooldown. Send outside a transaction of your own to avoid the retry.
 
 A factor that delivers no codes answers `not_found`. A delivered factor must name its challenge when it is verified:
 `Submission::factor()` on one is `not_found`, as is any other kind of submission its factor does not take.

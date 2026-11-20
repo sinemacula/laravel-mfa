@@ -138,7 +138,12 @@ final readonly class AttemptService
             $outcome = $verification();
         } catch (\Throwable $exception) {
 
-            $this->ipThrottle->giveBack($slot);
+            try {
+                $this->ipThrottle->giveBack($slot);
+            } catch (\Throwable $failure) {
+                // A database failure can abort the transaction this runs in.
+                throw $exception instanceof \PDOException ? $exception : $failure;
+            }
 
             throw $exception;
         }
