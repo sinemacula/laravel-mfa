@@ -5,9 +5,12 @@ declare(strict_types = 1);
 namespace Tests\Unit\RecoveryCodes;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Hashing\Hasher;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
 use PHPUnit\Framework\Attributes\CoversClass;
+use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Events\Actor;
@@ -329,6 +332,40 @@ final class RecoveryCodeGenerationTest extends TestCase
         $this->recoveryCodes()->generate($holder, 'web');
 
         self::assertSame(range(0, 9), $usable);
+    }
+
+    /**
+     * So the identity's lock is never held for the slow hashing.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testHashesBeforeTheLockIsTaken(): void
+    {
+        $holder = $this->signInHolder();
+        $level  = static fn (): int => DB::connection(StorageConnection::name())->transactionLevel();
+        $hashed = [];
+        $stored = [];
+
+        $hasher = \Mockery::mock(Hasher::class);
+
+        $hasher->shouldReceive('make')->andReturnUsing(static function (string $code) use ($level, &$hashed): string {
+            $hashed[] = $level();
+
+            return 'hashed:' . $code;
+        });
+
+        $this->container()->instance(Hasher::class, $hasher);
+
+        RecoveryCode::creating(static function () use ($level, &$stored): void {
+            $stored[] = $level();
+        });
+
+        $this->recoveryCodes()->generate($holder, 'web');
+
+        self::assertSame(array_fill(0, 10, 0), $hashed);
+        self::assertSame(array_fill(0, 10, 1), $stored);
     }
 
     /**

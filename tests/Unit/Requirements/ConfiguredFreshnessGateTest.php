@@ -11,23 +11,32 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Context\PendingContext;
 use SineMacula\Laravel\Mfa\Contracts\ActiveStateResolver;
+use SineMacula\Laravel\Mfa\Contracts\ActiveTenantResolver;
 use SineMacula\Laravel\Mfa\Contracts\CombinationPolicy;
 use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
 use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
+use SineMacula\Laravel\Mfa\Contracts\IdentityRequirement;
 use SineMacula\Laravel\Mfa\Contracts\PendingSessionResolver;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
+use SineMacula\Laravel\Mfa\Contracts\TenantRequirement;
 use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
+use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Requirements\ConfiguredFreshnessGate;
 use SineMacula\Laravel\Mfa\Requirements\OperationRequirements;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
+use SineMacula\Laravel\Mfa\Requirements\RequirementService;
 use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Context\FixedPendingSessionResolver;
 use Tests\Fixtures\Context\InvertedActiveState;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
+use Tests\Fixtures\Requirements\FixedActiveTenant;
 use Tests\Fixtures\Requirements\FixedFirstFactorResolver;
+use Tests\Fixtures\Requirements\FixedIdentityRequirement;
+use Tests\Fixtures\Requirements\FixedTenantRequirement;
 use Tests\Fixtures\Requirements\RecordingCombinationPolicy;
 use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\TestCase;
@@ -246,6 +255,53 @@ final class ConfiguredFreshnessGateTest extends TestCase
         self::assertFalse($this->gate()->isFresh(Callers::current(), 'mfa.add_factor', $stricter));
         self::assertTrue($this->gate()->isFresh(Callers::current(), 'reports.export', $looser));
         self::assertFalse($this->gate()->isFresh(Callers::current(), 'reports.export', $stricter));
+    }
+
+    /**
+     * An application's own entry for a package operation is not merged with the
+     * default, so a reauthentication alone can meet it.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testAnApplicationsEntryReplacesThePackagesDefault(): void
+    {
+        config()->set('mfa.applications.web.freshness', ['mfa.remove_factor' => ['minimum_level' => ['level' => 'aal1', 'max_age' => 300]]]);
+
+        $this->signIn(static fn (SignInProofs $signIn): array => [$signIn->password(self::TWO_HOURS), $signIn->reauthentication()]);
+
+        self::assertTrue($this->gate()->isFresh(Callers::current(), 'mfa.remove_factor'));
+        self::assertFalse($this->gate()->isFresh(Callers::current(), 'mfa.add_factor'));
+    }
+
+    /**
+     * Neither the application's mode, the identity's, the tenant's nor the
+     * re-enrolment obligation's parts are added, though a reauthentication
+     * alone meets none of them.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testFreshnessAddsNoneOfTheSignInsRequirement(): void
+    {
+        config()->set('mfa.applications.web', ['requirement' => 'always', 'freshness' => ['reports.export' => ['minimum_level' => ['level' => 'aal1', 'max_age' => 300]]]]);
+
+        $this->container()->instance(IdentityRequirement::class, new FixedIdentityRequirement(Requirement::none()->withMinimumLevel(AssuranceLevel::AAL2)));
+        $this->container()->instance(ActiveTenantResolver::class, new FixedActiveTenant('tenant-1'));
+        $this->container()->instance(TenantRequirement::class, new FixedTenantRequirement(Requirement::none()->withPhishingResistance()));
+
+        $user  = $this->signIn(static fn (SignInProofs $signIn): array => [$signIn->password(self::TWO_HOURS), $signIn->reauthentication()]);
+        $owner = ProofOwner::of($user);
+
+        IdentityState::query()->updateOrCreate(['authenticatable_type' => $owner->type, 'authenticatable_id' => $owner->key], ['reenrollment_required' => true]);
+
+        $signInRequirement = $this->container()->make(RequirementService::class)->requirement(Callers::current());
+
+        self::assertSame(['additional_verification', 'minimum_level', 'phishing_resistance'], array_keys($signInRequirement->toArray()));
+        self::assertTrue($this->gate()->isFresh(Callers::current(), 'reports.export'));
+        self::assertSame(['minimum_level' => ['level' => 'aal1', 'max_age' => 300]], $this->gate()->requirement(Callers::current(), 'reports.export')?->toArray());
     }
 
     /**
