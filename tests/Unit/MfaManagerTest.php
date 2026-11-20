@@ -46,7 +46,6 @@ use SineMacula\Laravel\Mfa\Verification\Submission;
 use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
 use Tests\Fixtures\Context\Callers;
-use Tests\Fixtures\Drivers\NoopFactorDriver;
 use Tests\Fixtures\Factors\InMemoryFactor;
 use Tests\Fixtures\Identities\NonEloquentIdentity;
 use Tests\Fixtures\Identities\TestUser;
@@ -104,7 +103,7 @@ final class MfaManagerTest extends TestCase
     /**
      * @return void
      */
-    public function testHasDriverKnowsASubclassCreatorMethod(): void
+    public function testHasDriverKnowsASubclassCreatorMethodWithoutBuildingIt(): void
     {
         $manager = new class ($this->container()) extends MfaManager {
             /**
@@ -112,7 +111,7 @@ final class MfaManagerTest extends TestCase
              */
             public function createVoiceCallDriver(): FactorDriver
             {
-                return new NoopFactorDriver;
+                Assert::fail('The driver must not be built.');
             }
         };
 
