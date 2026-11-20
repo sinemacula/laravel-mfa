@@ -119,11 +119,20 @@ factors as a builder over the configured factor model, an `EloquentFactor`, owne
 them by the owner hash, since a case-insensitive collation would also match an owner whose key differs only in case:
 
 ```php
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 
 public function authFactors(): Builder
 {
-    return Factor::query()->where('owner_hash', ProofOwner::of($this)->hash());
+    /** @var class-string<Model&EloquentFactor> $model */
+    $model = Factor::class;
+
+    return $model::query()->where('owner_hash', ProofOwner::of($this)->hash());
 }
 ```
+
+The `@var` widens the builder to the model type the contract declares, as PHPStan reads a builder of `Factor` as a
+different type.

@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Unit;
 
 use Carbon\CarbonImmutable;
+use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
@@ -79,6 +80,43 @@ final class MfaManagerTest extends TestCase
     public function testDefaultDriverIsTotp(): void
     {
         self::assertSame('totp', $this->manager()->getDefaultDriver());
+    }
+
+    /**
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testHasDriverKnowsEachRegisteredDriverWithoutBuildingIt(): void
+    {
+        $manager = $this->manager();
+
+        $manager->extend('custom', fn () => Assert::fail('The driver must not be built.'));
+
+        foreach (['totp', 'email', 'sms', 'passkey', 'custom'] as $driver) {
+            self::assertTrue($manager->hasDriver($driver), $driver);
+        }
+
+        self::assertFalse($manager->hasDriver('topt'));
+    }
+
+    /**
+     * @return void
+     */
+    public function testHasDriverKnowsASubclassCreatorMethodWithoutBuildingIt(): void
+    {
+        $manager = new class ($this->container()) extends MfaManager {
+            /**
+             * @return \SineMacula\Laravel\Mfa\Contracts\FactorDriver
+             */
+            public function createVoiceCallDriver(): FactorDriver
+            {
+                Assert::fail('The driver must not be built.');
+            }
+        };
+
+        self::assertTrue($manager->hasDriver('voice_call'));
+        self::assertFalse($manager->hasDriver('voice'));
     }
 
     /**

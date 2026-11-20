@@ -11,6 +11,9 @@ credential the route uses, through the model's own lookup. It also records what 
   handing `parent::...($value, $field)` as a closure to `Factors\FactorRouteBinding`, resolved through
   `Container::getInstance()`. The lookup is the parent's, so a custom key, `withTrashed()` and a base model's own
   binding (a hashid decoder, say) keep working.
+- On an integer key (`getKeyType()` is `int` or `integer`), a value for the key that is not an integer binds nothing and
+  sends no query, as PostgreSQL fails comparing the two. The check runs only where the parent's method is Eloquent's
+  own, so a base model's binding decodes the value first.
 - The shipped `Models\Factor` uses the trait, so an ordinary implicit binding of it enforces ownership with nothing
   else to do. An application's own model opts in beside `Concerns\ActsAsFactor`.
 - `FactorRouteBinding::resolve()`:
@@ -58,6 +61,8 @@ credential the route uses, through the model's own lookup. It also records what 
   reaches the trait, so such a route must scope its parent to the caller itself. `Route::bind()` is the application's
   own, and is the way to bind other people's factors; `unlockFactor()`, `enableFactor()` and `resetIdentity()` take the
   identity and a raw id, so an administrator needs no bound model.
+- On an integer key, a decoder in `resolveRouteBindingQuery()` is never handed a value that is not an integer, so the
+  binding misses. A decoder for an integer key belongs in `resolveRouteBinding()`.
 - An eager load on another connection is not pinned to its writer, and is not a security input.
 - A model passed to a helper finds nothing, since a helper looks up an id: `Mfa::removeFactor($caller, $factor)` answers
   `not_found`.
@@ -91,6 +96,10 @@ credential the route uses, through the model's own lookup. It also records what 
   `testABaseModelsOwnBindingIsTheLookup`
 - `tests/Unit/Concerns/ResolvesFactorRouteBindingTest.php`
   `testAnOwnerDifferingOnlyInCaseMisses`
+- `tests/Unit/Concerns/ResolvesFactorRouteBindingTest.php`
+  `testANonIntegerValueForAnIntegerKeyMissesWithNoQuery`
+- `tests/Unit/Concerns/ResolvesFactorRouteBindingTest.php`
+  `testABaseModelsOwnBindingDecodesAnIntegerKey`
 - `tests/Feature/Factors/FactorRouteBindingTest.php`
   `testPendingDisabledAndOtherApplicationFactorsBindForTheirOwner`
 - `tests/Feature/Factors/FactorRouteBindingTest.php`

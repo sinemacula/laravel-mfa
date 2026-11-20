@@ -10,12 +10,16 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\CoversTrait;
+use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Concerns\ResolvesFactorRouteBinding;
 use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 use SineMacula\Laravel\Mfa\Factors\FactorRouteBinding;
 use SineMacula\Laravel\Mfa\Models\Factor;
 use Tests\Fixtures\Factors\DecodedRouteKeyFactor;
+use Tests\Fixtures\Factors\IntegerAliasKeyedFactor;
+use Tests\Fixtures\Factors\IntegerKeyedDecodedRouteKeyFactor;
+use Tests\Fixtures\Factors\IntegerKeyedFactor;
 use Tests\Fixtures\Factors\OrderedRouteKeyFactor;
 use Tests\Fixtures\Factors\RemappedOwnerFactor;
 use Tests\Fixtures\Factors\SoftDeletingFactor;
@@ -171,6 +175,57 @@ final class ResolvesFactorRouteBindingTest extends TestCase
         $this->signedInUser();
 
         self::assertNull((new Factor)->resolveRouteBinding('not-a-ulid'));
+    }
+
+    /**
+     * @return iterable<string, array{class-string<\SineMacula\Laravel\Mfa\Models\Factor>, string}>
+     */
+    public static function nonIntegerKeys(): iterable
+    {
+        foreach (['int' => IntegerKeyedFactor::class, 'integer' => IntegerAliasKeyedFactor::class] as $keyType => $model) {
+            yield "letters on an {$keyType} key" => [$model, 'abc'];
+            yield "a number with a suffix on an {$keyType} key" => [$model, '1abc'];
+        }
+    }
+
+    /**
+     * PostgreSQL would refuse the query, so it is never sent.
+     *
+     * @param  class-string<\SineMacula\Laravel\Mfa\Models\Factor>  $model
+     * @param  string  $value
+     * @return void
+     */
+    #[DataProvider('nonIntegerKeys')]
+    public function testANonIntegerValueForAnIntegerKeyMissesWithNoQuery(string $model, string $value): void
+    {
+        $this->integerKeyedFactor($this->signedInUser(), $model);
+
+        DB::enableQueryLog();
+
+        self::assertNull((new $model)->resolveRouteBinding($value));
+        self::assertNull((new $model)->resolveSoftDeletableRouteBinding($value));
+        self::assertSame([], DB::getQueryLog());
+    }
+
+    /**
+     * @return void
+     */
+    public function testAnIntegerKeyBindsByItsIdOrACustomKey(): void
+    {
+        $id = $this->integerKeyedFactor($this->signedInUser());
+
+        self::assertSame($id, (new IntegerKeyedFactor)->resolveRouteBinding((string) $id)?->getKey());
+        self::assertSame($id, (new IntegerKeyedFactor)->resolveRouteBinding('Work phone', 'label')?->getKey());
+    }
+
+    /**
+     * @return void
+     */
+    public function testABaseModelsOwnBindingDecodesAnIntegerKey(): void
+    {
+        $id = $this->integerKeyedFactor($this->signedInUser(), IntegerKeyedDecodedRouteKeyFactor::class);
+
+        self::assertSame($id, (new IntegerKeyedDecodedRouteKeyFactor)->resolveRouteBinding(base64_encode((string) $id))?->getKey());
     }
 
     /**
@@ -336,6 +391,27 @@ final class ResolvesFactorRouteBindingTest extends TestCase
         ])->save();
 
         return $factor;
+    }
+
+    /**
+     * @param  \Tests\Fixtures\Identities\TestUser  $user
+     * @param  class-string<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor>  $model
+     * @return int
+     */
+    private function integerKeyedFactor(TestUser $user, string $model = IntegerKeyedFactor::class): int
+    {
+        config()->set('mfa.factor.table', 'test_integer_keyed_factors');
+
+        $id = $model::query()->forceCreate([
+            'authenticatable_type' => $user->getMorphClass(),
+            'authenticatable_id'   => (string) $user->id,
+            'type'                 => 'totp',
+            'label'                => 'Work phone',
+        ])->getKey();
+
+        self::assertIsInt($id);
+
+        return $id;
     }
 
     /**
