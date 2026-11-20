@@ -30,8 +30,8 @@ separate operations, and all are described here.
     with no factor. When the run reaches `failure_ceiling`, the failure disables the factor it was made against
     (`FactorDisabled`), and from then on every failure does, while an attempt that names no stateful factor (a recovery
     code, a factor that keeps no state) is refused with an identity-scoped `Lockout` that has no end, until a success
-    or `resetIdentityFailures()` clears the run. Guesses spread across factors and recovery codes are bounded as guesses
-    at one factor are;
+    or `resetIdentityFailures()` clears the run. Such an attempt reaching the ceiling disables nothing and dispatches no
+    event of its own. Guesses spread across factors and recovery codes are bounded as guesses at one factor are;
   - the address: its failures within `window_seconds`, a row of `mfa_attempts` (scope `ip`). At `ip_limit` it is refused
     until its window ends. The address is counted by the client it stands for (an IPv4 address, the IPv4 address an IPv6
     address carries, or an IPv6 /64).

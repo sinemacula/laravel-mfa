@@ -13,6 +13,7 @@ use SineMacula\Laravel\Mfa\Enums\ProofKind;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Proofs\Proof;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
+use SineMacula\Laravel\Mfa\Proofs\ProviderEvidence;
 
 /**
  * Builds the proofs of one session, each made a given number of seconds before
@@ -108,11 +109,12 @@ final class SessionProofs
     }
 
     /**
+     * @param  ?\SineMacula\Laravel\Mfa\Proofs\ProviderEvidence  $evidence
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
      */
-    public static function externalProvider(): Proof
+    public static function externalProvider(?ProviderEvidence $evidence = null): Proof
     {
-        return self::firstFactor('oidc', new Channel(ChannelKind::EXTERNAL_PROVIDER, 'provider-1'), ObservedProperties::none());
+        return self::firstFactor('oidc', new Channel(ChannelKind::EXTERNAL_PROVIDER, 'provider-1'), ObservedProperties::none(), evidence: $evidence);
     }
 
     /**
@@ -254,9 +256,10 @@ final class SessionProofs
      * @param  \SineMacula\Laravel\Mfa\Assurance\Channel  $channel
      * @param  \SineMacula\Laravel\Mfa\Assurance\ObservedProperties  $properties
      * @param  int  $secondsAgo
+     * @param  ?\SineMacula\Laravel\Mfa\Proofs\ProviderEvidence  $evidence
      * @return \SineMacula\Laravel\Mfa\Proofs\Proof
      */
-    private static function firstFactor(string $method, Channel $channel, ObservedProperties $properties, int $secondsAgo = 0): Proof
+    private static function firstFactor(string $method, Channel $channel, ObservedProperties $properties, int $secondsAgo = 0, ?ProviderEvidence $evidence = null): Proof
     {
         return new Proof(
             kind: ProofKind::FIRST_FACTOR,
@@ -267,6 +270,7 @@ final class SessionProofs
             provedAt: self::now()->subSeconds($secondsAgo),
             binding: self::binding(Purpose::SIGN_IN),
             generation: 0,
+            evidence: $evidence,
         );
     }
 

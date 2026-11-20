@@ -195,6 +195,13 @@ When the storage connection splits reads and writes (`read` and `write` hosts), 
 lockout or who owns a factor go to the write host, so a replica that has not caught up cannot pass a used code or miss
 a lockout.
 
+The package stores its times as wall-clock strings, so `app.timezone`, and the PHP default timezone Laravel sets from
+it, must be `UTC`, Laravel's default. In a timezone with daylight saving, a code issued just before the clocks go back
+would be stored as expiring before it was created, and attempt windows and lockouts would end early. Any other timezone
+fails the configuration check under `storage`. On MySQL or MariaDB, whose `timestamp` columns convert through the
+session time zone, also set the connection's `timezone` to `+00:00`: the check opens no connection, so it cannot see
+the session's.
+
 A value that is neither a connection name nor `null` or empty fails closed with an `InvalidArgumentException` naming the
 key, and a name `database.connections` does not configure fails the configuration check. A model takes the connection
 when it is built, so keep the setting fixed while the application runs. Changing it does not move tables already

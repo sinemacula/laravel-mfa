@@ -153,10 +153,12 @@ Only a wrong or replayed code counts, against the enrolment's own `mfa.enrollmen
 the pending factor and its grant are deleted, and `abandoned` is `true` on the result. It keeps the address's throttle
 slot. A factor's and an identity's failure counts are not charged. A resend keeps the count; a restart begins a new
 enrolment, with a new secret or code and a count of its own. A code that has expired answers `expired` and counts
-nothing, so the person may send another.
+nothing, so the person may send another. A challenge out of its `mfa.codes.max_attempts` answers `expired` too, but
+sends no new code until the challenge ends.
 
-Starting, resending and confirming are refused as `locked` while the identity's lockout is live. Cancelling is not,
-since it only gives something up.
+Starting, resending and confirming are refused as `locked` while the identity's lockout is live, with the time it
+lifts, or while its failures in a row are at `failure_ceiling`, with no time. Cancelling is not, since it only gives
+something up.
 
 ## What a confirmation does
 

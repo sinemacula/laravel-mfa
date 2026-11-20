@@ -7,6 +7,9 @@ composer require sinemacula/laravel-mfa
 The package registers itself, and needs PHP ^8.3 with `mbstring` and Laravel ^12.40 or ^13.3. Every class name below is
 relative to `SineMacula\Laravel\Mfa`.
 
+The application must run in UTC: keep `app.timezone` at Laravel's default, `UTC`, as any other fails the configuration
+check (see [Storage](configuration.md#storage)).
+
 ## Publishing and migrating
 
 Publish the config and the migrations, then migrate:
@@ -139,6 +142,9 @@ Behind any Laravel guard (session, Sanctum, Passport or your own) whose `Auth::u
   `Login` event and forgotten on `Logout` or `CurrentDeviceLogout`;
 - a guard that fires neither event calls `Proofs\GuardHooks`, and a stateless one binds its own `Contracts\ProofStore`
   (see [Recorded proofs](proofs.md));
+- a Sanctum SPA signs in through `web`, but its stateful requests are served under `sanctum`, by default another
+  application, so a verification there is `not_found` and any `mfa` route that asks for one refuses: bind a
+  `Contracts\ApplicationResolver` that names one application for both guards (see [The caller](helpers.md#the-caller));
 - there are no pending sessions, so a signed-in identity that still owes a factor is held at the gate: carry `mfa` on
   your routes and `mfa.exempt` on those that verify or enrol, so it can reach only those (see [Route
   middleware](middleware.md)). An active session steps up by default, so ask for `Purpose::SIGN_IN` on the verification
