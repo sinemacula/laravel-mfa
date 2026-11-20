@@ -53,6 +53,23 @@ final class SendWaitsTest extends TestCase
     }
 
     /**
+     * Sent at 01:00 and 01:01 GMT, just after the clocks went back, both still
+     * count at 01:04 GMT.
+     *
+     * @return void
+     */
+    public function testTheWindowHoldsAcrossTheClocksGoingBack(): void
+    {
+        $this->useTimezone('Europe/London');
+
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-10-25 01:04:00', 'UTC')->setTimezone('Europe/London'));
+
+        $this->send('destination-a', self::binding(), [240, 180]);
+
+        self::assertSame(360, $this->waits()->caps('destination-a', self::binding(), CarbonImmutable::now()));
+    }
+
+    /**
      * @return void
      */
     public function testSendsBelowBothCapsNeedNoWait(): void

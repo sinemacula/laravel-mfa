@@ -4,11 +4,11 @@ declare(strict_types = 1);
 
 namespace SineMacula\Laravel\Mfa\Database;
 
-use Carbon\CarbonImmutable;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 
 /**
@@ -51,7 +51,7 @@ final class IdentityStateRow
      */
     public static function lock(ProofOwner $owner, ConnectionInterface $connection): void
     {
-        $now = CarbonImmutable::now();
+        $now = (new IdentityState)->freshTimestampString();
 
         $connection->table(TableNames::of(TableNames::IDENTITY_STATES))->upsert([[
             'id'                   => Str::lower((string) Str::ulid()),

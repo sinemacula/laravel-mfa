@@ -6,6 +6,7 @@ namespace SineMacula\Laravel\Mfa\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
+use SineMacula\Laravel\Mfa\Concerns\StoresTimesInUtc;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 
@@ -27,7 +28,7 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
  */
 final class PasskeyAssociation extends Model
 {
-    use HasUlids;
+    use HasUlids, StoresTimesInUtc;
 
     /** @var list<string> */
     protected $fillable = [

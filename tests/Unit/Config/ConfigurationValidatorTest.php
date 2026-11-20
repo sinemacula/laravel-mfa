@@ -52,9 +52,6 @@ final class ConfigurationValidatorTest extends TestCase
         'applications'   => [],
     ];
 
-    /** @var string The problem of a timezone other than UTC. */
-    private const string NOT_UTC = 'app.timezone and the PHP default timezone must be UTC.';
-
     /** @var string The problem of an application that neither declares nor resolves its first factor. */
     private const string NO_FIRST_FACTOR = 'The application declares no first_factor, and no ' . FirstFactorResolver::class . ' is bound to report it.';
 
@@ -87,7 +84,6 @@ final class ConfigurationValidatorTest extends TestCase
             'storage',
             '`mfa.storage.connection` must be a connection name, or null or empty for the default connection.',
         ];
-        yield 'an application timezone other than UTC' => ['app.timezone', 'Europe/London', 'storage', self::NOT_UTC];
         yield 'a factor model that is not one' => [
             'mfa.factor.model',
             \stdClass::class,
@@ -189,17 +185,11 @@ final class ConfigurationValidatorTest extends TestCase
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function testAPhpDefaultTimezoneOtherThanUtcIsAProblem(): void
+    public function testATimezoneOtherThanUtcIsNoProblem(): void
     {
-        date_default_timezone_set('Europe/London');
+        $this->useTimezone('Europe/London');
 
-        try {
-            $report = $this->validator()->report();
-        } finally {
-            date_default_timezone_set('UTC');
-        }
-
-        self::assertSame([...self::SHIPPED, 'storage' => [self::NOT_UTC]], $report);
+        self::assertSame(self::SHIPPED, $this->validator()->report());
     }
 
     /**

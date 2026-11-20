@@ -717,6 +717,49 @@ final class AttemptServiceTest extends TestCase
     }
 
     /**
+     * Failing at 00:45 BST, the address and the factor are held until 01:30
+     * BST, an hour before the clocks go back, and free by 01:10 GMT.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     */
+    public function testWindowsAndLockoutsEndAtTheirDeadlinesAcrossTheClocksGoingBack(): void
+    {
+        config()->set('mfa.attempts.ip_limit', 1);
+        config()->set('mfa.attempts.window_seconds', 2700);
+        config()->set('mfa.attempts.factor_limit', 1);
+        config()->set('mfa.attempts.lockout_seconds', 2700);
+
+        $this->useTimezone('Europe/London');
+
+        $deadline = CarbonImmutable::parse('2026-10-25 00:30:00', 'UTC')->getTimestamp();
+
+        Carbon::setTestNow(CarbonImmutable::parse('2026-10-24 23:45:00', 'UTC'));
+
+        $user   = $this->user();
+        $factor = $this->factor($user);
+
+        $this->attempt($user, $factor, false);
+
+        Carbon::setTestNow(CarbonImmutable::parse('2026-10-24 23:59:00', 'UTC'));
+
+        $refused = $this->attempt($this->user('second@example.com'), null, true);
+
+        self::assertSame(AttemptScope::IP, $refused->lockout?->scope);
+        self::assertSame($deadline, $refused->lockout->until?->getTimestamp());
+        $lockout = $this->service()->lockout($user, $factor);
+
+        self::assertSame(AttemptScope::FACTOR, $lockout?->scope);
+        self::assertSame($deadline, $lockout->until?->getTimestamp());
+
+        Carbon::setTestNow(CarbonImmutable::parse('2026-10-25 01:10:00', 'UTC'));
+
+        self::assertNull($this->service()->lockout($user, $factor));
+        self::assertTrue($this->attempt($this->user('third@example.com'), null, true)->passed);
+    }
+
+    /**
      * @return void
      *
      * @throws \Throwable

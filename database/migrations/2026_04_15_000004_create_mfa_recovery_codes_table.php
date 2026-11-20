@@ -43,10 +43,10 @@ return new class extends Migration {
 
             $blueprint->unsignedInteger('generation');
 
-            $blueprint->timestamp('used_at')->nullable();
-            $blueprint->timestamp('replaced_at')->nullable();
+            $blueprint->dateTime('used_at')->nullable();
+            $blueprint->dateTime('replaced_at')->nullable();
 
-            $blueprint->timestamps();
+            $blueprint->datetimes();
         });
     }
 

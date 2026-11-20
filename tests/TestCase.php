@@ -121,6 +121,20 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
+     * Run as an application in the timezone, as Laravel sets it at boot. The
+     * next test's boot sets it back.
+     *
+     * @param  string  $timezone
+     * @return void
+     */
+    protected function useTimezone(string $timezone): void
+    {
+        $this->container()->make(Repository::class)->set('app.timezone', $timezone);
+
+        date_default_timezone_set($timezone);
+    }
+
+    /**
      * Narrows the parent's nullable property for static analysis.
      *
      * @return \Illuminate\Foundation\Application

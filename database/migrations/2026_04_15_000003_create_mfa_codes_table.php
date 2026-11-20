@@ -58,12 +58,12 @@ return new class extends Migration {
             // `sent_times` is a JSON list of Unix times the send caps count.
             $blueprint->unsignedInteger('attempts')->default(0);
             $blueprint->unsignedInteger('sends')->default(1);
-            $blueprint->timestamp('sent_at');
+            $blueprint->dateTime('sent_at');
             $blueprint->json('sent_times');
-            $blueprint->timestamp('expires_at')->index(IndexName::for($table, '_expiry_index'));
-            $blueprint->timestamp('consumed_at')->nullable();
+            $blueprint->dateTime('expires_at')->index(IndexName::for($table, '_expiry_index'));
+            $blueprint->dateTime('consumed_at')->nullable();
 
-            $blueprint->timestamps();
+            $blueprint->datetimes();
         });
     }
 

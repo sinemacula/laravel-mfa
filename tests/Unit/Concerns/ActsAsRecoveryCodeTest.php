@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Unit\Concerns;
 
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\CoversTrait;
@@ -103,6 +104,33 @@ final class ActsAsRecoveryCodeTest extends TestCase
         $usedThen->markUsed(Carbon::parse('2026-04-14T08:00:00+00:00'));
 
         self::assertSame('2026-04-14T08:00:00+00:00', $usedThen->getUsedAt()?->toIso8601String());
+    }
+
+    /**
+     * Without a cast on the column, in a timezone that is not UTC.
+     *
+     * @return void
+     */
+    public function testACustomModelStoresTheTimeItWasUsedInUtc(): void
+    {
+        $this->useTimezone('Europe/London');
+
+        $code = new class extends RecoveryCode {
+            /**
+             * @return array<string, string>
+             */
+            #[\Override]
+            protected function casts(): array
+            {
+                return [];
+            }
+        };
+
+        $code->forceFill(['authenticatable_type' => 'users', 'authenticatable_id' => '42', 'code_hash' => 'hash', 'generation' => 1]);
+        $code->markUsed(CarbonImmutable::parse('2026-07-01 09:00:00', 'UTC')->setTimezone('Europe/London'));
+        $code->save();
+
+        self::assertSame('2026-07-01 09:00:00', RecoveryCode::query()->toBase()->value('used_at'));
     }
 
     /**

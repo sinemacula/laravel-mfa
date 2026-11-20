@@ -23,6 +23,8 @@ use SineMacula\Laravel\Mfa\Secrets\QueryExceptionMask;
  */
 trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMethods
 {
+    use StoresTimesInUtc;
+
     /**
      * Casts the lockout and disabled columns a refusal reads as datetimes,
      * unless the model declares its own cast for them.
@@ -429,22 +431,26 @@ trait ActsAsFactor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMeth
     }
 
     /**
+     * In UTC, so a model without a cast on the column stores it as UTC too.
+     *
      * @param  ?\Carbon\CarbonInterface  $at
      * @return void
      */
     public function recordVerification(?CarbonInterface $at = null): void
     {
-        $this->setAttribute($this->getLastUsedAtName(), $at ?? Carbon::now());
+        $this->setAttribute($this->getLastUsedAtName(), ($at ?? Carbon::now())->toImmutable()->utc());
     }
 
     /**
+     * In UTC, so a model without a cast on the column stores it as UTC too.
+     *
      * @param  ?\Carbon\CarbonInterface  $at
      * @return void
      */
     public function confirm(?CarbonInterface $at = null): void
     {
         $this->setAttribute($this->getStatusName(), FactorStatus::CONFIRMED->value);
-        $this->setAttribute($this->getConfirmedAtName(), $at ?? Carbon::now());
+        $this->setAttribute($this->getConfirmedAtName(), ($at ?? Carbon::now())->toImmutable()->utc());
     }
 
     /**

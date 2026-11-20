@@ -178,7 +178,6 @@ The security and lifecycle contracts behind them, for maintainers and reviewers,
 
 - PHP ^8.3 (extensions: mbstring)
 - Laravel ^12.40 || ^13.3
-- `app.timezone` set to `UTC`, the Laravel default
 
 ## Testing
 

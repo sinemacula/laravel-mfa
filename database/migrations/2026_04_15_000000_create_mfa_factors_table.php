@@ -65,18 +65,18 @@ return new class extends Migration {
 
             // Reset only by a success of this factor.
             $blueprint->unsignedInteger('consecutive_failures')->default(0);
-            $blueprint->timestamp('disabled_at')->nullable();
+            $blueprint->dateTime('disabled_at')->nullable();
 
             // On the locked row, so an attempt reads it as committed.
-            $blueprint->timestamp('locked_until')->nullable();
+            $blueprint->dateTime('locked_until')->nullable();
 
             // An application's enrolment limits count only its own factors.
             $blueprint->string('application')->nullable();
 
-            $blueprint->timestamp('confirmed_at')->nullable();
-            $blueprint->timestamp('last_used_at')->nullable();
+            $blueprint->dateTime('confirmed_at')->nullable();
+            $blueprint->dateTime('last_used_at')->nullable();
 
-            $blueprint->timestamps();
+            $blueprint->datetimes();
         });
     }
 

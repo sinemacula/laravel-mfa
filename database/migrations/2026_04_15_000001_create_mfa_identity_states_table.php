@@ -48,12 +48,12 @@ return new class extends Migration {
 
             // Across every factor.
             $blueprint->unsignedInteger('consecutive_failures')->default(0);
-            $blueprint->timestamp('locked_until')->nullable();
+            $blueprint->dateTime('locked_until')->nullable();
 
             $blueprint->unsignedInteger('recovery_codes_generation')->default(0);
-            $blueprint->timestamp('recovery_codes_generated_at')->nullable();
+            $blueprint->dateTime('recovery_codes_generated_at')->nullable();
 
-            $blueprint->timestamps();
+            $blueprint->datetimes();
         });
     }
 

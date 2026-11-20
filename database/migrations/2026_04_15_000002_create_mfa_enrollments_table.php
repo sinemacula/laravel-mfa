@@ -55,10 +55,10 @@ return new class extends Migration {
             $blueprint->string('challenge_id')->nullable();
 
             // Never renewed.
-            $blueprint->timestamp('expires_at')->index(IndexName::for($table, '_expiry_index'));
+            $blueprint->dateTime('expires_at')->index(IndexName::for($table, '_expiry_index'));
             $blueprint->unsignedInteger('attempts')->default(0);
 
-            $blueprint->timestamps();
+            $blueprint->datetimes();
         });
     }
 

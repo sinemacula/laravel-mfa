@@ -69,7 +69,7 @@ final readonly class RecordPruner
      */
     public function __invoke(): PruneResult
     {
-        $now    = CarbonImmutable::now();
+        $now    = CarbonImmutable::now('UTC');
         $before = $now->subDays((new LifecycleSettings($this->config))->pruneAfterDays());
 
         return new PruneResult(

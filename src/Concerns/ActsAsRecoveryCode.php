@@ -17,6 +17,8 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  */
 trait ActsAsRecoveryCode
 {
+    use StoresTimesInUtc;
+
     /**
      * @formatter:off
      *
@@ -107,11 +109,13 @@ trait ActsAsRecoveryCode
     }
 
     /**
+     * In UTC, so a model without a cast on the column stores it as UTC too.
+     *
      * @param  ?\Carbon\CarbonInterface  $at
      * @return void
      */
     public function markUsed(?CarbonInterface $at = null): void
     {
-        $this->setAttribute($this->getUsedAtName(), $at ?? Carbon::now());
+        $this->setAttribute($this->getUsedAtName(), ($at ?? Carbon::now())->toImmutable()->utc());
     }
 }
