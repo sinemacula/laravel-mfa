@@ -419,16 +419,21 @@ final class DeliveredCodesTest extends TestCase
     {
         $codes = $this->codes(['resend_cooldown_seconds' => 60], ['111111', '222222', '333333']);
         $now   = self::now();
+        $state = IdentityStateRow::of(new ProofOwner(TestUser::class, '1'));
         $first = self::issued($codes->issue(self::FACTOR, self::binding(), $now));
+        $named = $state->value('code_challenges');
 
-        IdentityStateRow::of(new ProofOwner(TestUser::class, '1'))->update(['code_challenges' => null]);
+        $state->update(['code_challenges' => null]);
 
-        $second = self::issued($codes->issue(self::FACTOR, self::binding(), $now));
+        $second = self::issued($codes->issue(self::FACTOR, self::binding(), $now->addSecond()));
+
+        $state->update(['code_challenges' => $named]);
+
         $resent = self::issued($codes->issue(self::FACTOR, self::binding(), $now->addSeconds(60)));
 
         self::assertNotSame($first->challengeId, $second->challengeId);
-        self::assertSame($second->challengeId, $resent->challengeId);
-        self::assertSame(1, self::row($first)->sends);
+        self::assertSame($first->challengeId, $resent->challengeId);
+        self::assertSame(1, self::row($second)->sends);
     }
 
     /**
