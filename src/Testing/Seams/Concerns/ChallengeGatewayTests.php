@@ -105,6 +105,42 @@ trait ChallengeGatewayTests
     }
 
     /**
+     * Holds trivially when `secondChallengeCaller()` is `null`.
+     *
+     * @return void
+     */
+    public function testChallengeGatewayRefusesTheCodeToAnotherSessionOfTheIdentity(): void
+    {
+        $second = $this->secondChallengeCaller();
+
+        if ($second === null) {
+            $this->addToAssertionCount(1);
+
+            return;
+        }
+
+        ChallengeGatewayContract::assertACodeAnswersNoOtherSessionOfTheIdentity(
+            $this->challengeGateway(),
+            $this->challengeCaller(),
+            $this->challengedFactor(),
+            $this->challengeBinding(),
+            $this->deliveredCode(...),
+            $second,
+        );
+    }
+
+    /**
+     * The challenged identity on another session or application, with the
+     * binding it holds there, or `null` (the default) to skip that check.
+     *
+     * @return ?array{0: \SineMacula\Laravel\Mfa\Context\CallerContext, 1: \SineMacula\Laravel\Mfa\Proofs\ProofBinding}
+     */
+    protected function secondChallengeCaller(): ?array
+    {
+        return null;
+    }
+
+    /**
      * Wrong codes a challenge takes; by default the package's
      * `mfa.codes.max_attempts`.
      *

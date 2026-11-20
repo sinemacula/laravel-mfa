@@ -15,7 +15,8 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 /**
  * What every `ChallengeGateway` must guarantee: a wrong code fails and is
  * counted, a code answers only its own binding and only once, another caller's
- * binding and an unknown challenge are not found, and a challenge takes no more
+ * binding and an unknown challenge are not found, the identity on another
+ * session or application cannot use the code, and a challenge takes no more
  * than its wrong codes. `$delivered` reads a sent code back, as from a fake
  * sender.
  *
@@ -100,6 +101,37 @@ final class ChallengeGatewayContract
         }
 
         Assert::assertTrue($gateway->verify($caller, $factor, $binding, $challenge, $code)->hasPassed(), 'A binding that does not name the caller must not use up the code.');
+    }
+
+    /**
+     * `$second` is the identity on another session or application with the
+     * binding it holds there, so a gateway that checks the binding against the
+     * caller but looks the code up without the parts that differ is caught. Its
+     * attempt may be counted, so the factor needs room for one more failure.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\ChallengeGateway  $gateway
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
+     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @param  \Closure(string): string  $delivered
+     * @param  array{0: \SineMacula\Laravel\Mfa\Context\CallerContext, 1: \SineMacula\Laravel\Mfa\Proofs\ProofBinding}  $second
+     * @return void
+     */
+    public static function assertACodeAnswersNoOtherSessionOfTheIdentity(
+        ChallengeGateway $gateway,
+        CallerContext $caller,
+        Factor $factor,
+        ProofBinding $binding,
+        \Closure $delivered,
+        array $second,
+    ): void {
+        $challenge = self::sent($gateway, $caller, $factor, $binding);
+        $code      = $delivered($challenge);
+
+        [$other, $held] = $second;
+
+        Assert::assertFalse($gateway->verify($other, $factor, $held, $challenge, $code)->hasPassed(), 'A code must not answer the identity on another session or application.');
+        Assert::assertTrue($gateway->verify($caller, $factor, $binding, $challenge, $code)->hasPassed(), 'Another session or application must not use up the code.');
     }
 
     /**

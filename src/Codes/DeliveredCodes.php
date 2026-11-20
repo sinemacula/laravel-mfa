@@ -18,7 +18,7 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
  * Issues and checks delivered codes, one row per challenge, on the write
  * connection. Every change is a single conditional statement, so concurrent
  * checks never exceed `max_attempts` and only one correct submission wins.
- * Issuing reads then writes, so the caller must serialise per identity.
+ * Issuing reads then writes, so the caller must hold the identity's state lock.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -32,9 +32,6 @@ final readonly class DeliveredCodes
 
     /** @var \SineMacula\Laravel\Mfa\Codes\CodeKeys */
     private CodeKeys $keys;
-
-    /** @var \SineMacula\Laravel\Mfa\Codes\SendWaits */
-    private SendWaits $waits;
 
     /**
      * @param  \Illuminate\Contracts\Config\Repository  $config
@@ -50,7 +47,6 @@ final readonly class DeliveredCodes
     ) {
         $this->settings = new CodeSettings($config);
         $this->keys     = new CodeKeys($config);
-        $this->waits    = new SendWaits($this->settings);
     }
 
     /**
@@ -72,19 +68,26 @@ final readonly class DeliveredCodes
     {
         $session = $this->keys->session($binding->sessionId);
         $target  = $this->keys->destination($binding, $factorId, $destination);
+        $sends   = SendLedger::read($this->settings, $binding);
         $open    = $this->open($factorId, $binding, $session, $now);
         $wait    = max(
-            $this->waits->caps($target, $binding, $now),
-            $open === null ? $this->waits->restart($target, $binding, $now) : $this->resendWait($open, $now),
+            $sends->caps($target, $now),
+            $open === null ? $sends->restart($target, $binding->purpose, $now) : $this->resendWait($open, $now),
         );
 
         if ($wait > 0) {
             return $wait;
         }
 
-        return $open === null
-            ? $this->start($factorId, $binding, $session, $target, $now)
+        $issued = $open === null
+            ? $this->start($factorId, $binding, $session, $now)
             : $this->resend($open, $factorId, $binding, $now);
+
+        if ($issued instanceof IssuedCode) {
+            $sends->record($target, $binding->purpose, $now);
+        }
+
+        return $issued;
     }
 
     /**
@@ -184,15 +187,13 @@ final readonly class DeliveredCodes
      * @param  string  $factorId
      * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
      * @param  string  $session
-     * @param  string  $target
      * @param  \Carbon\CarbonImmutable  $now
      * @return \SineMacula\Laravel\Mfa\Codes\IssuedCode
      *
      * @throws \InvalidArgumentException
      * @throws \Random\RandomException
-     * @throws \JsonException
      */
-    private function start(string $factorId, ProofBinding $binding, string $session, string $target, CarbonImmutable $now): IssuedCode
+    private function start(string $factorId, ProofBinding $binding, string $session, CarbonImmutable $now): IssuedCode
     {
         $model   = new Code;
         $id      = Str::lower((string) Str::ulid());
@@ -208,12 +209,10 @@ final readonly class DeliveredCodes
             'purpose'              => $binding->purpose->value,
             'application'          => $binding->application,
             'session_id'           => $session,
-            'destination_hash'     => $target,
             'code_hash'            => $this->keys->code($id, 1, $factorId, $binding, $code),
             'attempts'             => 0,
             'sends'                => 1,
             'sent_at'              => $at,
-            'sent_times'           => json_encode([$now->getTimestamp()], JSON_THROW_ON_ERROR),
             'expires_at'           => $model->fromDateTime($expires),
             'consumed_at'          => null,
             'created_at'           => $at,
@@ -236,7 +235,6 @@ final readonly class DeliveredCodes
      *
      * @throws \InvalidArgumentException
      * @throws \Random\RandomException
-     * @throws \JsonException
      */
     private function resend(Code $open, string $factorId, ProofBinding $binding, CarbonImmutable $now): int|IssuedCode
     {
@@ -259,7 +257,6 @@ final readonly class DeliveredCodes
                 'code_hash'  => $this->keys->code($open->id, $issue, $factorId, $binding, $code),
                 'sends'      => $issue,
                 'sent_at'    => $at,
-                'sent_times' => json_encode([...$open->sent_times, $now->getTimestamp()], JSON_THROW_ON_ERROR),
                 'expires_at' => $open->fromDateTime($expires),
                 'updated_at' => $at,
             ]);

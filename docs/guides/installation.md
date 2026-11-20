@@ -4,7 +4,7 @@
 composer require sinemacula/laravel-mfa
 ```
 
-The package registers itself, and needs PHP ^8.3 with `mbstring` and Laravel ^12.40 or ^13.3. Every class name below is
+The package registers itself, and needs PHP ^8.3 with `mbstring` and Laravel ^12.40 or ^13.4. Every class name below is
 relative to `SineMacula\Laravel\Mfa`.
 
 ## Publishing and migrating

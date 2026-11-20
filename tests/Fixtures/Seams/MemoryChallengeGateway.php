@@ -15,8 +15,9 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
 /**
  * Keeps its challenges in memory, keyed by the binding parts it is told to
- * check and by the caller unless told not to, so the challenge gateway kit can
- * be shown one that checks too little.
+ * check and by the caller unless told not to, and given the caller's sessions
+ * refuses a binding that is not the caller's own, so the challenge gateway kit
+ * can be shown one that checks too little.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -38,6 +39,7 @@ final class MemoryChallengeGateway implements ChallengeGateway
      * @param  list<string>  $keyedBy
      * @param  ?int  $maxAttempts
      * @param  bool  $checksCaller
+     * @param  ?array<string, string>  $sessions
      */
     public function __construct(
 
@@ -49,6 +51,9 @@ final class MemoryChallengeGateway implements ChallengeGateway
 
         /** Whether a challenge answers only the caller it was sent to. */
         private readonly bool $checksCaller = true,
+
+        /** The session the caller is on in each application, or `null` to not check the binding is the caller's. */
+        private readonly ?array $sessions = null,
     ) {}
 
     /**
@@ -80,7 +85,12 @@ final class MemoryChallengeGateway implements ChallengeGateway
     {
         $challenge = $this->challenges[$challengeId] ?? null;
 
-        if ($challenge === null || $challenge['key'] !== $this->keyOf($binding) || ($this->checksCaller && $challenge['caller'] !== $caller->identity)) {
+        if (
+            $challenge === null
+            || $challenge['key'] !== $this->keyOf($binding)
+            || ($this->checksCaller && $challenge['caller'] !== $caller->identity)
+            || !$this->isTheCallersBinding($caller, $binding)
+        ) {
             return ChallengeOutcome::refused(FailureReason::NOT_FOUND, 'No such challenge.');
         }
 
@@ -101,6 +111,17 @@ final class MemoryChallengeGateway implements ChallengeGateway
         $this->challenges[$challengeId]['used'] = true;
 
         return ChallengeOutcome::passed();
+    }
+
+    /**
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @return bool
+     */
+    private function isTheCallersBinding(CallerContext $caller, ProofBinding $binding): bool
+    {
+        return $this->sessions === null
+            || ($binding->application === $caller->application && ($this->sessions[$caller->application] ?? null) === $binding->sessionId);
     }
 
     /**

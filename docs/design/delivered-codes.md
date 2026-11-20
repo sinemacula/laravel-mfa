@@ -31,17 +31,25 @@ concurrency, who delivers a code, and why a code is never kept or queued in clea
   factor held it, so restarting an enrolment is no way round it. A new challenge of any other purpose has no code before
   it to wait out.
 - Every send, resends included, is refused while the factor's destination has been sent `factor_send_limit` codes, or
-  the identity `identity_send_limit` across its factors, within `send_window_minutes`, across every session. A
-  destination is counted by `destination_hash`, a keyed digest of the owner and the destination (or of the factor, for
-  one with none), so its count outlives a pending factor discarded for a new one, and two factors of one identity on one
-  destination share it. A challenge records the time of each of its sends (`sent_times`), and each send leaves the
-  window on its own, a window after it was made, so a challenge's earlier sends stop counting while its later ones still
-  do. A refusal answers `sending_capped` with the seconds until enough sends have left the window for one more.
+  the identity `identity_send_limit` across its factors, within `send_window_minutes`, across every session. Each send
+  is recorded on the identity's state row (`code_sends`, read by `Codes\SendLedger`): its time, a keyed digest of the
+  owner and the destination (or of the factor, for one with none), and whether it was an enrolment code. A destination
+  is counted by that digest, so its count outlives a pending factor discarded for a new one, and two factors of one
+  identity on one destination share it. Each send leaves the window on its own, a window after it was made, so a
+  challenge's earlier sends stop counting while its later ones still do. A send drops the recorded sends older than both
+  the window and the cooldown, so raising either setting brings none of them back. A refusal answers `sending_capped`
+  with the seconds until enough sends have left the window for one more.
 - Sending runs in the identity's factor state transaction (see [Storage and Transactions](storage-and-transactions.md)),
   so the sends of one identity are serialised and the counts the caps read cannot be overrun by parallel requests. The
-  factor is read again under the lock; one a concurrent change removed answers `not_found`. The send's time is read
-  once the locks are held, so a send that waited for them starts its cooldown and its code's lifetime from when it was
-  made, not from when it began waiting.
+  caps and the restart cooldown read the sends `FOR UPDATE` from the state row the transaction already holds, so a send
+  inside a transaction the application opened on the storage connection, after it has read, still counts a send
+  committed since: MySQL answers a locking read with the row as committed, under `REPEATABLE READ` too, and PostgreSQL's
+  `REPEATABLE READ` raises a serialisation failure at the identity's lock instead, for the application to retry. The
+  open challenge is found with a plain read, so under such an older snapshot a send in the same sign-in may start a new
+  challenge rather than resend one committed since, skipping its resend cooldown, or the wait of an exhausted one; the
+  caps still count it. The factor is read again under the lock; one a concurrent change removed answers `not_found`. The
+  send's time is read once the locks are held, so a send that waited for them starts its cooldown and its code's
+  lifetime from when it was made, not from when it began waiting.
 - The code is stored first, then delivered by the factor's driver (`Contracts\CodeDeliveryDriver::deliver()`) inside
   the same transaction, so a delivery that throws keeps no code and spends no cooldown or cap. `CodeSent` is dispatched
   by `Verification\ChallengeRequests` once the transaction commits, whichever gateway sent the code, with the factor's
@@ -112,14 +120,15 @@ concurrency, who delivers a code, and why a code is never kept or queued in clea
 - A factor that is not a stored Eloquent factor: `UnsupportedFactorException`. A binding that names another identity
   than the factor's owner: `InvalidArgumentException`. Neither reads anything.
 - A code sent inside a transaction that rolls back is gone with it, and `CodeSent` is never dispatched.
-- Expired and used challenges stay in the table, for pruning to remove past `lifecycle.prune_after_days`; their sends
-  still count towards the caps while they are inside the send window.
+- Expired and used challenges stay in the table, for pruning to remove past `lifecycle.prune_after_days`. Pruning them
+  changes no cap, since the sends are counted from the identity's state row.
 - A verification in a sign-in other than the one the code was sent in finds no challenge and answers `not_found`.
 
 ## Implementation Anchors
 
-- `src/Codes/DeliveredCodes.php` (engine), `src/Codes/CodeKeys.php`, `src/Codes/CodeService.php`,
-  `src/Enums/CodeCheck.php`, `src/Codes/SendResult.php`, `src/Codes/IssuedCode.php`, `src/Codes/CodeSettings.php`.
+- `src/Codes/DeliveredCodes.php` (engine), `src/Codes/SendLedger.php`, `src/Codes/CodeKeys.php`,
+  `src/Codes/CodeService.php`, `src/Enums/CodeCheck.php`, `src/Codes/SendResult.php`, `src/Codes/IssuedCode.php`,
+  `src/Codes/CodeSettings.php`.
 - `src/Contracts/CodeDeliveryDriver.php`, `src/Drivers/AbstractCodeDriver.php`, `src/Drivers/EmailDriver.php`,
   `src/Drivers/SmsDriver.php`.
 - `src/Codes/CodeMessage.php`, `src/Codes/SmsCodeText.php`, `src/Contracts/SmsSender.php`,
@@ -132,11 +141,13 @@ concurrency, who delivers a code, and why a code is never kept or queued in clea
 ## Authoritative Tests
 
 - `tests/Unit/Codes/DeliveredCodesTest.php`
+- `tests/Unit/Codes/SendLedgerTest.php`
 - `tests/Unit/Codes/CodeServiceTest.php`
 - `tests/Unit/Codes/CodeKeysTest.php`
 - `tests/Unit/Codes/MfaCodeMessageQueueTest.php`
 - `tests/Feature/OtpLifecycleTest.php`
 - `tests/Unit/Config/ConfigurationValidatorTest.php`
+- `tests/Integration/Database/FactorLockoutSnapshotTest.php` (MySQL and PostgreSQL)
 
 ## Change Triggers
 
