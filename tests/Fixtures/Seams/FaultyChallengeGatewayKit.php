@@ -17,8 +17,8 @@ use Tests\Fixtures\Context\Callers;
 
 /**
  * The challenge gateway kit over a gateway that answers any caller and takes
- * any number of wrong codes, with no second caller unless one is set, for
- * running its checks as PHPUnit does.
+ * any number of wrong codes, with no second caller, for running its checks as
+ * PHPUnit does.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
  * @copyright   2026 Sine Macula Limited
@@ -29,9 +29,6 @@ use Tests\Fixtures\Context\Callers;
 final class FaultyChallengeGatewayKit extends TestCase
 {
     use ChallengeGatewayTests;
-
-    /** @var ?array{0: \SineMacula\Laravel\Mfa\Context\CallerContext, 1: \SineMacula\Laravel\Mfa\Proofs\ProofBinding} The identity on another session, with the binding it holds there. */
-    public ?array $secondCaller = null;
 
     /**
      * @return \SineMacula\Laravel\Mfa\Context\CallerContext
@@ -79,13 +76,5 @@ final class FaultyChallengeGatewayKit extends TestCase
     protected function deliveredCode(string $challengeId): string
     {
         return MemoryChallengeGateway::CODE;
-    }
-
-    /**
-     * @return ?array{0: \SineMacula\Laravel\Mfa\Context\CallerContext, 1: \SineMacula\Laravel\Mfa\Proofs\ProofBinding}
-     */
-    protected function secondChallengeCaller(): ?array
-    {
-        return $this->secondCaller;
     }
 }
