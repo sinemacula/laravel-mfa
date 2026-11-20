@@ -54,13 +54,17 @@ final readonly class ConfigurationValidator
     ) {}
 
     /**
+     * Given which drivers are registered, each application's types must have
+     * one.
+     *
+     * @param  ?\Closure(string): bool  $registered
      * @return array<string, list<string>>
      */
-    public function report(): array
+    public function report(?\Closure $registered = null): array
     {
         $report = [];
 
-        foreach ($this->checks() as $subject => $checks) {
+        foreach ($this->checks($registered) as $subject => $checks) {
             $problems = array_map(static fn (\Closure $check): ?string => self::problem($check), $checks);
 
             $report[$subject] = array_values(array_unique(array_filter($problems, static fn (?string $problem): bool => $problem !== null)));
@@ -91,9 +95,10 @@ final readonly class ConfigurationValidator
     }
 
     /**
+     * @param  ?\Closure(string): bool  $registered
      * @return array<string, list<\Closure(): mixed>>
      */
-    private function checks(): array
+    private function checks(?\Closure $registered): array
     {
         $config = $this->config;
 
@@ -131,6 +136,7 @@ final readonly class ConfigurationValidator
                 fn () => $this->checkPasskeys($application),
                 fn () => $this->checkFirstFactor($application),
                 fn () => $this->checkIssuer($application),
+                static fn () => self::checkDrivers($application, $registered),
             ];
         }
 
@@ -304,6 +310,30 @@ final readonly class ConfigurationValidator
         }
 
         (new TotpSettings($this->config))->issuer();
+    }
+
+    /**
+     * The manager's factory runs this before registering its drivers, so only a
+     * caller holding the built manager can say which exist.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Applications\ApplicationSettings  $application
+     * @param  ?\Closure(string): bool  $registered
+     * @return void
+     *
+     * @throws \InvalidArgumentException
+     * @throws \LogicException
+     */
+    private static function checkDrivers(ApplicationSettings $application, ?\Closure $registered): void
+    {
+        if ($registered === null) {
+            return;
+        }
+
+        $missing = array_filter($application->types(), static fn (string $type): bool => !$registered($type));
+
+        if ($missing !== []) {
+            throw new \LogicException(sprintf('The application enables types with no registered driver: %s.', implode(', ', $missing)));
+        }
     }
 
     /**

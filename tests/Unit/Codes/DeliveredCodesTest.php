@@ -6,14 +6,17 @@ namespace Tests\Unit\Codes;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Config\Repository;
+use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SineMacula\Laravel\Mfa\Codes\DeliveredCodes;
 use SineMacula\Laravel\Mfa\Codes\IssuedCode;
+use SineMacula\Laravel\Mfa\Database\IdentityStateRow;
 use SineMacula\Laravel\Mfa\Enums\CodeCheck;
 use SineMacula\Laravel\Mfa\Enums\Purpose;
 use SineMacula\Laravel\Mfa\Models\Code;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use Tests\Fixtures\Identities\TestUser;
 use Tests\TestCase;
 
@@ -43,6 +46,21 @@ final class DeliveredCodesTest extends TestCase
 
     /** @var list<string> The codes the engine draws next, in order. */
     private array $draws = [];
+
+    /**
+     * The state rows the factor state lock would create for both identities.
+     *
+     * @return void
+     */
+    #[\Override]
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        foreach (['1', '2'] as $identity) {
+            IdentityStateRow::lock(new ProofOwner(TestUser::class, $identity), DB::connection());
+        }
+    }
 
     /**
      * Used, it is replayed for itself and missing for any other code.
@@ -140,7 +158,7 @@ final class DeliveredCodesTest extends TestCase
         self::assertSame('sign_in', $first->purpose);
         self::assertSame('web', $first->application);
         self::assertSame(1, $first->sends);
-        self::assertSame([$now->getTimestamp()], $first->sent_times);
+        self::assertSame($now->getTimestamp(), $first->sent_at->getTimestamp());
         self::assertSame(0, $first->attempts);
         self::assertNull($first->consumed_at);
     }
@@ -498,7 +516,8 @@ final class DeliveredCodesTest extends TestCase
 
         $resent = self::issued($codes->issue('01jfactor0000000000000000e1', self::binding(), $now->addSeconds(20)));
 
-        self::assertSame([$now->getTimestamp(), $now->addSeconds(20)->getTimestamp()], self::row($resent)->sent_times);
+        self::assertSame(2, self::row($resent)->sends);
+        self::assertSame([$now->getTimestamp(), $now->addSeconds(10)->getTimestamp(), $now->addSeconds(20)->getTimestamp()], self::sentTimes());
 
         $capped = $this->codes(['identity_send_limit' => 2], ['444444']);
 
@@ -518,9 +537,9 @@ final class DeliveredCodesTest extends TestCase
         self::issued($codes->issue(self::FACTOR, self::binding(), $now));
         self::issued($codes->issue(self::FACTOR, self::binding(), $now));
 
-        $last = self::issued($codes->issue(self::FACTOR, self::binding(), $now));
+        self::issued($codes->issue(self::FACTOR, self::binding(), $now));
 
-        self::assertSame(array_fill(0, 3, $now->getTimestamp()), self::row($last)->sent_times);
+        self::assertSame(array_fill(0, 3, $now->getTimestamp()), self::sentTimes());
         self::assertSame(3600, $codes->issue(self::FACTOR, self::binding(), $now));
     }
 
@@ -538,9 +557,9 @@ final class DeliveredCodesTest extends TestCase
 
         self::issued($codes->issue(self::FACTOR, self::binding(), $now));
 
-        $resent = self::issued($codes->issue(self::FACTOR, self::binding(), $now->addMinutes(4)));
+        self::issued($codes->issue(self::FACTOR, self::binding(), $now->addMinutes(4)));
 
-        self::assertSame([$now->getTimestamp(), $now->addMinutes(4)->getTimestamp()], self::row($resent)->sent_times);
+        self::assertSame([$now->getTimestamp(), $now->addMinutes(4)->getTimestamp()], self::sentTimes());
         self::assertSame(59, $codes->issue(self::FACTOR, self::binding(session: 'session-b'), $now->addSeconds(241)));
         self::assertInstanceOf(IssuedCode::class, $codes->issue(self::FACTOR, self::binding(session: 'session-b'), $now->addMinutes(5)));
         self::assertSame(180, $codes->issue(self::FACTOR, self::binding(session: 'session-c'), $now->addMinutes(6)));
@@ -559,6 +578,7 @@ final class DeliveredCodesTest extends TestCase
     {
         $config = $this->container()->make(Repository::class);
         $config->set('mfa.codes.length', 8);
+        $config->set('mfa.codes.identity_send_limit', 100);
 
         $codes  = new DeliveredCodes($config);
         $now    = self::now();
@@ -570,8 +590,8 @@ final class DeliveredCodesTest extends TestCase
         $digits = '';
 
         // 400 digits miss one of the ten with a chance of about 1 in 10^17
-        for ($identity = 2; $identity <= 51; $identity++) {
-            $code = self::issued($codes->issue(self::FACTOR . $identity, self::binding(identity: (string) $identity), $now))->code;
+        for ($factor = 2; $factor <= 51; $factor++) {
+            $code = self::issued($codes->issue(self::FACTOR . $factor, self::binding(), $now))->code;
 
             self::assertMatchesRegularExpression('/^\d{8}$/D', $code);
 
@@ -681,6 +701,7 @@ final class DeliveredCodesTest extends TestCase
         self::assertSame(1, $codes->issue(self::FACTOR, self::binding(), $now->addSeconds(60)));
         self::assertSame(2, self::row($issued)->sends);
         self::assertSame($hash, self::row($issued)->code_hash);
+        self::assertSame([$now->getTimestamp()], self::sentTimes());
     }
 
     /**
@@ -771,6 +792,25 @@ final class DeliveredCodesTest extends TestCase
         self::assertInstanceOf(IssuedCode::class, $issued);
 
         return $issued;
+    }
+
+    /**
+     * The times of the first identity's sends the caps count.
+     *
+     * @return list<int>
+     *
+     * @throws \JsonException
+     */
+    private static function sentTimes(): array
+    {
+        $sends = IdentityStateRow::of(new ProofOwner(TestUser::class, '1'))->value('code_sends');
+
+        self::assertIsString($sends);
+
+        /** @var list<array{at: int}> $decoded */
+        $decoded = json_decode($sends, true, flags: JSON_THROW_ON_ERROR);
+
+        return array_column($decoded, 'at');
     }
 
     /**

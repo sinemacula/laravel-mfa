@@ -15,6 +15,8 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use SineMacula\Laravel\Mfa\Console\CheckConfigurationCommand;
 use SineMacula\Laravel\Mfa\Contracts\EloquentFactor;
 use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
+use SineMacula\Laravel\Mfa\Facades\Mfa;
+use Tests\Fixtures\Drivers\NoopFactorDriver;
 use Tests\TestCase;
 
 /**
@@ -168,6 +170,85 @@ final class CheckConfigurationCommandTest extends TestCase
     }
 
     /**
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testATypeWithNoRegisteredDriverFailsTheCheck(): void
+    {
+        $this->configureWeb(['totp', 'topt']);
+
+        $command = $this->artisan('mfa:check');
+
+        self::assertInstanceOf(PendingCommand::class, $command);
+
+        $command->expectsOutput('[applications.web] The application enables types with no registered driver: topt.')
+            ->doesntExpectOutput('[applications.web] OK')
+            ->assertExitCode(1)
+            ->run();
+    }
+
+    /**
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testATypeOfAnExtendedDriverPassesTheCheck(): void
+    {
+        Mfa::extend('custom', static fn (): NoopFactorDriver => new NoopFactorDriver);
+
+        $this->configureWeb(['totp', 'custom']);
+
+        $command = $this->artisan('mfa:check');
+
+        self::assertInstanceOf(PendingCommand::class, $command);
+
+        $command->expectsOutput('[applications.web] OK')
+            ->assertExitCode(0)
+            ->run();
+    }
+
+    /**
+     * Even with the manager already built.
+     *
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function testTypesAreNotCheckedWhileAnotherProblemStands(): void
+    {
+        $this->container()->make('mfa');
+
+        $this->configureWeb(['topt']);
+        $this->container()->make(Repository::class)->set('mfa.codes.length', 4);
+
+        $command = $this->artisan('mfa:check');
+
+        self::assertInstanceOf(PendingCommand::class, $command);
+
+        $command->expectsOutput('[codes] mfa.codes.length must be an integer from 6 to 10.')
+            ->expectsOutput('[applications.web] OK')
+            ->assertExitCode(1)
+            ->run();
+    }
+
+    /**
+     * @return void
+     */
+    public function testAnotherKindOfManagerIsRefused(): void
+    {
+        $this->container()->instance('mfa', new \stdClass);
+
+        $command = $this->artisan('mfa:check');
+
+        self::assertInstanceOf(PendingCommand::class, $command);
+
+        $this->expectExceptionObject(new \LogicException('The [mfa] binding must be the MFA manager.'));
+
+        $command->run();
+    }
+
+    /**
      * Boot as `mfa:check` with a non-model factor class, as a deployment would.
      *
      * @param  \Illuminate\Foundation\Application  $app
@@ -180,5 +261,21 @@ final class CheckConfigurationCommandTest extends TestCase
         $_SERVER['argv'] = ['artisan', 'mfa:check'];
 
         $app->make(Repository::class)->set('mfa.factor.model', \stdClass::class);
+    }
+
+    /**
+     * Configure the `web` application with a declared first factor.
+     *
+     * @param  list<string>  $types
+     * @return void
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    private function configureWeb(array $types): void
+    {
+        $this->container()->make(Repository::class)->set('mfa.applications', ['web' => [
+            'types'        => $types,
+            'first_factor' => ['method' => 'password', 'channel' => 'password'],
+        ]]);
     }
 }

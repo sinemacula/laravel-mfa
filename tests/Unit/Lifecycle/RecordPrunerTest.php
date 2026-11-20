@@ -94,12 +94,10 @@ final class RecordPrunerTest extends TestCase
             'authenticatable_id'   => (string) $userId,
             'purpose'              => 'sign_in',
             'application'          => 'web',
-            'destination_hash'     => 'destination',
             'code_hash'            => 'code',
             'attempts'             => 0,
             'sends'                => 1,
             'sent_at'              => $expiresAt,
-            'sent_times'           => [],
             'expires_at'           => $expiresAt,
         ]);
     }

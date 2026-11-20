@@ -51,6 +51,10 @@ before anything relies on it.
   package's `NullSmsSender`, `email` a `Contracts\EmailSender` other than its `NullEmailSender`; and either has the
   application key its codes are hashed with (see [Delivered Codes](delivered-codes.md)). The package's
   `MailEmailSender` looks its mailer up only to send, so the boot check of every request builds no mail transport.
+- Every type an application enables has a registered driver, the package's or one added with `Mfa::extend()`. Drivers
+  are registered as the manager is built, after its factory has run the check, so only `mfa:check` checks this. Once
+  the rest of the configuration passes, as the factory requires, it builds the manager and hands the validator its
+  `hasDriver()`. Enrolling a type with no driver fails with the manager's `InvalidArgumentException`.
 - `Config\ConfigurationValidator` runs every check and groups the problems by subject: `storage`, `factor`,
   `identity_state`, each capability block, `applications`, and `applications.{name}`. It runs once the application has
   booted (`Config\ConfigurationBindings::boot()`, from the provider's `boot()`, deferred until every provider has
@@ -115,7 +119,8 @@ before anything relies on it.
 - `tests/Unit/Config/IntegerSettingTest.php`
 - `tests/Unit/Config/ConfigurationValidatorTest.php`
 - `tests/Unit/Config/ConfigurationBindingsTest.php`
-- `tests/Feature/Console/CheckConfigurationCommandTest.php`, `testTheCommandReportsAFactorModelProblemPresentAtBoot`
+- `tests/Feature/Console/CheckConfigurationCommandTest.php`, `testTheCommandReportsAFactorModelProblemPresentAtBoot`,
+  `testATypeWithNoRegisteredDriverFailsTheCheck`, `testATypeOfAnExtendedDriverPassesTheCheck`
 - `tests/Unit/MfaServiceProviderTest.php` `testAWorkerRefusesAnInvalidConfiguration`,
   `testResolvingTheManagerRefusesAnInvalidConfiguration`
 
