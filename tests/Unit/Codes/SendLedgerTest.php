@@ -60,7 +60,7 @@ final class SendLedgerTest extends TestCase
     }
 
     /**
-     * Sent at 01:00 and 01:01 GMT, just after the clocks went back, both still
+     * Sent at 01:58 and 01:59 BST, just before the clocks went back, both still
      * count at 01:04 GMT.
      *
      * @return void
@@ -73,9 +73,9 @@ final class SendLedgerTest extends TestCase
 
         CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-10-25 01:04:00', 'UTC')->setTimezone('Europe/London'));
 
-        $this->sent('1', ['destination-a' => [240, 180]]);
+        $this->sent('1', ['destination-a' => [360, 300]]);
 
-        self::assertSame(360, $this->ledger()->caps('destination-a', CarbonImmutable::now()));
+        self::assertSame(240, $this->ledger()->caps('destination-a', CarbonImmutable::now()));
     }
 
     /**

@@ -226,17 +226,21 @@ final class ResettingIdentityTest extends TestCase
             'expires_at'           => CarbonImmutable::now()->addMinutes(10),
         ]);
 
-        $sends = json_encode([['at' => CarbonImmutable::now()->getTimestamp(), 'to' => hash('sha256', 'destination'), 'enrollment' => false]], JSON_THROW_ON_ERROR);
+        $sends = [['at' => CarbonImmutable::now()->getTimestamp(), 'to' => hash('sha256', 'destination'), 'enrollment' => false]];
 
         IdentityStateRow::lock(ProofOwner::of($user), DB::connection());
-        IdentityStateRow::of(ProofOwner::of($user))->update(['code_sends' => $sends]);
+        IdentityStateRow::of(ProofOwner::of($user))->update(['code_sends' => json_encode($sends, JSON_THROW_ON_ERROR)]);
 
         Mfa::resetIdentity($user, self::actor(), self::REASON);
 
         self::assertSame(0, Factor::query()->count());
         self::assertSame(0, Enrollment::query()->count());
         self::assertTrue(Code::query()->whereKey($code->getKey())->exists());
-        self::assertSame($sends, IdentityStateRow::of(ProofOwner::of($user))->value('code_sends'));
+
+        $kept = IdentityStateRow::of(ProofOwner::of($user))->value('code_sends');
+
+        self::assertIsString($kept);
+        self::assertSame($sends, json_decode($kept, true, flags: JSON_THROW_ON_ERROR));
     }
 
     /**
