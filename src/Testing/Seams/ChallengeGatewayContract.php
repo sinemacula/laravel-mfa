@@ -14,8 +14,9 @@ use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 
 /**
  * What every `ChallengeGateway` must guarantee: a wrong code fails and is
- * counted, a code answers only its own binding and only once, and an unknown
- * challenge is not found. `$delivered` reads a sent code back, as from a fake
+ * counted, a code answers only its own binding and only once, another caller's
+ * binding and an unknown challenge are not found, and a challenge takes no more
+ * than its wrong codes. `$delivered` reads a sent code back, as from a fake
  * sender.
  *
  * @author      Ben Carey <bdmc@sinemacula.co.uk>
@@ -43,7 +44,8 @@ final class ChallengeGatewayContract
     }
 
     /**
-     * Another purpose's challenge is not found.
+     * Another purpose, session or application than the one the code was sent
+     * for.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\ChallengeGateway  $gateway
      * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
@@ -56,11 +58,76 @@ final class ChallengeGatewayContract
     {
         $challenge = self::sent($gateway, $caller, $factor, $binding);
         $code      = $delivered($challenge);
-        $purpose   = $binding->purpose === Purpose::STEP_UP ? Purpose::SIGN_IN : Purpose::STEP_UP;
-        $other     = new ProofBinding($binding->identityType, $binding->identityKey, $binding->application, $binding->sessionId, $purpose);
 
-        Assert::assertFalse($gateway->verify($caller, $factor, $other, $challenge, $code)->hasPassed(), 'A code must not answer another purpose than the one it was sent for.');
+        foreach (['purpose' => 'purpose', 'session_id' => 'session', 'application' => 'application'] as $part => $name) {
+            $message = sprintf('A code must not answer another %s than the one it was sent for.', $name);
+
+            Assert::assertFalse($gateway->verify($caller, $factor, self::another($binding, $part), $challenge, $code)->hasPassed(), $message);
+        }
+
         Assert::assertTrue($gateway->verify($caller, $factor, $binding, $challenge, $code)->hasPassed(), 'The code sent must answer its own binding.');
+    }
+
+    /**
+     * Another identity's binding, or the binding asked by a caller who is
+     * nobody, is refused uncounted and leaves the code to answer its own.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Contracts\ChallengeGateway  $gateway
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
+     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @param  \Closure(string): string  $delivered
+     * @return void
+     *
+     * @throws \InvalidArgumentException
+     */
+    public static function assertAnotherCallersBindingIsNotFound(ChallengeGateway $gateway, CallerContext $caller, Factor $factor, ProofBinding $binding, \Closure $delivered): void
+    {
+        $challenge = self::sent($gateway, $caller, $factor, $binding);
+        $code      = $delivered($challenge);
+
+        $asked = [
+            [$caller, self::another($binding, 'identity_key')],
+            [$caller, self::another($binding, 'identity_type')],
+            [CallerContext::nobody($caller->application, $caller->client), $binding],
+        ];
+
+        foreach ($asked as [$asking, $named]) {
+            $outcome = $gateway->verify($asking, $factor, $named, $challenge, $code);
+
+            Assert::assertSame(FailureReason::NOT_FOUND, $outcome->reason, 'A binding that does not name the caller must not be found.');
+            Assert::assertFalse($outcome->counted, 'A binding that does not name the caller must not be counted.');
+        }
+
+        Assert::assertTrue($gateway->verify($caller, $factor, $binding, $challenge, $code)->hasPassed(), 'A binding that does not name the caller must not use up the code.');
+    }
+
+    /**
+     * @param  \SineMacula\Laravel\Mfa\Contracts\ChallengeGateway  $gateway
+     * @param  \SineMacula\Laravel\Mfa\Context\CallerContext  $caller
+     * @param  \SineMacula\Laravel\Mfa\Contracts\Factor  $factor
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @param  \Closure(string): string  $delivered
+     * @param  int  $maxAttempts
+     * @return void
+     */
+    public static function assertAChallengeTakesNoMoreThanItsAttempts(
+        ChallengeGateway $gateway,
+        CallerContext $caller,
+        Factor $factor,
+        ProofBinding $binding,
+        \Closure $delivered,
+        int $maxAttempts,
+    ): void {
+        $challenge = self::sent($gateway, $caller, $factor, $binding);
+        $code      = $delivered($challenge);
+        $wrong     = self::wrong($code);
+
+        for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
+            Assert::assertFalse($gateway->verify($caller, $factor, $binding, $challenge, $wrong)->hasPassed(), 'A code other than the one sent must not pass.');
+        }
+
+        Assert::assertFalse($gateway->verify($caller, $factor, $binding, $challenge, $code)->hasPassed(), 'The code sent must not pass once its challenge has taken its attempts.');
     }
 
     /**
@@ -110,6 +177,23 @@ final class ChallengeGatewayContract
         Assert::assertNotNull($challenge, 'A code must be sent for a factor that may be challenged.');
 
         return $challenge;
+    }
+
+    /**
+     * The binding with one part, by its serialised name, naming another.
+     *
+     * @param  \SineMacula\Laravel\Mfa\Proofs\ProofBinding  $binding
+     * @param  string  $part
+     * @return \SineMacula\Laravel\Mfa\Proofs\ProofBinding
+     */
+    private static function another(ProofBinding $binding, string $part): ProofBinding
+    {
+        $fields  = $binding->toArray();
+        $purpose = $binding->purpose === Purpose::STEP_UP ? Purpose::SIGN_IN : Purpose::STEP_UP;
+
+        $fields[$part] = $part === 'purpose' ? $purpose->value : sprintf('%s-other', $fields[$part]);
+
+        return ProofBinding::fromArray($fields);
     }
 
     /**

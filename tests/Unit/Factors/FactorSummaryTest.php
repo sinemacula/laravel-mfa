@@ -6,10 +6,13 @@ namespace Tests\Unit\Factors;
 
 use Carbon\Carbon;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use SineMacula\Laravel\Mfa\Contracts\Factor;
 use SineMacula\Laravel\Mfa\Enums\FactorStatus;
+use SineMacula\Laravel\Mfa\Exceptions\InsufficientAuthenticationException;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
+use SineMacula\Laravel\Mfa\Requirements\Requirement;
 use Tests\Unit\Concerns\BuildsFactorSummaries;
 
 /**
@@ -285,6 +288,41 @@ final class FactorSummaryTest extends TestCase
         $summary = $this->buildSummaryWithDestination('9');
 
         self::assertSame('*', $summary->maskedDestination);
+    }
+
+    /**
+     * @return iterable<string, array{0: string, 1: string}>
+     */
+    public static function multibyteDestinations(): iterable
+    {
+        yield 'a one-character local part' => ['ü@example.com', 'ü*@example.com'];
+        yield 'a two-character local part' => ['田中@example.jp', '田*@example.jp'];
+        yield 'a longer local part' => ['jürgen@example.de', 'jü****@example.de'];
+        yield 'a long opaque destination' => ['ab①②③④', '**①②③④'];
+        yield 'a short opaque destination' => ['①②③', '***'];
+    }
+
+    /**
+     * @param  string  $destination
+     * @param  string  $expected
+     * @return void
+     */
+    #[DataProvider('multibyteDestinations')]
+    public function testMaskingKeepsWholeMultibyteCharacters(string $destination, string $expected): void
+    {
+        self::assertSame($expected, $this->buildSummaryWithDestination($destination)->maskedDestination);
+    }
+
+    /**
+     * @return void
+     */
+    public function testMultibyteMaskedDestinationEncodesAsJson(): void
+    {
+        $summary   = $this->buildSummaryWithDestination('田中@example.jp');
+        $exception = new InsufficientAuthenticationException(Requirement::none()->withMultifactor(), [$summary]);
+
+        self::assertStringContainsString('田*@example.jp', json_encode($summary, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
+        self::assertStringContainsString('田*@example.jp', json_encode($exception->toArray(), JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
     }
 
     /**

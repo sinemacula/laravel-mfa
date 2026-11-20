@@ -64,6 +64,14 @@ trait FreshnessGateTests
     /**
      * @return void
      */
+    public function testFreshnessGateAppliesTheCallersStricterRequirement(): void
+    {
+        FreshnessGateContract::assertTheCallersStricterRequirementApplies($this->freshGate(), $this->freshnessCaller(), $this->freshOperation());
+    }
+
+    /**
+     * @return void
+     */
     public function testFreshnessGateHoldsASessionToWhatTheCallerAsks(): void
     {
         FreshnessGateContract::assertTheRequirementAsksWhatTheCallerAsks($this->freshnessGate(), $this->freshnessCaller());
@@ -84,7 +92,8 @@ trait FreshnessGateTests
     abstract protected function freshnessGate(): FreshnessGate;
 
     /**
-     * Asked on behalf of a session fresh for `freshOperation()`.
+     * Asked on behalf of a session fresh for `freshOperation()`, whose
+     * additional verifications were all made over 10 seconds ago.
      *
      * @return \SineMacula\Laravel\Mfa\Contracts\FreshnessGate
      */
