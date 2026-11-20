@@ -53,10 +53,10 @@ for the session. The API is in [Enrolment](../guides/enrollment.md).
   the same instance, so `VerificationFailed` carries a summary taken before it and never reads `confirmed`.
 - A binding whose purpose is `enrollment` inverts the admission in `Attempts\ChallengeCounters`: only a pending factor
   holding a live enrolment bound to the binding and the caller, of an enabled type, with no question of the combination
-  policy, refused while the identity's lockout is live. A confirmed factor under `enrollment`, and a pending factor
-  under any other purpose, are refused, which is what makes an enrolment challenge never usable as an `mfa` one or the
-  reverse. `report()` under `enrollment` changes no factor's or identity's count, and still refuses a binding naming
-  another identity.
+  policy, refused while the identity's lockout is live or its run is at the ceiling. A confirmed factor under
+  `enrollment`, and a pending factor under any other purpose, are refused, which is what makes an enrolment challenge
+  never usable as an `mfa` one or the reverse. `report()` under `enrollment` changes no factor's or identity's count,
+  and still refuses a binding naming another identity.
 - `PackageChallengeGateway` maps the pending action by purpose: an enrolment send needs `mfa.start_bootstrap_enrollment`
   and an enrolment check `mfa.confirm_bootstrap_enrollment`, so `mfa.send_code` alone never reaches a pending factor.
 - The enrolment's own cap (`mfa.enrollment.max_attempts`) counts only `invalid_code` and `replayed`, once each, under
@@ -98,6 +98,8 @@ for the session. The API is in [Enrolment](../guides/enrollment.md).
 - A wrong-code count and an abandonment commit, because they return. A valid code followed by a refusal throws, carried
   by `RefusedUnderLockException`, so the code's use, the TOTP step, the confirmation, the end of the obligation and the
   recovery codes all roll back. Returning a refusal alone would not roll any of it back.
+- An identity whose run of failures is at the failure ceiling is refused on start, resend and confirm as `locked` with
+  no `lockedUntil` or `retryAfter`, since the ceiling does not lift by itself. Nothing is created, sent or counted.
 - A sending cap throws `CodeNotSentException` out of the start's transaction, so nothing is left, with `retryAfter` kept
   for the answer. A code already sent cannot be recalled: a later failure of the transaction leaves a delivered code
   nothing can confirm, and nothing retries the transaction.
