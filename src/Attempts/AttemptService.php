@@ -199,8 +199,8 @@ final readonly class AttemptService
 
     /**
      * Lift the factor's lockout, or the identity's when no factor is given.
-     * Failure counts are kept, so the next failure locks again. `false` can
-     * still mean the identity's throttle window was cleared.
+     * Failure counts are kept, so a factor's next failure locks it again; the
+     * identity's throttle window is cleared even when this returns `false`.
      *
      * @param  \SineMacula\Laravel\Mfa\Contracts\MultiFactorAuthenticatable  $identity
      * @param  ?\SineMacula\Laravel\Mfa\Contracts\Factor  $factor

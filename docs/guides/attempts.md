@@ -110,10 +110,11 @@ $attempts->resetIdentityFailures($user);                  // clear the identity'
   snapshot. Use it to tell someone what to expect, not to decide anything; every attempt reads the lockouts again under
   the lock.
 - `liftLockout($identity, $factor, $actor)` lifts the factor's lockout, or the identity's when no factor is given. It
-  keeps the factor's failures in a row and the identity's, so the next failure locks again, and leaves a disabled
-  factor disabled. A factor that is not the identity's lifts nothing. It dispatches `LockoutLifted`, naming the actor,
-  when a live lockout was lifted, and answers whether one was: a deadline that has already passed is cleared without
-  either. A machine identity is refused as `machine_identity`.
+  keeps the factor's failures in a row and the identity's, so a factor's next failure locks it again, while the
+  identity's window starts afresh, and leaves a disabled factor disabled. A factor that is not the identity's lifts
+  nothing. It dispatches `LockoutLifted`, naming the actor, when a live lockout was lifted, and answers whether one
+  was: a deadline that has already passed is cleared without either. A machine identity is refused as
+  `machine_identity`.
 - `enableFactor($factor)` enables a factor the failure ceiling disabled and clears its failures in a row, leaving any
   lockout to end on its own.
 - `resetIdentityFailures($identity)` clears the identity's failures in a row, so attempts that name no factor of its

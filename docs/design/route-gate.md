@@ -116,7 +116,8 @@ response if the commit fails.
 ## Authoritative Tests
 
 - `tests/Feature/Http/EnsureMfaRequirementIsMetTest.php`: the matrix through the kernel: modes, evidence, operations,
-  refusals, parsing, exemption in both orders, two populated guards, read-only and stateless.
+  refusals, parsing, exemption in both orders, from controller middleware and for a pending session, two populated
+  guards, read-only and stateless.
 - `tests/Feature/Http/RemovedFactorGateTest.php`: a recent weaker proof does not pass once the stronger factor is
   removed.
 - `tests/Feature/Http/EnrolledFactorGateTest.php`: on an `enrolled` application, a first factor confirmed through a real

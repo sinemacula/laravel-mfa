@@ -16,6 +16,7 @@ use SineMacula\Laravel\Mfa\Attempts\ChallengeCounters;
 use SineMacula\Laravel\Mfa\Attempts\ChallengeOutcome;
 use SineMacula\Laravel\Mfa\Codes\PackageChallengeGateway;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
+use SineMacula\Laravel\Mfa\Context\CallerContext;
 use SineMacula\Laravel\Mfa\Context\ClientContext;
 use SineMacula\Laravel\Mfa\Contracts\ChallengeGateway;
 use SineMacula\Laravel\Mfa\Contracts\FirstFactorResolver;
@@ -34,6 +35,7 @@ use SineMacula\Laravel\Mfa\Passkeys\PasskeyAssertions;
 use SineMacula\Laravel\Mfa\Passkeys\UnavailablePasskeyGateway;
 use SineMacula\Laravel\Mfa\Proofs\ProofBinding;
 use SineMacula\Laravel\Mfa\RecoveryCodes\RecoveryCodeService;
+use SineMacula\Laravel\Mfa\Secrets\RevealedSecret;
 use SineMacula\Laravel\Mfa\Testing\AuthenticatorApp;
 use SineMacula\Laravel\Mfa\Verification\ChallengeRequests;
 use SineMacula\Laravel\Mfa\Verification\CheckOutcome;
@@ -464,6 +466,69 @@ final class FailureReasonsVerificationServiceTest extends TestCase
 
         self::assertTrue($this->mfa()->verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)))->isVerified());
         self::assertSame(0, $this->identityRun($user));
+    }
+
+    /**
+     * One code is spent and the identity's run ends; the factor stays disabled.
+     *
+     * @return void
+     */
+    public function testARecoveryCodeRedeemsWhenTheOnlyFactorIsDisabled(): void
+    {
+        $user     = $this->signedInPerson();
+        $factor   = $this->totpFactor($user);
+        $code     = $this->recoveryCode($user);
+        $disabled = CarbonImmutable::now()->subMinute();
+
+        Factor::query()->whereKey($factor->id)->update(['disabled_at' => $disabled]);
+        IdentityState::query()->where('authenticatable_id', (string) $user->id)->update(['consecutive_failures' => 3]);
+
+        self::assertTrue($this->mfa()->verify(Callers::current(), Submission::recoveryCode($code))->isVerified());
+        self::assertSame(9, $this->mfa()->recoveryCodeStatus(Callers::current())?->remaining);
+        self::assertSame(0, $this->identityRun($user));
+        self::assertSame($disabled->getTimestamp(), Factor::query()->whereKey($factor->id)->sole()->getDisabledAt()?->getTimestamp());
+    }
+
+    /**
+     * Redeemed, counted and replaced across the applications that accept
+     * codes; one that does not spends nothing.
+     *
+     * @return void
+     */
+    public function testOneSetIsSharedAcrossTheApplicationsThatAcceptRecoveryCodes(): void
+    {
+        $first = ['method' => 'password', 'channel' => 'password'];
+
+        config()->set('mfa.applications.api', ['types' => ['totp'], 'recovery_codes' => ['enabled' => true], 'first_factor' => $first]);
+        config()->set('mfa.applications.admin', ['types' => ['totp'], 'recovery_codes' => ['enabled' => false], 'first_factor' => $first]);
+
+        $user    = $this->signedInPerson();
+        $service = $this->container()->make(RecoveryCodeService::class);
+        $store   = $this->container()->make(ProofStore::class);
+
+        $this->totpFactor($user);
+
+        $codes = array_map(static fn (RevealedSecret $code): string => $code->reveal(), $service->generate($user, self::APPLICATION));
+        $api   = CallerContext::forIdentity($user, 'api');
+        $admin = CallerContext::forIdentity($user, 'admin');
+
+        $store->begin($user, 'api', 'sign-in-api');
+        $store->begin($user, 'admin', 'sign-in-admin');
+
+        self::assertSame(FailureReason::TYPE_NOT_ENABLED, $this->mfa()->verify($admin, Submission::recoveryCode($codes[0]))->reason);
+        self::assertSame(10, $this->mfa()->recoveryCodeStatus($api)?->remaining);
+
+        self::assertTrue($this->mfa()->verify($api, Submission::recoveryCode($codes[0]))->isVerified());
+        self::assertSame(1, $this->mfa()->recoveryCodeStatus($api)?->generation);
+        self::assertSame(9, $this->mfa()->recoveryCodeStatus(Callers::current())?->remaining);
+
+        $replacement = $service->generate($user, 'api');
+        $status      = $this->mfa()->recoveryCodeStatus(Callers::current());
+
+        self::assertSame(2, $status->generation);
+        self::assertSame(10, $status->remaining);
+        self::assertSame(FailureReason::INVALID_CODE, $this->mfa()->verify(Callers::current(), Submission::recoveryCode($codes[1]))->reason);
+        self::assertTrue($this->mfa()->verify(Callers::current(), Submission::recoveryCode($replacement[0]->reveal()))->isVerified());
     }
 
     /**

@@ -98,7 +98,7 @@ final readonly class ConfigurationValidator
         $config = $this->config;
 
         $checks = [
-            'storage'        => [fn () => $this->checkStorageConnection(), fn () => $this->checkDistinctTables()],
+            'storage'        => [fn () => $this->checkStorageConnection(), fn () => $this->checkDistinctTables(), fn () => $this->checkTimezone()],
             'factor'         => [fn () => $this->checkModel(ConfiguredModels::factor($config), ConfiguredModels::FACTOR), fn () => $this->checkTable(TableNames::FACTORS)],
             'identity_state' => [fn () => $this->checkTable(TableNames::IDENTITY_STATES)],
             'totp'           => [static fn () => (new TotpSettings($config))->validate()],
@@ -200,6 +200,21 @@ final readonly class ConfigurationValidator
             $settings = array_keys(array_filter($names, static fn (string $name): bool => in_array($name, $shared, true)));
 
             throw new \InvalidArgumentException(sprintf('Each of the package\'s tables needs a name of its own: %s share one.', implode(', ', $settings)));
+        }
+    }
+
+    /**
+     * Times are stored as wall-clock strings, which a daylight saving change
+     * would put out of order.
+     *
+     * @return void
+     *
+     * @throws \InvalidArgumentException
+     */
+    private function checkTimezone(): void
+    {
+        if ($this->config->get('app.timezone') !== 'UTC' || date_default_timezone_get() !== 'UTC') {
+            throw new \InvalidArgumentException('app.timezone and the PHP default timezone must be UTC.');
         }
     }
 
