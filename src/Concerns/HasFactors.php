@@ -12,8 +12,8 @@ use SineMacula\Laravel\Mfa\Database\ConfiguredModels;
 use SineMacula\Laravel\Mfa\Database\WriteConnection;
 use SineMacula\Laravel\Mfa\Enums\FactorStatus;
 use SineMacula\Laravel\Mfa\Lifecycle\ForgetIdentity;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Requirements\Requirement;
-use SineMacula\Laravel\Mfa\Support\FactorOwnerColumns;
 
 /**
  * Factor ownership for an Eloquent identity model beside
@@ -95,7 +95,8 @@ trait HasFactors
     }
 
     /**
-     * Matched on the factor model's own `authenticatable` owner columns.
+     * Matched on the factor model's owner hash, so a collation ignoring case
+     * cannot match another owner's.
      *
      * @formatter:off
      *
@@ -108,13 +109,11 @@ trait HasFactors
         $model  = ConfiguredModels::factor(Container::getInstance()->make('config'));
         $factor = new $model;
 
-        [$typeColumn, $keyColumn] = FactorOwnerColumns::of($factor);
-
+        /** @var int|string|null $key */
         $key = $this instanceof Authenticatable ? $this->getAuthIdentifier() : $this->getKey();
 
         /** @var \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor> */
         return $factor->newQuery()
-            ->where($factor->qualifyColumn($typeColumn), $this->getMorphClass())
-            ->where($factor->qualifyColumn($keyColumn), is_int($key) ? (string) $key : $key);
+            ->where($factor->qualifyColumn($factor->getOwnerHashName()), (new ProofOwner($this->getMorphClass(), (string) $key))->hash());
     }
 }

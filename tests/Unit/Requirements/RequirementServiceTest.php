@@ -21,6 +21,7 @@ use SineMacula\Laravel\Mfa\Contracts\TenantRequirement;
 use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
 use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Requirements\IdentityContractRequirement;
 use SineMacula\Laravel\Mfa\Requirements\NoActiveTenant;
 use SineMacula\Laravel\Mfa\Requirements\NoTenantRequirement;
@@ -618,6 +619,7 @@ final class RequirementServiceTest extends TestCase
             'id'                    => Str::lower((string) Str::ulid()),
             'authenticatable_type'  => $type,
             'authenticatable_id'    => $key,
+            'owner_hash'            => (new ProofOwner($type, $key))->hash(),
             'reenrollment_required' => $required,
             'created_at'            => $now,
             'updated_at'            => $now,

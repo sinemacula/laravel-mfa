@@ -15,6 +15,7 @@ use SineMacula\Laravel\Mfa\Models\Factor;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
 use SineMacula\Laravel\Mfa\Models\PasskeyAssociation;
 use SineMacula\Laravel\Mfa\Models\RecoveryCode;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Support\IdentityType;
 
 /**
@@ -67,7 +68,7 @@ trait HoldsIdentityRecords
             'credential_id_hash' => hash('sha256', 'p' . $factor->id),
             'credential_id'      => 'credential',
         ]);
-        IdentityState::query()->firstOrCreate($owner);
+        IdentityState::query()->firstOrCreate(['owner_hash' => ProofOwner::of($identity)->hash()], $owner);
     }
 
     /**
@@ -79,7 +80,7 @@ trait HoldsIdentityRecords
         $counts = [];
 
         foreach ($this->recordTables() as $table) {
-            $counts[$table] = DB::table($table)->where($this->ownerOf($identity))->count();
+            $counts[$table] = DB::table($table)->where('owner_hash', ProofOwner::of($identity)->hash())->count();
         }
 
         return $counts;

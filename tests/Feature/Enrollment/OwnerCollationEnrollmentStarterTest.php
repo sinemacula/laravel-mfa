@@ -209,10 +209,11 @@ final class OwnerCollationEnrollmentStarterTest extends TestCase
      */
     private function handToAnotherOwner(TestUser $user): void
     {
-        $type = self::otherType($user);
+        $other = new ProofOwner(self::otherType($user), ProofOwner::of($user)->key);
+        $moved = ['authenticatable_type' => $other->type, 'owner_hash' => $other->hash()];
 
-        Factor::query()->update(['authenticatable_type' => $type]);
-        Enrollment::query()->update(['authenticatable_type' => $type]);
+        Factor::query()->update($moved);
+        Enrollment::query()->update($moved);
     }
 
     /**

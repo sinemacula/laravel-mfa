@@ -25,6 +25,7 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
  * @property string $id
  * @property string $authenticatable_type
  * @property string $authenticatable_id
+ * @property string $owner_hash
  * @property string $type
  * @property ?string $label
  * @property ?string $destination
@@ -55,6 +56,7 @@ class Factor extends Model implements EloquentFactor
     protected $fillable = [
         'authenticatable_type',
         'authenticatable_id',
+        'owner_hash',
         'type',
         'label',
         'destination',
@@ -122,6 +124,7 @@ class Factor extends Model implements EloquentFactor
         return [
             'authenticatable_type' => 'string',
             'authenticatable_id'   => 'string',
+            'owner_hash'           => 'string',
             'type'                 => 'string',
             'label'                => 'string',
             'destination'          => 'string',

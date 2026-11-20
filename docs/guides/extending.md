@@ -40,6 +40,12 @@ model is set with `mfa.recovery_codes.model`. Identity models are described in [
 `Concerns\ActsAsFactor` and `Concerns\ActsAsRecoveryCode` store and read every time on the model in UTC, whatever
 `app.timezone` is, as the package's own models do.
 
+Its table has an `owner_hash` column, `char(64)` and indexed, beside the owner columns (or the column
+`getOwnerHashName()` names). The package finds and deletes an identity's records by it, so a case-insensitive collation
+cannot match an owner whose key differs only in case. Both traits set it from the owner columns on every save; a model
+implementing the contract without them, or a write that skips model events, such as a mass update of the owner columns,
+sets it to `ProofOwner::hash()` of the owner itself.
+
 A custom factor model keeps its temporary lockout on its own row, in the column `getLockedUntilName()` names
 (`locked_until` by default), and when the failure ceiling disabled it in the column `getDisabledAtName()` names
 (`disabled_at` by default). `Concerns\ActsAsFactor` casts both columns as a `datetime` itself, whatever they are named,

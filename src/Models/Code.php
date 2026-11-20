@@ -6,7 +6,9 @@ namespace SineMacula\Laravel\Mfa\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
+use SineMacula\Laravel\Mfa\Concerns\HashesOwner;
 use SineMacula\Laravel\Mfa\Concerns\StoresTimesInUtc;
+use SineMacula\Laravel\Mfa\Contracts\OwnedRecord;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 
@@ -21,6 +23,7 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
  * @property string $factor_id
  * @property string $authenticatable_type
  * @property string $authenticatable_id
+ * @property string $owner_hash
  * @property string $purpose
  * @property string $application
  * @property ?string $session_id
@@ -35,15 +38,16 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
  *
  * @internal
  */
-final class Code extends Model
+final class Code extends Model implements OwnedRecord
 {
-    use HasUlids, StoresTimesInUtc;
+    use HashesOwner, HasUlids, StoresTimesInUtc;
 
     /** @var list<string> */
     protected $fillable = [
         'factor_id',
         'authenticatable_type',
         'authenticatable_id',
+        'owner_hash',
         'purpose',
         'application',
         'session_id',
@@ -100,6 +104,7 @@ final class Code extends Model
             'code_hash'            => 'string',
             'authenticatable_type' => 'string',
             'authenticatable_id'   => 'string',
+            'owner_hash'           => 'string',
             'attempts'             => 'integer',
             'sends'                => 'integer',
             'sent_at'              => 'datetime',

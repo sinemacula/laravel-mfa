@@ -79,7 +79,7 @@ final class HasFactorsTest extends TestCase
 
         $record->setAttribute('id', $identity->id);
 
-        Factor::query()->whereKey($own->id)->update(['authenticatable_type' => $record->getMorphClass()]);
+        $own->update(['authenticatable_type' => $record->getMorphClass()]);
 
         self::assertSame([$own->id], $record->authFactors()->pluck('id')->all());
     }

@@ -35,8 +35,7 @@ final class IdentityStateRow
         $connection ??= DB::connection(StorageConnection::name());
 
         return $connection->table(TableNames::of(TableNames::IDENTITY_STATES))
-            ->where('authenticatable_type', $owner->type)
-            ->where('authenticatable_id', $owner->key);
+            ->where('owner_hash', $owner->hash());
     }
 
     /**
@@ -57,8 +56,9 @@ final class IdentityStateRow
             'id'                   => Str::lower((string) Str::ulid()),
             'authenticatable_type' => $owner->type,
             'authenticatable_id'   => $owner->key,
+            'owner_hash'           => $owner->hash(),
             'created_at'           => $now,
             'updated_at'           => $now,
-        ]], ['authenticatable_type', 'authenticatable_id'], ['updated_at']);
+        ]], ['owner_hash'], ['updated_at']);
     }
 }

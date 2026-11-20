@@ -5,7 +5,6 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Contracts;
 
 use Carbon\CarbonInterface;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 /**
  * The persistence side of a factor the services write through; a non-Eloquent
@@ -18,17 +17,8 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  *
  * @SuppressWarnings("php:S1448")
  */
-interface EloquentFactor extends Factor // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMethods
+interface EloquentFactor extends Factor, OwnedRecord // phpcs:ignore SineMacula.Metrics.MaxMethodCount.TooManyMethods
 {
-    /**
-     * @formatter:off
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\MorphTo<\Illuminate\Database\Eloquent\Model, \Illuminate\Database\Eloquent\Model>
-     *
-     * @formatter:on
-     */
-    public function authenticatable(): MorphTo;
-
     /**
      * @return string
      */

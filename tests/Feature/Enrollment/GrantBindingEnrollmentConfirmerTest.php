@@ -160,7 +160,9 @@ final class GrantBindingEnrollmentConfirmerTest extends TestCase
         $user  = $this->reauthenticatedPerson();
         $start = $this->startedTotp();
 
-        Enrollment::query()->update(['authenticatable_type' => strtoupper(ProofOwner::of($user)->type)]);
+        $other = new ProofOwner(strtoupper(ProofOwner::of($user)->type), ProofOwner::of($user)->key);
+
+        Enrollment::query()->update(['authenticatable_type' => $other->type, 'owner_hash' => $other->hash()]);
 
         self::assertSame(FailureReason::NOT_FOUND, $this->mfa()->confirmEnrollment(Callers::current(), $this->grantOf($start), $this->appCode($start))->reason);
     }

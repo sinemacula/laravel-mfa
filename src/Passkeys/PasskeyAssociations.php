@@ -38,8 +38,7 @@ final readonly class PasskeyAssociations
     {
         $association = WriteConnection::query(PasskeyAssociation::query())
             ->where('credential_id_hash', CredentialId::hash($credentialId))
-            ->where('authenticatable_type', $owner->type)
-            ->where('authenticatable_id', $owner->key)
+            ->where('owner_hash', $owner->hash())
             ->lockForUpdate()
             ->first();
 

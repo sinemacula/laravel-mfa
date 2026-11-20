@@ -55,23 +55,19 @@ final readonly class RecoveryCodeRows
         $code  = $this->codeModel();
         $state = new IdentityState;
 
-        [$typeColumn, $keyColumn] = self::ownerColumns($code);
-
         $codes      = $code->getTable();
         $generation = $state->qualifyColumn('recovery_codes_generation');
         $generated  = $state->qualifyColumn('recovery_codes_generated_at');
         $count      = new GrammarExpression(static fn (Grammar $grammar): string => "count({$grammar->wrap($codes . '.' . $code->getKeyName())}) as remaining");
 
         $row = WriteConnection::query($state->newQuery())
-            ->leftJoin($codes, static function (JoinClause $join) use ($state, $code, $codes, $typeColumn, $keyColumn, $generation): void {
-                $join->on($codes . '.' . $typeColumn, '=', $state->qualifyColumn('authenticatable_type'))
-                    ->on($codes . '.' . $keyColumn, '=', $state->qualifyColumn('authenticatable_id'))
+            ->leftJoin($codes, static function (JoinClause $join) use ($state, $code, $codes, $generation): void {
+                $join->on($codes . '.' . $code->getOwnerHashName(), '=', $state->qualifyColumn('owner_hash'))
                     ->on($codes . '.' . $code->getGenerationName(), '=', $generation)
                     ->whereNull($codes . '.' . $code->getUsedAtName())
                     ->whereNull($codes . '.' . $code->getReplacedAtName());
             })
-            ->where($state->qualifyColumn('authenticatable_type'), $owner->type)
-            ->where($state->qualifyColumn('authenticatable_id'), $owner->key)
+            ->where($state->qualifyColumn('owner_hash'), $owner->hash())
             ->groupBy($generation, $generated)
             ->select([$generation, $generated, $count])
             ->first();
@@ -108,13 +104,14 @@ final readonly class RecoveryCodeRows
             ->whereNull($model->getReplacedAtName())
             ->update([$model->getReplacedAtName() => $model->fromDateTime($now)]);
 
-        [$typeColumn, $keyColumn] = self::ownerColumns($model);
+        // An application's model may name its owner columns differently.
+        $relation = $model->authenticatable();
 
         foreach ($hashes as $hash) {
             $code = $model->newInstance();
 
-            $code->setAttribute($typeColumn, $owner->type);
-            $code->setAttribute($keyColumn, $owner->key);
+            $code->setAttribute($relation->getMorphType(), $owner->type);
+            $code->setAttribute($relation->getForeignKeyName(), $owner->key);
             $code->setAttribute($model->getGenerationName(), $generation);
             $code->setAttribute($model->getCodeHashName(), $hash);
             self::save($code);
@@ -230,8 +227,7 @@ final readonly class RecoveryCodeRows
     private function lockedState(ProofOwner $owner): IdentityState
     {
         return IdentityState::query()
-            ->where('authenticatable_type', $owner->type)
-            ->where('authenticatable_id', $owner->key)
+            ->where('owner_hash', $owner->hash())
             ->lockForUpdate()
             ->firstOrFail();
     }
@@ -247,25 +243,8 @@ final readonly class RecoveryCodeRows
      */
     private function owned(Model&RecoveryCode $model, ProofOwner $owner): Builder
     {
-        [$typeColumn, $keyColumn] = self::ownerColumns($model);
-
         return WriteConnection::query($model->newQuery())
-            ->where($typeColumn, $owner->type)
-            ->where($keyColumn, $owner->key);
-    }
-
-    /**
-     * Read from the `authenticatable` relation, which an application's model
-     * may name differently.
-     *
-     * @param  \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\RecoveryCode  $model
-     * @return array{0: string, 1: string}
-     */
-    private static function ownerColumns(Model&RecoveryCode $model): array
-    {
-        $relation = $model->authenticatable();
-
-        return [$relation->getMorphType(), $relation->getForeignKeyName()];
+            ->where($model->getOwnerHashName(), $owner->hash());
     }
 
     /**

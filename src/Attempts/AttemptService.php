@@ -27,6 +27,7 @@ use SineMacula\Laravel\Mfa\Exceptions\UnsupportedIdentifierException;
 use SineMacula\Laravel\Mfa\Exceptions\WriteCanceledException;
 use SineMacula\Laravel\Mfa\Factors\FactorSummary;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
+use SineMacula\Laravel\Mfa\Proofs\ProofOwner;
 use SineMacula\Laravel\Mfa\Support\FactorStateTransaction;
 use SineMacula\Laravel\Mfa\Support\IdentityType;
 
@@ -583,8 +584,7 @@ final readonly class AttemptService
     private function identityState(array $subject, bool $locked = false): ?IdentityState
     {
         $query = WriteConnection::query(IdentityState::query())
-            ->where('authenticatable_type', $subject[0])
-            ->where('authenticatable_id', $subject[1]);
+            ->where('owner_hash', (new ProofOwner(...$subject))->hash());
 
         return ($locked ? $query->lockForUpdate() : $query)->first();
     }

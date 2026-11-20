@@ -104,4 +104,15 @@ final readonly class ProofOwner
     {
         return strlen($this->type) . ':' . $this->type . '|' . $this->key;
     }
+
+    /**
+     * The SHA-256 of the slot, which owner lookups compare in place of the type
+     * and key, as a collation may ignore case.
+     *
+     * @return string
+     */
+    public function hash(): string
+    {
+        return hash('sha256', $this->slot());
+    }
 }

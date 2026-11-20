@@ -6,7 +6,9 @@ namespace SineMacula\Laravel\Mfa\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
+use SineMacula\Laravel\Mfa\Concerns\HashesOwner;
 use SineMacula\Laravel\Mfa\Concerns\StoresTimesInUtc;
+use SineMacula\Laravel\Mfa\Contracts\OwnedRecord;
 use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Database\TableNames;
 
@@ -21,20 +23,22 @@ use SineMacula\Laravel\Mfa\Database\TableNames;
  * @property string $factor_id
  * @property string $authenticatable_type
  * @property string $authenticatable_id
+ * @property string $owner_hash
  * @property string $credential_id_hash
  * @property string $credential_id
  *
  * @internal
  */
-final class PasskeyAssociation extends Model
+final class PasskeyAssociation extends Model implements OwnedRecord
 {
-    use HasUlids, StoresTimesInUtc;
+    use HashesOwner, HasUlids, StoresTimesInUtc;
 
     /** @var list<string> */
     protected $fillable = [
         'factor_id',
         'authenticatable_type',
         'authenticatable_id',
+        'owner_hash',
         'credential_id_hash',
         'credential_id',
     ];
@@ -76,6 +80,7 @@ final class PasskeyAssociation extends Model
             'credential_id'        => 'string',
             'authenticatable_type' => 'string',
             'authenticatable_id'   => 'string',
+            'owner_hash'           => 'string',
         ];
     }
 }

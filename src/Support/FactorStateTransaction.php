@@ -174,11 +174,8 @@ final class FactorStateTransaction
      */
     private static function owned(Builder $query, string $type, string $key, EloquentFactor&Model $factorModel): Collection
     {
-        [$typeColumn, $keyColumn] = FactorOwnerColumns::of($factorModel);
-
         /** @var \Illuminate\Database\Eloquent\Collection<int, \Illuminate\Database\Eloquent\Model&\SineMacula\Laravel\Mfa\Contracts\EloquentFactor> */
-        return $query->where($typeColumn, $type)
-            ->where($keyColumn, $key)
+        return $query->where($factorModel->getOwnerHashName(), (new ProofOwner($type, $key))->hash())
             ->get()
             ->filter(static fn (EloquentFactor&Model $factor): bool => FactorOwnerColumns::owns($factor, $type, $key))
             ->values();

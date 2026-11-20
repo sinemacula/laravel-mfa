@@ -97,8 +97,7 @@ final readonly class PendingEnrollments
         $enrollment = self::locked(
             Enrollment::query()
                 ->where('grant_hash', $grantHash)
-                ->where('authenticatable_type', $owner->type)
-                ->where('authenticatable_id', $owner->key),
+                ->where('owner_hash', $owner->hash()),
         )->first();
         $id     = $enrollment?->factor_id;
         $factor = $factors->first(static fn (EloquentFactor&Model $candidate): bool => LockedFactors::idOf($candidate) === $id);
@@ -135,7 +134,7 @@ final readonly class PendingEnrollments
      */
     public function ofOwner(ProofOwner $owner): Collection
     {
-        return self::locked(Enrollment::query()->where('authenticatable_type', $owner->type)->where('authenticatable_id', $owner->key))
+        return self::locked(Enrollment::query()->where('owner_hash', $owner->hash()))
             ->orderBy('id')
             ->get()
             ->filter(static fn (Enrollment $enrollment): bool => $enrollment->authenticatable_type === $owner->type && $enrollment->authenticatable_id === $owner->key)

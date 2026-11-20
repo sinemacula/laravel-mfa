@@ -164,4 +164,13 @@ final class ProofOwnerTest extends TestCase
         self::assertSame('4:user|7', (new ProofOwner('user', '7'))->slot());
         self::assertNotSame((new ProofOwner('a|b', 'c'))->slot(), (new ProofOwner('a', 'b|c'))->slot());
     }
+
+    /**
+     * @return void
+     */
+    public function testTheHashIsOfTheSlotAndKeepsCase(): void
+    {
+        self::assertSame(hash('sha256', '4:user|ab12Cd'), (new ProofOwner('user', 'ab12Cd'))->hash());
+        self::assertNotSame((new ProofOwner('user', 'ab12Cd'))->hash(), (new ProofOwner('user', 'AB12CD'))->hash());
+    }
 }

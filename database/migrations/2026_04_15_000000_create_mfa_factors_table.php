@@ -33,10 +33,12 @@ return new class extends Migration {
         $schema->create($table, static function (Blueprint $blueprint) use ($table): void {
             $blueprint->ulid('id')->primary();
 
-            // Plain strings, not `morphs()`, so UUID and ULID keys fit.
+            // Plain strings, not `morphs()`, so UUID and ULID keys fit. Owners
+            // are found by their hash, as a collation may ignore case.
             $blueprint->string('authenticatable_type');
             $blueprint->string('authenticatable_id');
-            $blueprint->index(['authenticatable_type', 'authenticatable_id'], IndexName::for($table, '_owner_index'));
+            $blueprint->char('owner_hash', 64);
+            $blueprint->index('owner_hash', IndexName::for($table, '_owner_index'));
 
             // The driver name: `totp`, `email`, `sms`, `passkey` or custom.
             $blueprint->string('type', 64);

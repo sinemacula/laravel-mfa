@@ -30,11 +30,10 @@ cannot interleave.
 - `Support\FactorStateTransaction` is the one transaction of those changes: confirming an identity's first additional
   factor, replacing its recovery codes, removing a factor, a reset, and a verification racing any of them. It opens a
   transaction on the storage connection, locks the identity's row in `mfa_identity_states` first, then the identity's
-  factors, read `FOR UPDATE` from the write connection, and hands the callback those factors as stored under the lock,
-  matched to the owner exactly: a case-insensitive collation may read and lock another owner's too, and those are not
-  handed over. Every change takes the locks in that order, so two changes for one identity never wait on each other in
-  opposite orders: the second waits for the first to commit, then sees what it left, and checks its preconditions again
-  on it.
+  factors, read `FOR UPDATE` from the write connection by the owner hash, and hands the callback those factors as stored
+  under the lock, whose owner columns match the owner exactly. Every change takes the locks in that order, so two
+  changes for one identity never wait on each other in opposite orders: the second waits for the first to commit, then
+  sees what it left, and checks its preconditions again on it.
 - `Database\StorageTransaction` is every transaction the package opens on the storage connection, that one included.
   When its commit fails, the work waiting for that commit (`Database\AfterStorageCommit`: a proof, an event, a queued
   cookie) ends with it. Laravel 13 discards that work itself; Laravel 12 keeps it and runs it on the connection's next
@@ -45,13 +44,13 @@ cannot interleave.
   error for the caller to retry, as running it again would run a driver again and could deliver a second code. A failed
   query leaves it masked, and a concurrency failure in a nested transaction leaves it as Laravel's `DeadlockException`,
   masked too (see [Secrets in responses and logs](secrets-in-responses-and-logs.md)).
-- The identity's row is one per owner (a unique index on `authenticatable_type` and `authenticatable_id`), created by
-  the first change that needs it. The lock is an insert that updates the existing row's `updated_at` on a conflict,
-  which takes the row's exclusive lock in one statement on MySQL and PostgreSQL, also when two first changes race to
-  create it. A separate insert and `SELECT ... FOR UPDATE` would let two transactions share a lock on MySQL and then
-  deadlock upgrading it. SQLite serialises its writers, so the insert takes the database's write lock there. Every lock
-  of the row is `Database\IdentityStateRow::lock()`, advancing the verification generation's included, so there is one
-  way. An advance that then changes no row is refused with a `LogicException`, not answered with generation 0.
+- The identity's row is one per owner (a unique index on `owner_hash`), created by the first change that needs it. The
+  lock is an insert that updates the existing row's `updated_at` on a conflict, which takes the row's exclusive lock in
+  one statement on MySQL and PostgreSQL, also when two first changes race to create it. A separate insert and
+  `SELECT ... FOR UPDATE` would let two transactions share a lock on MySQL and then deadlock upgrading it. SQLite
+  serialises its writers, so the insert takes the database's write lock there. Every lock of the row is
+  `Database\IdentityStateRow::lock()`, advancing the verification generation's included, so there is one way. An advance
+  that then changes no row is refused with a `LogicException`, not answered with generation 0.
 - Reads that decide a verification, a lockout or who owns a factor go to the storage connection's write host
   (`Database\WriteConnection::query()`), so a replica that lags behind a lockout, a used code or a removed factor
   cannot answer them: the identity's factors as `FactorService::factors()` reads them, whether the identity has a
@@ -63,15 +62,16 @@ cannot interleave.
   table's name, a hash of the whole and the same suffix, so a long configured table name still migrates and the name is
   the same on every run.
 - The owner is recorded as on the factors table: its morph class for an Eloquent identity (honouring the morph map), its
-  class name otherwise, and its key as a string. Its columns are read from the owner relation of a blank instance of the
-  factor's class (`Support\FactorOwnerColumns`), never of a stored factor, on which Eloquent would build the owner: an
-  owner that is not an Eloquent model cannot be built, and is locked and matched by its columns all the same. A key that
-  is neither a non-empty string nor an integer is refused (`UnsupportedIdentifierException`) rather than collapsing
-  distinct identities onto one lock.
+  class name otherwise, and its key as a string, with `owner_hash`, the SHA-256 of the two, which every lookup and lock
+  compares, as a case-insensitive collation would match an owner whose key differs only in case. Its columns are read
+  from the owner relation of a blank instance of the factor's class (`Support\FactorOwnerColumns`), never of a stored
+  factor, on which Eloquent would build the owner: an owner that is not an Eloquent model cannot be built, and is locked
+  and matched all the same. A key that is neither a non-empty string nor an integer is refused
+  (`UnsupportedIdentifierException`) rather than collapsing distinct identities onto one lock.
 - Calls to another package that must be atomic with the change (revoking sessions, reporting a challenge's outcome, a
   passkey change gate) run inside the callback. An adapter whose own storage is on another connection cannot be atomic
   with it and must say so.
-- A locking lookup by a grant's hash or a credential's hash names the owner's columns in the same query, so another
+- A locking lookup by a grant's hash or a credential's hash names the owner's hash in the same query, so another
   identity's row is never returned or acted on. A credential someone else holds is found by the unlocked `exists()` and
   answered `not_found`. The one locking read that names no owner is a passkey association's lookup after a unique
   violation, when the credential is the question.
