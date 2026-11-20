@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Tests\Feature\Verification;
 
 use Carbon\Carbon;
+use Illuminate\Contracts\Hashing\Hasher;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -15,6 +16,7 @@ use SineMacula\Laravel\Mfa\Contracts\FreshnessGate;
 use SineMacula\Laravel\Mfa\Contracts\MfaEvent;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\SubjectTypeResolver;
+use SineMacula\Laravel\Mfa\Database\StorageConnection;
 use SineMacula\Laravel\Mfa\Enums\FactorChange;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
 use SineMacula\Laravel\Mfa\Enums\PendingAction;
@@ -98,6 +100,28 @@ final class RecoveryCodeIssuanceTest extends TestCase
         self::assertSame(10, RecoveryCode::query()->whereNull('replaced_at')->count());
         self::assertTrue($user->isMfaEnabled());
         self::assertCount(1, array_filter($this->reported, static fn (MfaEvent $event): bool => $event instanceof RecoveryCodesGenerated));
+    }
+
+    /**
+     * @return void
+     */
+    public function testASetIsHashedBeforeTheLockIsTaken(): void
+    {
+        $this->steppedUpPerson();
+
+        $hasher = \Mockery::mock(Hasher::class);
+        $hashed = [];
+
+        $hasher->shouldReceive('make')->andReturnUsing(static function (string $code) use (&$hashed): string {
+            $hashed[] = DB::connection(StorageConnection::name())->transactionLevel();
+
+            return 'hashed:' . $code;
+        });
+
+        $this->container()->instance(Hasher::class, $hasher);
+
+        self::assertTrue($this->mfa()->generateRecoveryCodes(Callers::current())->wasGenerated());
+        self::assertSame(array_fill(0, 10, 0), $hashed);
     }
 
     /**
