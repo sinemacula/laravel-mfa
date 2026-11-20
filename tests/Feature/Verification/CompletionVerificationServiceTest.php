@@ -16,11 +16,13 @@ use SineMacula\Laravel\Mfa\Attempts\ChallengeOutcome;
 use SineMacula\Laravel\Mfa\Codes\PackageChallengeGateway;
 use SineMacula\Laravel\Mfa\Codes\SendResult;
 use SineMacula\Laravel\Mfa\Context\SessionFirstFactor;
+use SineMacula\Laravel\Mfa\Contracts\ActiveTenantResolver;
 use SineMacula\Laravel\Mfa\Contracts\CombinationPolicy;
 use SineMacula\Laravel\Mfa\Contracts\IdentityRequirement;
 use SineMacula\Laravel\Mfa\Contracts\PendingCompletion;
 use SineMacula\Laravel\Mfa\Contracts\ProofStore;
 use SineMacula\Laravel\Mfa\Contracts\StepUp;
+use SineMacula\Laravel\Mfa\Contracts\TenantRequirement;
 use SineMacula\Laravel\Mfa\Enums\AssuranceLevel;
 use SineMacula\Laravel\Mfa\Enums\ChannelKind;
 use SineMacula\Laravel\Mfa\Enums\FailureReason;
@@ -51,7 +53,9 @@ use SineMacula\Laravel\Mfa\Verification\VerificationResult;
 use SineMacula\Laravel\Mfa\Verification\VerificationService;
 use Tests\Fixtures\Context\Callers;
 use Tests\Fixtures\Drivers\RecordingFactorDriver;
+use Tests\Fixtures\Requirements\FixedActiveTenant;
 use Tests\Fixtures\Requirements\FixedIdentityRequirement;
+use Tests\Fixtures\Requirements\FixedTenantRequirement;
 use Tests\Fixtures\Requirements\RecordingCombinationPolicy;
 use Tests\Fixtures\Requirements\SignInProofs;
 use Tests\Fixtures\Requirements\UnacceptingCombinationPolicy;
@@ -333,6 +337,31 @@ final class CompletionVerificationServiceTest extends TestCase
 
         self::assertTrue($second->evaluation?->meetsRequirement());
         self::assertCount(2, $this->furtherProofs($user));
+    }
+
+    /**
+     * Under an application that asks for nothing, and handed to the step-up as
+     * the caller gets it.
+     *
+     * @return void
+     */
+    public function testAStepUpIsEvaluatedAgainstTheActiveTenantsRequirement(): void
+    {
+        $this->enableApplication(['requirement' => 'never']);
+
+        $user   = $this->signedInPerson();
+        $factor = $this->totpFactor($user);
+        $seam   = new CheckingCompletion(self::SESSION);
+
+        $this->container()->instance(StepUp::class, $seam);
+        $this->container()->instance(ActiveTenantResolver::class, new FixedActiveTenant('tenant-1'));
+        $this->container()->instance(TenantRequirement::class, new FixedTenantRequirement(Requirement::none()->withPhishingResistance()));
+
+        $result = $this->mfa()->verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)));
+
+        self::assertTrue($result->isVerified());
+        self::assertSame([RequirementPart::PHISHING_RESISTANCE], $result->evaluation?->unmet);
+        self::assertSame($result->evaluation, $seam->accepted[0]->evaluation);
     }
 
     /**
@@ -659,5 +688,53 @@ final class CompletionVerificationServiceTest extends TestCase
         self::assertSame([], $this->furtherProofs($user));
         self::assertTrue($result->isVerified());
         self::assertSame($seam->accepted[0]->proof, $result->proof);
+    }
+
+    /**
+     * Whether the sign-in is pending decides the seam, never the purpose.
+     *
+     * @return void
+     */
+    public function testAnActiveSignInVerifyingForSignInIsHandedToTheStepUp(): void
+    {
+        $user       = $this->signedInPerson();
+        $factor     = $this->emailFactor($user);
+        $completion = new \stdClass;
+        $stepUp     = new CheckingCompletion(self::SESSION, completion: $completion);
+        $pending    = new CheckingCompletion('unused', false);
+
+        $this->container()->instance(StepUp::class, $stepUp);
+        $this->container()->instance(PendingCompletion::class, $pending);
+
+        [$challenge, $code] = $this->sentCode($factor, Purpose::SIGN_IN);
+
+        $result = $this->mfa()->verify(Callers::current(), Submission::challenge($factor->id, $challenge, $code), Purpose::SIGN_IN);
+
+        self::assertSame($completion, $result->completion());
+        self::assertCount(1, $stepUp->accepted);
+        self::assertSame(Purpose::SIGN_IN, $stepUp->accepted[0]->proof?->binding->purpose);
+        self::assertSame([], $pending->accepted);
+    }
+
+    /**
+     * @return void
+     */
+    public function testAPendingSignInIsHandedToTheCompletion(): void
+    {
+        $user       = $this->person();
+        $factor     = $this->totpFactor($user);
+        $completion = new \stdClass;
+        $stepUp     = new CheckingCompletion('unused', false);
+        $pending    = new CheckingCompletion('unused', false, $completion);
+
+        $this->pendingSession($user);
+        $this->container()->instance(StepUp::class, $stepUp);
+        $this->container()->instance(PendingCompletion::class, $pending);
+
+        $result = $this->mfa()->verify(Callers::current(), Submission::factor($factor->id, AuthenticatorApp::code($factor)));
+
+        self::assertSame($completion, $result->completion());
+        self::assertCount(1, $pending->accepted);
+        self::assertSame([], $stepUp->accepted);
     }
 }
