@@ -6,8 +6,8 @@ namespace Tests\Unit\Concerns;
 
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
-use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Date;
 use PHPUnit\Framework\Attributes\CoversTrait;
 use SineMacula\Laravel\Mfa\Concerns\StoresTimesInUtc;
 use SineMacula\Laravel\Mfa\Models\IdentityState;
@@ -43,6 +43,7 @@ final class StoresTimesInUtcTest extends TestCase
     protected function tearDown(): void
     {
         Carbon::setTestNow();
+        Date::useDefault();
 
         parent::tearDown();
     }
@@ -90,7 +91,8 @@ final class StoresTimesInUtcTest extends TestCase
     }
 
     /**
-     * A day before the month, which a generic parse would misread.
+     * A day before the month, which a generic parse would misread, read through
+     * the configured date class.
      *
      * @return void
      */
@@ -112,11 +114,13 @@ final class StoresTimesInUtcTest extends TestCase
             }
         };
 
+        Date::use(CarbonImmutable::class);
+
         $model->setRawAttributes(['at' => '12/10/2026 01:30:00']);
 
         $at = $model->getAttribute('at');
 
-        self::assertInstanceOf(CarbonInterface::class, $at);
+        self::assertInstanceOf(CarbonImmutable::class, $at);
         self::assertSame(CarbonImmutable::parse('2026-10-12 01:30:00', 'UTC')->getTimestamp(), $at->getTimestamp());
     }
 

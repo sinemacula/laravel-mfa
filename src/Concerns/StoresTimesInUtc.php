@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace SineMacula\Laravel\Mfa\Concerns;
 
 use Carbon\CarbonInterface;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Date;
 
 /**
@@ -22,7 +23,7 @@ trait StoresTimesInUtc
      * without an offset is a UTC time.
      *
      * @param  mixed  $value
-     * @return \Carbon\CarbonInterface
+     * @return \Illuminate\Support\Carbon
      */
     protected function asDateTime(mixed $value): CarbonInterface
     {
@@ -31,11 +32,11 @@ trait StoresTimesInUtc
         }
 
         try {
-            $time = Date::createFromFormat($this->getDateFormat(), $value, 'UTC');
+            $time = Carbon::createFromFormat($this->getDateFormat(), $value, 'UTC');
         } catch (\InvalidArgumentException) {
             $time = null;
         }
 
-        return ($time ?? Date::parse($value, 'UTC'))->utc();
+        return Date::instance($time ?? Date::parse($value, 'UTC'))->utc();
     }
 }
